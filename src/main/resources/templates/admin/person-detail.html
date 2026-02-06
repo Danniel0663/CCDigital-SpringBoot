@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Detalle Persona · CCDigital</title>
+
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+
+<body class="bg-light">
+<nav class="navbar bg-white border-bottom">
+  <div class="container">
+    <a class="navbar-brand fw-semibold text-decoration-none" th:href="@{/admin/dashboard}">
+      <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
+    </a>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/persons}">
+        <i class="bi bi-arrow-left"></i> Volver
+      </a>
+      <a class="btn btn-sm btn-outline-primary" th:href="@{/admin/sync}">
+        <i class="bi bi-arrow-repeat"></i> Sync
+      </a>
+      <a class="btn btn-sm btn-outline-dark" href="/issuer">
+        <i class="bi bi-building me-1"></i>Módulo Emisor
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main class="container py-4">
+
+  <!-- Header persona -->
+  <div class="bg-white border rounded-4 shadow-sm p-4 mb-3">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+      <div>
+        <h1 class="h4 mb-1" th:text="${person.fullName}">Nombre</h1>
+        <p class="text-muted mb-0">
+          <span class="me-2"><strong>ID:</strong> <span th:text="${person.id}"></span></span>
+          ·
+          <span class="ms-2">
+            <strong>Documento:</strong>
+            <span th:text="${person.idType}"></span>
+            <span th:text="${person.idNumber}"></span>
+          </span>
+        </p>
+      </div>
+
+      <div class="text-muted small">
+        <div><i class="bi bi-envelope me-1"></i><span th:text="${person.email}"></span></div>
+        <div><i class="bi bi-telephone me-1"></i><span th:text="${person.phone}"></span></div>
+      </div>
+    </div>
+
+    <hr class="my-3">
+
+    <div class="alert alert-info mb-0">
+      <i class="bi bi-info-circle me-2"></i>
+      Los documentos se cargan desde el <b>Módulo Emisor</b>. Aquí solo se <b>aprueban/rechazan</b>.
+    </div>
+  </div>
+
+  <!-- Documentos -->
+  <div class="bg-white border rounded-4 shadow-sm p-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="h6 text-uppercase text-muted mb-0">Documentos de la persona</h2>
+      <span class="badge text-bg-light border" th:text="${#lists.size(docs)} + ' registros'">0</span>
+    </div>
+
+    <div th:if="${#lists.isEmpty(docs)}" class="text-center text-muted py-4">
+      No hay documentos aún.
+    </div>
+
+    <div class="accordion" id="docsAccordion" th:if="${!#lists.isEmpty(docs)}">
+      <div class="accordion-item" th:each="pd : ${docs}">
+        <h2 class="accordion-header" th:id="${'h' + pd.id}">
+          <button class="accordion-button collapsed" type="button"
+                  data-bs-toggle="collapse"
+                  th:attr="data-bs-target=${'#c' + pd.id}"
+                  aria-expanded="false">
+            <div class="w-100 d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <div>
+                <div class="fw-semibold">
+                  #<span th:text="${pd.id}"></span>
+                  · <span th:text="${pd.documentDefinition.title}">Documento</span>
+                </div>
+                <div class="text-muted small">
+                  Emisor: <span th:text="${pd.issuerEntity != null ? pd.issuerEntity.name : '—'}">—</span>
+                  · Catálogo: <span th:text="${pd.documentDefinition.issuingEntity}">—</span>
+                </div>
+              </div>
+
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <!-- estado del documento -->
+                <span class="badge text-bg-secondary" th:text="${pd.status}"></span>
+
+                <!-- review status badge -->
+                <span class="badge"
+                      th:text="${pd.reviewStatus}"
+                      th:classappend="
+                        ${pd.reviewStatus.name() == 'APPROVED'} ? ' text-bg-success' :
+                        (${pd.reviewStatus.name() == 'REJECTED'} ? ' text-bg-danger' : ' text-bg-warning')">
+                  PENDING
+                </span>
+
+                <span class="text-muted small">
+                  Issue: <span th:text="${pd.issueDate}"></span>
+                  · Expiry: <span th:text="${pd.expiryDate}"></span>
+                </span>
+              </div>
+            </div>
+          </button>
+        </h2>
+
+        <div class="accordion-collapse collapse"
+             th:id="${'c' + pd.id}"
+             data-bs-parent="#docsAccordion">
+          <div class="accordion-body">
+
+            <!-- Archivos -->
+            <div class="table-responsive mb-3">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                  <th>Archivo</th>
+                  <th>MIME</th>
+                  <th class="text-end">Tamaño</th>
+                  <th>SHA256</th>
+                  <th class="text-end">Acción</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="f : ${pd.files}">
+                  <td class="fw-semibold" th:text="${f.originalName}"></td>
+                  <td class="text-muted" th:text="${f.mimeType}"></td>
+                  <td class="text-end text-muted">
+                    <span th:text="${f.byteSize}"></span> bytes
+                  </td>
+                  <td>
+                    <code class="small" th:text="${f.hashSha256}"></code>
+                  </td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary"
+                       th:href="@{/api/person-documents/{pdId}/files/{fileId}(pdId=${pd.id},fileId=${f.id})}"
+                       target="_blank">
+                      <i class="bi bi-download me-1"></i>Ver
+                    </a>
+                  </td>
+                </tr>
+
+                <tr th:if="${#lists.isEmpty(pd.files)}">
+                  <td colspan="5" class="text-center text-muted py-3">
+                    No hay archivos asociados a este PersonDocument.
+                  </td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Revisión -->
+            <div class="p-3 border rounded-3 bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-semibold">
+                  <i class="bi bi-clipboard-check me-2"></i>Revisión (Admin)
+                </div>
+                <div class="text-muted small">
+                  Revisado: <span th:text="${pd.reviewedAt != null ? pd.reviewedAt : '—'}">—</span>
+                </div>
+              </div>
+
+              <form th:action="@{/admin/person-documents/{personDocId}/review(personDocId=${pd.id})}"
+                    method="post"
+                    class="row g-2">
+                <input type="hidden" name="personId" th:value="${person.id}"/>
+
+                <div class="col-12 col-lg-4">
+                  <label class="form-label small text-muted mb-1">Estado</label>
+                  <select class="form-select" name="status" required>
+                    <option value="PENDING"  th:selected="${pd.reviewStatus.name() == 'PENDING'}">PENDING</option>
+                    <option value="APPROVED" th:selected="${pd.reviewStatus.name() == 'APPROVED'}">APPROVED</option>
+                    <option value="REJECTED" th:selected="${pd.reviewStatus.name() == 'REJECTED'}">REJECTED</option>
+                  </select>
+                </div>
+
+                <div class="col-12 col-lg-8">
+                  <label class="form-label small text-muted mb-1">Observaciones</label>
+                  <input class="form-control" type="text" name="notes"
+                         maxlength="500"
+                         th:value="${pd.reviewNotes}"
+                         placeholder="Ej: Documento ilegible / Falta firma / OK"/>
+                </div>
+
+                <div class="col-12 d-flex gap-2">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-2"></i>Guardar revisión
+                  </button>
+                  <span class="text-muted small align-self-center">
+                    (El campo “reviewed_by_user” queda null hasta implementar login)
+                  </span>
+                </div>
+              </form>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
