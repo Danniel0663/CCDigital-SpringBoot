@@ -10,19 +10,9 @@ import java.util.Optional;
 
 public interface PersonDocumentRepository extends JpaRepository<PersonDocument, Long> {
 
-    @Query("select distinct pd " +
-           "from PersonDocument pd " +
-           "left join fetch pd.files " +
-           "left join fetch pd.documentDefinition " +
-           "left join fetch pd.issuerEntity " +
-           "where pd.person.id = :personId")
+    @Query("select distinct pd from PersonDocument pd left join fetch pd.files where pd.person.id = :personId")
     List<PersonDocument> findByPersonIdWithFiles(@Param("personId") Long personId);
 
-    @Query("select pd " +
-           "from PersonDocument pd " +
-           "left join fetch pd.files " +
-           "left join fetch pd.documentDefinition " +
-           "left join fetch pd.issuerEntity " +
-           "where pd.id = :id")
+    @Query("select pd from PersonDocument pd left join fetch pd.files where pd.id = :id")
     Optional<PersonDocument> findByIdWithFiles(@Param("id") Long id);
 }

@@ -12,10 +12,6 @@ public class DocumentDefinitionService {
 
     private final DocumentDefinitionRepository repository;
 
-    public List<DocumentDefinition> findAllowedByIssuer(Long issuerId) {
-        return repository.findAllowedByIssuer(issuerId);
-    }
-
     public DocumentDefinitionService(DocumentDefinitionRepository repository) {
         this.repository = repository;
     }

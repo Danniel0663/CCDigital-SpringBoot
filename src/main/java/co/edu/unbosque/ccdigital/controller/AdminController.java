@@ -6,7 +6,6 @@ import co.edu.unbosque.ccdigital.dto.SyncPersonForm;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
-import co.edu.unbosque.ccdigital.entity.ReviewStatus;
 import co.edu.unbosque.ccdigital.service.DocumentDefinitionService;
 import co.edu.unbosque.ccdigital.service.ExternalToolsService;
 import co.edu.unbosque.ccdigital.service.PersonDocumentService;
@@ -51,13 +50,6 @@ public class AdminController {
         model.addAttribute("idTypes", IdType.values());
         return "admin/persons";
     }
-    @GetMapping("/persons/new")
-    public String newPerson(Model model) {
-        model.addAttribute("form", new PersonCreateForm());
-        model.addAttribute("idTypes", IdType.values());
-        return "admin/person_form"; // <-- tu archivo person_form.html
-    }
-
 
     @PostMapping("/persons")
     public String createPerson(@ModelAttribute("form") PersonCreateForm form) {
@@ -81,18 +73,11 @@ public class AdminController {
 
         model.addAttribute("person", person);
         model.addAttribute("docs", docs);
+
+        model.addAttribute("uploadForm", new DocumentUploadForm());
+        model.addAttribute("definitions", documentDefinitionService.findAll());
         return "admin/person-detail";
     }
-   // @PostMapping("/person-documents/{personDocId}/review")
-   // public String reviewPersonDocument(@PathVariable Long personDocId,
-    //                                   @RequestParam("status") ReviewStatus status,
-  //                                     @RequestParam(value = "notes", required = false) String notes,
-  //                                     @RequestParam("personId") Long personId) {
-//
- //.review(personDocId, status, notes);
-  //      return "redirect:/admin/persons/" + personId;
-  //  }
-
 
     @PostMapping("/persons/{id}/upload")
     public String uploadDoc(@PathVariable Long id,
