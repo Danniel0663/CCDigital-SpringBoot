@@ -48,20 +48,8 @@ public class DocumentDefinition {
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = false)
     @JsonIgnore
     private List<FileRecord> files = new ArrayList<>();
-    @ManyToMany(mappedBy = "documentDefinitions")
-    @JsonIgnore
-    private List<IssuingEntity> issuers = new java.util.ArrayList<>();
 
-    public List<IssuingEntity> getIssuers() { return issuers; }
-    public void setIssuers(List<IssuingEntity> issuers) { this.issuers = issuers; }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-		this.createdAt = createdAt;
-	}
-	public void setUpdatedAt(LocalDateTime updatedAt) {
-		this.updatedAt = updatedAt;
-	}
-	public Long getId() { return id; }
+    public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
     public Category getCategory() { return category; }
