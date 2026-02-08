@@ -50,6 +50,14 @@ public class AdminController {
         model.addAttribute("idTypes", IdType.values());
         return "admin/persons";
     }
+    
+    @GetMapping("/persons/new")
+    public String newPerson(Model model) {
+        model.addAttribute("form", new PersonCreateForm());
+        model.addAttribute("idTypes", IdType.values());
+        return "admin/person_form"; // <-- tu archivo person_form.html
+    }
+
 
     @PostMapping("/persons")
     public String createPerson(@ModelAttribute("form") PersonCreateForm form) {
@@ -63,10 +71,10 @@ public class AdminController {
         p.setBirthdate(form.getBirthdate());
 
         Person saved = personService.createPersonAndFolder(p);
-        return "redirect:/admin/persons/" + saved.getId();
+        return "redirect:admin/persons/" + saved.getId();
     }
 
-    @GetMapping("/persons/{id}")
+    @GetMapping("/persons/{id:\\d+}")
     public String personDetail(@PathVariable Long id, Model model) {
         Person person = personService.findById(id).orElseThrow();
         List<PersonDocument> docs = personDocumentService.listByPerson(id);
@@ -78,6 +86,7 @@ public class AdminController {
         model.addAttribute("definitions", documentDefinitionService.findAll());
         return "admin/person-detail";
     }
+
 
     @PostMapping("/persons/{id}/upload")
     public String uploadDoc(@PathVariable Long id,
