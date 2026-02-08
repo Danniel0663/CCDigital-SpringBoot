@@ -1,17 +1,47 @@
 package co.edu.unbosque.ccdigital;
 
-import co.edu.unbosque.ccdigital.config.ExternalToolsProperties;
 import co.edu.unbosque.ccdigital.config.FileStorageProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
+/**
+ * Punto de entrada principal de la aplicación <b>CCDigital</b>.
+ * <p>
+ * Esta clase inicializa el contexto de <i>Spring Boot</i> y realiza el arranque de la aplicación,
+ * habilitando además la carga de propiedades de configuración asociadas al almacenamiento de archivos.
+ * </p>
+ *
+ * <h2>Responsabilidades</h2>
+ * <ul>
+ *   <li>Arrancar la aplicación Spring Boot.</li>
+ *   <li>Habilitar el enlace (binding) de propiedades de configuración mediante {@link EnableConfigurationProperties}.</li>
+ * </ul>
+ *
+ * <h2>Configuración habilitada</h2>
+ * <ul>
+ *   <li>{@link FileStorageProperties}: propiedades relacionadas con la configuración de almacenamiento de archivos.</li>
+ * </ul>
+ *
+ * @author Danniel
+ * @since 1.0
+ */
 @SpringBootApplication
 @EnableConfigurationProperties({
         FileStorageProperties.class
 })
 public class CcDigitalApplication {
 
+    /**
+     * Método principal (entry point) que ejecuta el arranque de la aplicación.
+     * <p>
+     * Este método delega en {@link SpringApplication#run(Class, String...)} para
+     * inicializar el contenedor de Spring, cargar los beans, aplicar la configuración
+     * y dejar la aplicación lista para atender solicitudes.
+     * </p>
+     *
+     * @param args argumentos de línea de comandos utilizados durante el arranque.
+     */
     public static void main(String[] args) {
         SpringApplication.run(CcDigitalApplication.class, args);
     }
