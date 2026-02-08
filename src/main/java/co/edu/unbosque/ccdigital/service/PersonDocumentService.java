@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -19,17 +20,20 @@ public class PersonDocumentService {
     private final PersonDocumentRepository personDocumentRepository;
     private final FileRecordRepository fileRecordRepository;
     private final FileStorageService fileStorageService;
+    private final IssuingEntityService issuingEntityService;
 
     public PersonDocumentService(PersonRepository personRepository,
                                  DocumentDefinitionService documentDefinitionService,
                                  PersonDocumentRepository personDocumentRepository,
                                  FileRecordRepository fileRecordRepository,
-                                 FileStorageService fileStorageService) {
+                                 FileStorageService fileStorageService,
+                                 IssuingEntityService issuingEntityService) {
         this.personRepository = personRepository;
         this.documentDefinitionService = documentDefinitionService;
         this.personDocumentRepository = personDocumentRepository;
         this.fileRecordRepository = fileRecordRepository;
         this.fileStorageService = fileStorageService;
+        this.issuingEntityService = issuingEntityService;
     }
 
     public List<PersonDocument> listByPerson(Long personId) {
@@ -41,24 +45,48 @@ public class PersonDocumentService {
                 .orElseThrow(() -> new IllegalArgumentException("PersonDocument no encontrado"));
     }
 
-    // API: crea PersonDocument y FileRecord si ya viene storagePath
+    /**
+     * API: crea PersonDocument y opcionalmente un FileRecord si ya viene storagePath.
+     * - Asigna issuerEntity según def.issuingEntity (tabla entities)
+     * - Asigna reviewStatus = PENDING por defecto
+     * - Genera relación issuer<->document en entity_document_definitions
+     */
     @Transactional
     public PersonDocument create(PersonDocumentRequest request) {
+
         Person person = personRepository.findById(request.getPersonId())
                 .orElseThrow(() -> new IllegalArgumentException("Persona no encontrada"));
 
         DocumentDefinition def = documentDefinitionService.findById(request.getDocumentId())
                 .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + request.getDocumentId()));
 
+        // Resolver emisor (issuer) por nombre (issuingEntity del catálogo)
+        IssuingEntity issuer = issuingEntityService.resolveEmitterByName(def.getIssuingEntity());
+
         PersonDocument pd = new PersonDocument();
         pd.setPerson(person);
         pd.setDocumentDefinition(def);
+
         pd.setStatus(request.getStatus() != null ? request.getStatus() : PersonDocumentStatus.VIGENTE);
         pd.setIssueDate(request.getIssueDate());
         pd.setExpiryDate(request.getExpiryDate());
 
+        // NUEVO:
+        pd.setIssuerEntity(issuer);
+        pd.setReviewStatus(ReviewStatus.PENDING);
+
+        // (por ahora) submitted/reviewed user quedan null hasta implementar login
+        // pd.setSubmittedByEntityUserId(null);
+        // pd.setReviewedByUserId(null);
+
         PersonDocument saved = personDocumentRepository.save(pd);
 
+        // Asegurar relación emisor-documento (tabla entity_document_definitions)
+        if (issuer != null) {
+            issuingEntityService.ensureIssuerHasDocument(issuer, def.getId());
+        }
+
+        // Si viene storagePath, crear FileRecord básico
         if (request.getStoragePath() != null && !request.getStoragePath().isBlank()) {
             FileRecord fr = new FileRecord();
             fr.setPersonDocument(saved);
@@ -71,12 +99,17 @@ public class PersonDocumentService {
             fr.setStoredAs(FileStoredAs.PATH);
             fr.setVersion(1);
             fileRecordRepository.save(fr);
+
+            // para que quede reflejado en el objeto en memoria
+            saved.addFile(fr);
         }
 
         return saved;
     }
 
-    // ADMIN: subir archivo y calcular hash automáticamente
+    /**
+     * ADMIN: sube archivo, calcula hash, crea FileRecord y deja el PersonDocument en PENDING.
+     */
     @Transactional
     public PersonDocument uploadForPerson(Long personId,
                                           Long documentId,
@@ -91,13 +124,20 @@ public class PersonDocumentService {
         DocumentDefinition def = documentDefinitionService.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + documentId));
 
-        // 1) Crear person_document
+        IssuingEntity issuer = issuingEntityService.resolveEmitterByName(def.getIssuingEntity());
+
+        // 1) Crear person_document (con issuer + review status)
         PersonDocument pd = new PersonDocument();
         pd.setPerson(person);
         pd.setDocumentDefinition(def);
+
         pd.setStatus(status != null ? status : PersonDocumentStatus.VIGENTE);
         pd.setIssueDate(issueDate);
         pd.setExpiryDate(expiryDate);
+
+        // NUEVO:
+        pd.setIssuerEntity(issuer);
+        pd.setReviewStatus(ReviewStatus.PENDING);
 
         PersonDocument savedPd = personDocumentRepository.save(pd);
 
@@ -119,10 +159,31 @@ public class PersonDocumentService {
         fr.setVersion(1);
 
         fileRecordRepository.save(fr);
-
-        // para que al devolverlo ya venga el archivo en la lista (si OpenInView está off, igual el repo fetch ayuda)
         savedPd.addFile(fr);
 
+        // Asegurar relación emisor-documento (tabla entity_document_definitions)
+        if (issuer != null) {
+            issuingEntityService.ensureIssuerHasDocument(issuer, def.getId());
+        }
+
         return savedPd;
+    }
+
+    /**
+     * Cambia el estado de revisión y guarda auditoría mínima.
+     * Login pendiente => reviewedByUserId = null por ahora.
+     */
+    @Transactional
+    public void review(Long personDocumentId, ReviewStatus status, String notes) {
+
+        PersonDocument pd = personDocumentRepository.findById(personDocumentId)
+                .orElseThrow(() -> new IllegalArgumentException("PersonDocument no encontrado"));
+
+        pd.setReviewStatus(status != null ? status : ReviewStatus.PENDING);
+        pd.setReviewNotes((notes != null && !notes.isBlank()) ? notes.trim() : null);
+        pd.setReviewedAt(LocalDateTime.now());
+        pd.setReviewedByUserId(null); // login después
+
+        personDocumentRepository.save(pd);
     }
 }
