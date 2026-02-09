@@ -8,7 +8,7 @@ package co.edu.unbosque.ccdigital.entity;
  *
  * @author Danniel
  * @author Yeison
- * @since 1.0
+ * @since 3.0
  */
 public enum EntityStatus {
 
