@@ -21,9 +21,9 @@
 </nav>
 
 <main class="container py-4">
-  <div class="mb-3">
+  <div class="bg-white border rounded-4 shadow-sm p-4 mb-3">
     <h1 class="h4 mb-1">Emisores</h1>
-    <p class="text-muted mb-0">Empresas/entidades emisoras y sus tipos de documento.</p>
+    <p class="text-muted mb-0">Gestiona emisores y los tipos de documento permitidos.</p>
   </div>
 
   <div class="bg-white border rounded-4 shadow-sm p-3 p-md-4">
@@ -31,23 +31,30 @@
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
         <tr>
-          <th style="width:90px;">ID</th>
-          <th>Nombre</th>
-          <th class="text-end" style="width:180px;">Docs emitidos</th>
-          <th class="text-end" style="width:180px;">Tipos documento</th>
-          <th class="text-end" style="width:120px;">Acción</th>
+          <th style="width: 90px;">ID</th>
+          <th>Emisor</th>
+          <th class="text-end" style="width: 160px;">Docs emitidos</th>
+          <th class="text-end" style="width: 160px;">Tipos permitidos</th>
+          <th class="text-end" style="width: 160px;">Acción</th>
         </tr>
         </thead>
+
         <tbody>
+        <tr th:if="${#lists.isEmpty(stats)}">
+          <td colspan="5" class="text-center text-muted py-4">
+            No hay emisores para mostrar.
+          </td>
+        </tr>
+
         <tr th:each="s : ${stats}">
-          <td th:text="${s.id}"></td>
-          <td class="fw-semibold" th:text="${s.name}"></td>
-          <td class="text-end" th:text="${s.documentosEmitidos}"></td>
-          <td class="text-end" th:text="${s.tiposDocumento}"></td>
+          <td th:text="${s.id}">1</td>
+          <td class="fw-semibold" th:text="${s.name}">Emisor</td>
+          <td class="text-end" th:text="${s.documentosEmitidos}">0</td>
+          <td class="text-end" th:text="${s.tiposDocumento}">0</td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-primary"
                th:href="@{/admin/issuers/{id}(id=${s.id})}">
-              <i class="bi bi-eye me-1"></i>Ver
+              <i class="bi bi-gear me-1"></i>Gestionar tipos
             </a>
           </td>
         </tr>
