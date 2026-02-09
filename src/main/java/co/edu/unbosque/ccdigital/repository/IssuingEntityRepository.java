@@ -6,19 +6,38 @@ import co.edu.unbosque.ccdigital.entity.IssuingEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
-import co.edu.unbosque.ccdigital.entity.EntityStatus;
-import co.edu.unbosque.ccdigital.entity.EntityType;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repositorio JPA para la entidad {@link IssuingEntity}.
+ *
+ * <p>Incluye búsquedas por atributos funcionales (tipo/estado) y una consulta de
+ * agregación para estadísticas de emisores.</p>
+ */
 public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Long> {
 
+    /**
+     * Busca una entidad por tipo y nombre, ignorando mayúsculas/minúsculas.
+     *
+     * @param entityType tipo de entidad
+     * @param name nombre de la entidad
+     * @return {@link Optional} con la entidad encontrada o vacío si no existe
+     */
     Optional<IssuingEntity> findByEntityTypeAndNameIgnoreCase(EntityType entityType, String name);
 
-    // ✅ Para el módulo issuer: listar emisores aprobados
+    /**
+     * Lista entidades filtrando por tipo y estado, ordenadas por nombre.
+     *
+     * @param entityType tipo de entidad
+     * @param status estado de entidad
+     * @return lista de entidades
+     */
     List<IssuingEntity> findByEntityTypeAndStatusOrderByNameAsc(EntityType entityType, EntityStatus status);
 
-    // Para el listado admin con conteos
+    /**
+     * Proyección para estadísticas agregadas de emisores.
+     */
     interface IssuerStats {
         Long getId();
         String getName();
@@ -26,7 +45,15 @@ public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Lo
         Long getTiposDocumento();
     }
 
-    // ✅ Sin text blocks (compatibilidad)
+    /**
+     * Retorna estadísticas de emisores:
+     * <ul>
+     *   <li>Total de documentos emitidos (person_documents asociados)</li>
+     *   <li>Total de tipos de documento habilitados (relación entity_document_definitions)</li>
+     * </ul>
+     *
+     * @return lista de estadísticas ordenadas por documentos emitidos descendente y nombre ascendente
+     */
     @Query(value =
             "SELECT " +
             "  e.id AS id, " +
@@ -41,5 +68,4 @@ public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Lo
             "ORDER BY documentosEmitidos DESC, e.name ASC",
             nativeQuery = true)
     List<IssuerStats> findIssuerStats();
-    
 }

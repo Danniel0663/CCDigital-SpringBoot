@@ -16,22 +16,46 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.Normalizer;
 
+/**
+ * Servicio para almacenamiento y recuperación de archivos en el sistema de archivos.
+ *
+ * <p>La ubicación base se define mediante {@link FileStorageProperties}.</p>
+ */
 @Service
 public class FileStorageService {
 
     private final FileStorageProperties properties;
 
+    /**
+     * Crea el servicio.
+     *
+     * @param properties propiedades de almacenamiento
+     */
     public FileStorageService(FileStorageProperties properties) {
         this.properties = properties;
     }
 
+    /**
+     * Obtiene la ruta base configurada para almacenamiento, en forma absoluta y normalizada.
+     *
+     * @return ruta base
+     */
     private Path getBasePath() {
         return Paths.get(properties.getBasePath())
                 .toAbsolutePath()
                 .normalize();
     }
 
-    /** Crea (si no existe) la carpeta de la persona: ApellidosNombres */
+    /**
+     * Asegura la existencia de la carpeta asociada a una persona.
+     *
+     * <p>El nombre de la carpeta se construye a partir de apellidos y nombres sin espacios,
+     * sin acentos y restringido a caracteres alfanuméricos.</p>
+     *
+     * @param person persona
+     * @return ruta de la carpeta de la persona
+     * @throws IllegalStateException si no se puede crear el directorio
+     */
     public Path ensurePersonFolder(Person person) {
         try {
             String folderName = buildPersonFolderName(person);
@@ -43,6 +67,12 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * Construye el nombre de carpeta para una persona.
+     *
+     * @param person persona
+     * @return nombre de carpeta normalizado
+     */
     private String buildPersonFolderName(Person person) {
         String last = person.getLastName() != null ? person.getLastName() : "";
         String first = person.getFirstName() != null ? person.getFirstName() : "";
@@ -55,18 +85,34 @@ public class FileStorageService {
         return joined;
     }
 
-    /** Ruta relativa (desde basePath) para un archivo de esa persona. */
+    /**
+     * Construye la ruta relativa (desde basePath) para un archivo asociado a una persona.
+     *
+     * <p>El nombre del archivo se normaliza usando {@code getFileName()} para reducir
+     * riesgos de path traversal.</p>
+     *
+     * @param person persona propietaria
+     * @param filename nombre del archivo
+     * @return ruta relativa con separador {@code /}
+     */
     public String buildRelativePath(Person person, String filename) {
         Path base = getBasePath();
         Path personFolder = ensurePersonFolder(person);
-        Path target = personFolder.resolve(filename);
+
+        String safeName = Paths.get(filename).getFileName().toString();
+
+        Path target = personFolder.resolve(safeName);
         Path rel = base.relativize(target);
         return rel.toString().replace(File.separatorChar, '/');
     }
 
     /**
-     * Copia el archivo al disco en la carpeta de la persona, calcula tamaño y hash,
-     * y devuelve esos datos.
+     * Almacena un archivo en la carpeta de la persona, calculando tamaño y hash SHA-256.
+     *
+     * @param person persona propietaria
+     * @param file archivo recibido por multipart
+     * @return información del archivo almacenado
+     * @throws IllegalStateException si ocurre un error de E/S o si el destino queda fuera de basePath
      */
     public StoredFileInfo storePersonFile(Person person, MultipartFile file) {
         String originalName = file.getOriginalFilename();
@@ -74,10 +120,16 @@ public class FileStorageService {
             originalName = "upload-" + System.currentTimeMillis();
         }
 
+        originalName = Paths.get(originalName).getFileName().toString();
+
         try {
             Path base = getBasePath();
             Path personFolder = ensurePersonFolder(person);
             Path target = personFolder.resolve(originalName).normalize();
+
+            if (!target.toAbsolutePath().startsWith(base)) {
+                throw new IllegalStateException("Ruta inválida de almacenamiento (fuera de basePath).");
+            }
 
             try (InputStream in = file.getInputStream()) {
                 Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
@@ -95,6 +147,13 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * Calcula el hash SHA-256 de un archivo.
+     *
+     * @param file ruta del archivo
+     * @return hash SHA-256 en hexadecimal
+     * @throws IllegalStateException si ocurre un error de lectura o no existe el algoritmo
+     */
     private String calculateSha256(Path file) {
         try (InputStream in = Files.newInputStream(file)) {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -114,34 +173,62 @@ public class FileStorageService {
         }
     }
 
-    // ==== descarga ====
-
+    /**
+     * Resuelve una ruta absoluta a partir del {@code storagePath} almacenado en {@link FileRecord}.
+     *
+     * <p>Convierte separadores Windows a formato estándar y valida que la ruta resultante
+     * permanezca dentro de {@code basePath}.</p>
+     *
+     * @param fileRecord registro del archivo
+     * @return ruta absoluta validada
+     * @throws IllegalStateException si el {@code storagePath} es vacío o sale de basePath
+     */
     public Path resolvePath(FileRecord fileRecord) {
         String relative = fileRecord.getStoragePath();
         if (relative == null || relative.isBlank()) {
             throw new IllegalStateException("storagePath vacío para FileRecord id=" + fileRecord.getId());
         }
 
-        // ✅ Corrección mínima: aceptar rutas guardadas con "\" (Windows) y "/" (Linux)
         relative = relative.replace("\\", "/");
 
-        return getBasePath()
-                .resolve(relative)
-                .normalize()
-                .toAbsolutePath();
+        Path base = getBasePath();
+        Path resolved = base.resolve(relative).normalize().toAbsolutePath();
+
+        if (!resolved.startsWith(base)) {
+            throw new IllegalStateException("Ruta inválida (fuera de basePath).");
+        }
+
+        return resolved;
     }
 
+    /**
+     * Carga un archivo como {@link Resource} para descarga o visualización.
+     *
+     * @param fileRecord registro del archivo
+     * @return recurso del sistema de archivos
+     */
     public Resource loadAsResource(FileRecord fileRecord) {
         Path path = resolvePath(fileRecord);
         return new FileSystemResource(path);
     }
 
+    /**
+     * DTO con información del archivo almacenado.
+     */
     public static class StoredFileInfo {
         private final String relativePath;
         private final long size;
         private final String sha256;
         private final String originalName;
 
+        /**
+         * Construye información del archivo almacenado.
+         *
+         * @param relativePath ruta relativa desde basePath
+         * @param size tamaño en bytes
+         * @param sha256 hash SHA-256 en hexadecimal
+         * @param originalName nombre original del archivo
+         */
         public StoredFileInfo(String relativePath, long size, String sha256, String originalName) {
             this.relativePath = relativePath;
             this.size = size;

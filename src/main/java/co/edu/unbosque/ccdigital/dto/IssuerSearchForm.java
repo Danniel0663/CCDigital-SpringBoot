@@ -2,13 +2,20 @@ package co.edu.unbosque.ccdigital.dto;
 
 import co.edu.unbosque.ccdigital.entity.IdType;
 
+/**
+ * DTO para búsqueda de personas por tipo y número de identificación.
+ */
 public class IssuerSearchForm {
-    private Long issuerId;
-    private IdType idType;
-    private String idNumber;
 
-    public Long getIssuerId() { return issuerId; }
-    public void setIssuerId(Long issuerId) { this.issuerId = issuerId; }
+    /**
+     * Tipo de identificación.
+     */
+    private IdType idType;
+
+    /**
+     * Número de identificación.
+     */
+    private String idNumber;
 
     public IdType getIdType() { return idType; }
     public void setIdType(IdType idType) { this.idType = idType; }

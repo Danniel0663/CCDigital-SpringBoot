@@ -1,87 +1,30 @@
-<!doctype html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Detalle Emisor · CCDigital</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-</head>
-<body class="bg-light">
-
-<nav class="navbar bg-white border-bottom">
-  <div class="container">
-    <a class="navbar-brand fw-semibold text-decoration-none" th:href="@{/admin/dashboard}">
-      <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
-    </a>
-    <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/issuers}">
-      <i class="bi bi-arrow-left"></i> Volver
-    </a>
-  </div>
-</nav>
-
-<main class="container py-4">
   <div class="bg-white border rounded-4 shadow-sm p-4 mb-3">
-    <h1 class="h4 mb-1" th:text="${issuer.name}">Emisor</h1>
-    <p class="text-muted mb-0">
-      ID: <span th:text="${issuer.id}"></span>
-    </p>
-  </div>
+    <h2 class="h6 text-uppercase text-muted mb-3">Credenciales del emisor (Login)</h2>
 
-  <div class="row g-3">
-    <div class="col-12 col-lg-5">
-      <div class="bg-white border rounded-4 shadow-sm p-4">
-        <h2 class="h6 text-uppercase text-muted mb-3">Agregar tipo de documento</h2>
-        <form th:action="@{/admin/issuers/{id}/documents/add(id=${issuer.id})}" method="post">
-          <div class="mb-2">
-            <select class="form-select" name="documentId" required>
-              <option th:each="d : ${allDocs}"
-                      th:value="${d.id}"
-                      th:text="${d.title + ' - ' + d.issuingEntity}">
-              </option>
-            </select>
-          </div>
-          <button class="btn btn-primary w-100" type="submit">
-            <i class="bi bi-plus-circle me-2"></i>Agregar
-          </button>
-        </form>
-      </div>
+    <div th:if="${credOk != null}" class="alert alert-success mb-2">
+      Credenciales guardadas correctamente.
+    </div>
+    <div th:if="${credErr != null}" class="alert alert-danger mb-2" th:text="${credErr}">
+      Error
     </div>
 
-    <div class="col-12 col-lg-7">
-      <div class="bg-white border rounded-4 shadow-sm p-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 class="h6 text-uppercase text-muted mb-0">Tipos asociados</h2>
-          <span class="badge text-bg-light border" th:text="${#lists.size(issuer.documentDefinitions)} + ' tipos'">0</span>
-        </div>
-
-        <div th:if="${#lists.isEmpty(issuer.documentDefinitions)}" class="text-muted">
-          No hay tipos asociados aún.
-        </div>
-
-        <div class="list-group" th:if="${!#lists.isEmpty(issuer.documentDefinitions)}">
-          <div class="list-group-item d-flex justify-content-between align-items-start gap-2"
-               th:each="d : ${issuer.documentDefinitions}">
-            <div>
-              <div class="fw-semibold" th:text="${d.title}">Doc</div>
-              <div class="text-muted small" th:text="${d.issuingEntity}"></div>
-            </div>
-
-            <form th:action="@{/admin/issuers/{id}/documents/remove(id=${issuer.id})}" method="post">
-              <input type="hidden" name="documentId" th:value="${d.id}">
-              <button class="btn btn-sm btn-outline-danger" type="submit">
-                <i class="bi bi-trash"></i>
-              </button>
-            </form>
-          </div>
-        </div>
-
-      </div>
-    </div>
+<form th:action="@{/admin/issuers/{id}/credentials(id=${issuer.id})}" method="post" class="row g-2">
+  <div class="col-12 col-lg-6">
+    <label class="form-label">Correo (usuario de login)</label>
+    <input class="form-control" name="email" required
+           th:value="${entityUser != null ? entityUser.email : ''}">
+    <div class="form-text">El emisor iniciará sesión usando este correo.</div>
   </div>
 
-</main>
+  <div class="col-12 col-lg-6">
+    <label class="form-label">Nueva contraseña</label>
+    <input class="form-control" type="password" name="password" required>
+    <div class="form-text">Se guarda en BD como hash (bcrypt).</div>
+  </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+  <div class="col-12 mt-2">
+    <button class="btn btn-dark" type="submit">Guardar credenciales</button>
+  </div>
+</form>
+
+  </div>

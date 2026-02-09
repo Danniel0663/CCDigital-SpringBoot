@@ -6,7 +6,6 @@ import co.edu.unbosque.ccdigital.dto.SyncPersonForm;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
-import co.edu.unbosque.ccdigital.entity.ReviewStatus;
 import co.edu.unbosque.ccdigital.service.DocumentDefinitionService;
 import co.edu.unbosque.ccdigital.service.ExternalToolsService;
 import co.edu.unbosque.ccdigital.service.PersonDocumentService;
@@ -18,6 +17,17 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+/**
+ * Controlador MVC para funcionalidades administrativas.
+ *
+ * <p>Gestiona vistas y acciones relacionadas con:</p>
+ * <ul>
+ *   <li>Gestión de personas y sus documentos</li>
+ *   <li>Sincronizaciones con herramientas externas</li>
+ * </ul>
+ *
+ * @since 1.0.0
+ */
 @Controller
 @RequestMapping("/admin")
 public class AdminController {
@@ -27,6 +37,14 @@ public class AdminController {
     private final DocumentDefinitionService documentDefinitionService;
     private final ExternalToolsService externalToolsService;
 
+    /**
+     * Constructor con inyección de dependencias.
+     *
+     * @param personService servicio de personas
+     * @param personDocumentService servicio de documentos por persona
+     * @param documentDefinitionService servicio de definiciones de documentos
+     * @param externalToolsService servicio de ejecución de herramientas externas
+     */
     public AdminController(PersonService personService,
                            PersonDocumentService personDocumentService,
                            DocumentDefinitionService documentDefinitionService,
@@ -37,13 +55,22 @@ public class AdminController {
         this.externalToolsService = externalToolsService;
     }
 
+    /**
+     * Vista principal del panel administrativo.
+     *
+     * @return nombre de la vista del dashboard
+     */
     @GetMapping({"", "/", "/dashboard"})
     public String dashboard() {
         return "admin/dashboard";
     }
 
-    // ===== PERSONAS =====
-
+    /**
+     * Lista las personas registradas y prepara el formulario de creación.
+     *
+     * @param model modelo MVC
+     * @return vista de listado de personas
+     */
     @GetMapping("/persons")
     public String persons(Model model) {
         model.addAttribute("people", personService.findAll());
@@ -51,14 +78,26 @@ public class AdminController {
         model.addAttribute("idTypes", IdType.values());
         return "admin/persons";
     }
+
+    /**
+     * Presenta el formulario de creación de persona.
+     *
+     * @param model modelo MVC
+     * @return vista del formulario
+     */
     @GetMapping("/persons/new")
     public String newPerson(Model model) {
         model.addAttribute("form", new PersonCreateForm());
         model.addAttribute("idTypes", IdType.values());
-        return "admin/person_form"; // <-- tu archivo person_form.html
+        return "admin/person_form";
     }
 
-
+    /**
+     * Crea una persona y prepara su carpeta de almacenamiento.
+     *
+     * @param form formulario de creación de persona
+     * @return redirección al detalle de la persona creada
+     */
     @PostMapping("/persons")
     public String createPerson(@ModelAttribute("form") PersonCreateForm form) {
         Person p = new Person();
@@ -74,6 +113,13 @@ public class AdminController {
         return "redirect:/admin/persons/" + saved.getId();
     }
 
+    /**
+     * Visualiza el detalle de una persona, su listado de documentos y prepara el formulario de carga.
+     *
+     * @param id identificador de la persona
+     * @param model modelo MVC
+     * @return vista del detalle de la persona
+     */
     @GetMapping("/persons/{id}")
     public String personDetail(@PathVariable Long id, Model model) {
         Person person = personService.findById(id).orElseThrow();
@@ -81,19 +127,20 @@ public class AdminController {
 
         model.addAttribute("person", person);
         model.addAttribute("docs", docs);
+        model.addAttribute("uploadForm", new DocumentUploadForm());
+        model.addAttribute("allDocs", documentDefinitionService.findAll());
+
         return "admin/person-detail";
     }
-   // @PostMapping("/person-documents/{personDocId}/review")
-   // public String reviewPersonDocument(@PathVariable Long personDocId,
-    //                                   @RequestParam("status") ReviewStatus status,
-  //                                     @RequestParam(value = "notes", required = false) String notes,
-  //                                     @RequestParam("personId") Long personId) {
-//
- //.review(personDocId, status, notes);
-  //      return "redirect:/admin/persons/" + personId;
-  //  }
 
-
+    /**
+     * Carga un documento asociado a una persona.
+     *
+     * @param id identificador de la persona
+     * @param uploadForm formulario con metadatos del documento
+     * @param file archivo a cargar
+     * @return redirección al detalle de la persona
+     */
     @PostMapping("/persons/{id}/upload")
     public String uploadDoc(@PathVariable Long id,
                             @ModelAttribute("uploadForm") DocumentUploadForm uploadForm,
@@ -111,16 +158,26 @@ public class AdminController {
         return "redirect:/admin/persons/" + id;
     }
 
-    // ===== SYNC =====
-
+    /**
+     * Muestra la vista de sincronización.
+     *
+     * @param model modelo MVC
+     * @return vista de sincronización
+     */
     @GetMapping("/sync")
     public String syncPage(Model model) {
         model.addAttribute("personForm", new SyncPersonForm());
         model.addAttribute("idTypes", IdType.values());
-        model.addAttribute("result", null); // opcional, pero evita null checks raros
+        model.addAttribute("result", null);
         return "admin/sync";
     }
 
+    /**
+     * Ejecuta la sincronización global con Fabric.
+     *
+     * @param model modelo MVC
+     * @return vista de sincronización con el resultado de ejecución
+     */
     @PostMapping("/sync/fabric/all")
     public String fabricAll(Model model) {
         ExternalToolsService.ExecResult res = externalToolsService.runFabricSyncAll();
@@ -131,6 +188,13 @@ public class AdminController {
         return "admin/sync";
     }
 
+    /**
+     * Ejecuta la sincronización en Fabric para una persona identificada por tipo y número.
+     *
+     * @param form formulario con datos de identificación
+     * @param model modelo MVC
+     * @return vista de sincronización con el resultado de ejecución
+     */
     @PostMapping("/sync/fabric/person")
     public String fabricPerson(@ModelAttribute("personForm") SyncPersonForm form, Model model) {
         ExternalToolsService.ExecResult res =
@@ -142,7 +206,12 @@ public class AdminController {
         return "admin/sync";
     }
 
-    // ✅ ESTE ERA EL QUE FALTABA / ESTABA MAL RUTEADO
+    /**
+     * Ejecuta la emisión de credenciales en Indy usando la información de base de datos.
+     *
+     * @param model modelo MVC
+     * @return vista de sincronización con el resultado de ejecución
+     */
     @PostMapping("/sync/indy/issue")
     public String indyIssue(Model model) {
         ExternalToolsService.ExecResult res = externalToolsService.runIndyIssueFromDb();
@@ -152,15 +221,4 @@ public class AdminController {
         model.addAttribute("idTypes", IdType.values());
         return "admin/sync";
     }
-
-    // (Opcional) Si tú tienes una vista admin/tools aparte, déjalo así PERO SIN DOBLE /admin:
-    // @PostMapping("/tools/indy/issue")
-    // public String runIndyIssueTools(Model model) {
-    //     ExternalToolsService.ExecResult res = externalToolsService.runIndyIssueFromDb();
-    //     model.addAttribute("indyExitCode", res.getExitCode());
-    //     model.addAttribute("indyStdout", res.getStdout());
-    //     model.addAttribute("indyStderr", res.getStderr());
-    //     return "admin/tools";
-    // }
-
 }

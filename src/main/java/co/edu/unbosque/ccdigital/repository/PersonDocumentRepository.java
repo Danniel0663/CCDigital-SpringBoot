@@ -8,8 +8,27 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repositorio JPA para la entidad {@link PersonDocument}.
+ *
+ * <p>Incluye consultas con {@code fetch join} para cargar archivos y relaciones
+ * asociadas evitando problemas de inicialización perezosa.</p>
+ */
 public interface PersonDocumentRepository extends JpaRepository<PersonDocument, Long> {
 
+    /**
+     * Lista documentos de una persona incluyendo:
+     * <ul>
+     *   <li>Archivos asociados</li>
+     *   <li>Definición del documento</li>
+     *   <li>Entidad emisora</li>
+     * </ul>
+     *
+     * <p>El {@code distinct} evita duplicados por la relación uno-a-muchos con archivos.</p>
+     *
+     * @param personId identificador de la persona
+     * @return lista de documentos de la persona con relaciones cargadas
+     */
     @Query("select distinct pd " +
            "from PersonDocument pd " +
            "left join fetch pd.files " +
@@ -18,6 +37,12 @@ public interface PersonDocumentRepository extends JpaRepository<PersonDocument, 
            "where pd.person.id = :personId")
     List<PersonDocument> findByPersonIdWithFiles(@Param("personId") Long personId);
 
+    /**
+     * Obtiene un documento por id incluyendo archivos, definición y emisor.
+     *
+     * @param id identificador del documento de persona
+     * @return {@link Optional} con el documento si existe
+     */
     @Query("select pd " +
            "from PersonDocument pd " +
            "left join fetch pd.files " +

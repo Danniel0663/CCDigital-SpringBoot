@@ -2,7 +2,11 @@ package co.edu.unbosque.ccdigital.dto;
 
 import co.edu.unbosque.ccdigital.entity.IdType;
 
+/**
+ * DTO para captura de identificación de una persona en procesos de sincronización.
+ */
 public class SyncPersonForm {
+
     private IdType idType;
     private String idNumber;
 

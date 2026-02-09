@@ -7,6 +7,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Definición de documento (catálogo), persistida en la tabla {@code documents}.
+ *
+ * <p>Esta entidad describe el tipo de documento, su categoría, entidad emisora y metadatos.
+ * Las instancias de documentos cargados por personas se representan mediante {@link PersonDocument}.</p>
+ */
 @Entity
 @Table(name = "documents")
 public class DocumentDefinition {
@@ -15,6 +21,9 @@ public class DocumentDefinition {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Categoría asociada al documento.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -40,7 +49,6 @@ public class DocumentDefinition {
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
-    // OJO: mappedBy debe coincidir con el nombre del atributo en PersonDocument
     @OneToMany(mappedBy = "documentDefinition", cascade = CascadeType.ALL, orphanRemoval = false)
     @JsonIgnore
     private List<PersonDocument> personDocuments = new ArrayList<>();
@@ -48,20 +56,12 @@ public class DocumentDefinition {
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = false)
     @JsonIgnore
     private List<FileRecord> files = new ArrayList<>();
+
     @ManyToMany(mappedBy = "documentDefinitions")
     @JsonIgnore
-    private List<IssuingEntity> issuers = new java.util.ArrayList<>();
+    private List<IssuingEntity> issuers = new ArrayList<>();
 
-    public List<IssuingEntity> getIssuers() { return issuers; }
-    public void setIssuers(List<IssuingEntity> issuers) { this.issuers = issuers; }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-		this.createdAt = createdAt;
-	}
-	public void setUpdatedAt(LocalDateTime updatedAt) {
-		this.updatedAt = updatedAt;
-	}
-	public Long getId() { return id; }
+    public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
     public Category getCategory() { return category; }
@@ -90,4 +90,10 @@ public class DocumentDefinition {
 
     public List<FileRecord> getFiles() { return files; }
     public void setFiles(List<FileRecord> files) { this.files = files; }
+
+    public List<IssuingEntity> getIssuers() { return issuers; }
+    public void setIssuers(List<IssuingEntity> issuers) { this.issuers = issuers; }
+
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

@@ -4,7 +4,11 @@ import co.edu.unbosque.ccdigital.entity.IdType;
 
 import java.time.LocalDate;
 
+/**
+ * DTO para creación de una persona desde el módulo administrativo.
+ */
 public class PersonCreateForm {
+
     private IdType idType;
     private String idNumber;
     private String firstName;

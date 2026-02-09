@@ -4,6 +4,11 @@ import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Archivo asociado a una definición de documento y opcionalmente a un documento cargado por persona.
+ *
+ * <p>Permite almacenamiento por ruta (PATH), contenido binario (BLOB) o mecanismo externo (S3).</p>
+ */
 @Entity
 @Table(name = "files")
 public class FileRecord {
@@ -12,12 +17,16 @@ public class FileRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // documents.id
+    /**
+     * Definición de documento (catálogo) a la que pertenece el archivo.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_id", nullable = false)
     private DocumentDefinition document;
 
-    // person_documents.id
+    /**
+     * Documento específico de una persona. Puede ser nulo cuando el archivo no esté ligado a una carga individual.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "person_document_id")
     private PersonDocument personDocument;
@@ -48,9 +57,15 @@ public class FileRecord {
     @Column(name = "version", nullable = false)
     private Integer version = 1;
 
+    /**
+     * Identificador del usuario administrativo que cargó el archivo, cuando aplique.
+     */
     @Column(name = "uploaded_by_user")
     private Long uploadedByUserId;
 
+    /**
+     * Fecha de carga gestionada por la base de datos.
+     */
     @Column(name = "uploaded_at", nullable = false, updatable = false, insertable = false)
     private LocalDateTime createdAt;
 

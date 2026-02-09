@@ -7,6 +7,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Documento asociado a una persona, persistido en la tabla {@code person_documents}.
+ *
+ * <p>Incluye estado de vigencia, fechas, notas, emisor (si aplica) y estado de revisión.</p>
+ */
 @Entity
 @Table(
         name = "person_documents",
@@ -23,10 +28,16 @@ public class PersonDocument {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Persona propietaria del documento.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "person_id", nullable = false)
     private Person person;
 
+    /**
+     * Definición del documento (catálogo).
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_id", nullable = false)
     private DocumentDefinition documentDefinition;
@@ -47,16 +58,16 @@ public class PersonDocument {
     @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private LocalDateTime createdAt;
 
-    // ✅ NUEVO: emisor (FK -> entities.id)
+    /**
+     * Entidad emisora que remitió el documento, cuando el flujo proviene del portal de emisores.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "issuer_entity_id")
     private IssuingEntity issuerEntity;
 
-    // ✅ NUEVO: quién lo radicó (por ahora solo ID, sin login)
     @Column(name = "submitted_by_entity_user_id")
     private Long submittedByEntityUserId;
 
-    // ✅ NUEVO: workflow de revisión
     @Enumerated(EnumType.STRING)
     @Column(name = "review_status", nullable = false, length = 10)
     private ReviewStatus reviewStatus = ReviewStatus.PENDING;
@@ -70,10 +81,14 @@ public class PersonDocument {
     @Column(name = "review_notes", length = 500)
     private String reviewNotes;
 
+    /**
+     * Archivos asociados al documento.
+     *
+     * <p>Se utiliza relación bidireccional. Los métodos {@link #addFile(FileRecord)}
+     * y {@link #removeFile(FileRecord)} aseguran consistencia entre ambas entidades.</p>
+     */
     @OneToMany(mappedBy = "personDocument", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FileRecord> files = new ArrayList<>();
-
-    // ===== getters/setters =====
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -120,11 +135,21 @@ public class PersonDocument {
     public List<FileRecord> getFiles() { return files; }
     public void setFiles(List<FileRecord> files) { this.files = files; }
 
+    /**
+     * Asocia un archivo a este documento y sincroniza la referencia inversa.
+     *
+     * @param file archivo a asociar
+     */
     public void addFile(FileRecord file) {
         files.add(file);
         file.setPersonDocument(this);
     }
 
+    /**
+     * Elimina la asociación de un archivo y limpia la referencia inversa.
+     *
+     * @param file archivo a desasociar
+     */
     public void removeFile(FileRecord file) {
         files.remove(file);
         file.setPersonDocument(null);

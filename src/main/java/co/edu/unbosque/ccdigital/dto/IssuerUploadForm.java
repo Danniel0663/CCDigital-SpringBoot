@@ -4,17 +4,38 @@ import co.edu.unbosque.ccdigital.entity.PersonDocumentStatus;
 
 import java.time.LocalDate;
 
+/**
+ * DTO para carga de documentos por parte de un emisor.
+ *
+ * <p>Incluye el identificador de la persona, el tipo de documento autorizado
+ * para el emisor y los metadatos del documento.</p>
+ */
 public class IssuerUploadForm {
-    private Long issuerId;
+
+    /**
+     * Identificador de la persona a la que se asociará el documento.
+     */
     private Long personId;
+
+    /**
+     * Identificador de la definición del documento a cargar.
+     */
     private Long documentId;
 
+    /**
+     * Estado del documento (por defecto: VIGENTE).
+     */
     private PersonDocumentStatus status = PersonDocumentStatus.VIGENTE;
-    private LocalDate issueDate;
-    private LocalDate expiryDate;
 
-    public Long getIssuerId() { return issuerId; }
-    public void setIssuerId(Long issuerId) { this.issuerId = issuerId; }
+    /**
+     * Fecha de emisión del documento.
+     */
+    private LocalDate issueDate;
+
+    /**
+     * Fecha de vencimiento del documento.
+     */
+    private LocalDate expiryDate;
 
     public Long getPersonId() { return personId; }
     public void setPersonId(Long personId) { this.personId = personId; }

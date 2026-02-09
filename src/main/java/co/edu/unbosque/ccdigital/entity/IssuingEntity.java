@@ -6,6 +6,12 @@ import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Entidad emisora, persistida en la tabla {@code entities}.
+ *
+ * <p>Una entidad emisora puede tener permisos sobre múltiples definiciones de documentos
+ * mediante la tabla de relación {@code entity_document_definitions}.</p>
+ */
 @Entity
 @Table(name = "entities")
 public class IssuingEntity {
@@ -14,21 +20,17 @@ public class IssuingEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // En tu BD: e.name
     @Column(name = "name", nullable = false, length = 300)
     private String name;
 
-    // En tu BD: e.entity_type ('EMISOR')
     @Enumerated(EnumType.STRING)
     @Column(name = "entity_type", nullable = false, length = 30)
     private EntityType entityType = EntityType.EMISOR;
 
-    // En tu BD: e.status ('APROBADA')
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private EntityStatus status = EntityStatus.APROBADA;
 
-    // Relación con documents por entity_document_definitions
     @ManyToMany
     @JoinTable(
             name = "entity_document_definitions",

@@ -8,6 +8,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Persona registrada en el sistema, persistida en la tabla {@code persons}.
+ */
 @Entity
 @Table(name = "persons")
 public class Person {
@@ -75,6 +78,11 @@ public class Person {
     public List<PersonDocument> getPersonDocuments() { return personDocuments; }
     public void setPersonDocuments(List<PersonDocument> personDocuments) { this.personDocuments = personDocuments; }
 
+    /**
+     * Retorna el nombre completo sin persistirlo como columna.
+     *
+     * @return nombre y apellido concatenados
+     */
     @Transient
     public String getFullName() {
         return (firstName == null ? "" : firstName) + " " + (lastName == null ? "" : lastName);

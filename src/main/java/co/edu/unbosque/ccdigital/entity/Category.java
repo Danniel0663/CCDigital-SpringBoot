@@ -6,6 +6,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Categoría de documentos, persistida en la tabla {@code categories}.
+ *
+ * <p>El campo {@code slug} es gestionado por la base de datos (columna generada), por lo cual
+ * no se permite inserción ni actualización desde la aplicación.</p>
+ */
 @Entity
 @Table(name = "categories")
 public class Category {

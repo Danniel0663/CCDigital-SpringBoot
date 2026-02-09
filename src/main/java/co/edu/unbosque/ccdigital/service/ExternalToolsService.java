@@ -9,72 +9,103 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+/**
+ * Servicio para ejecutar integraciones externas (Fabric e Indy) mediante comandos del sistema.
+ *
+ * <p>Los comandos se parametrizan por configuración a través de {@link ExternalToolsProperties}.</p>
+ */
 @Service
 public class ExternalToolsService {
 
     private final ExternalToolsProperties props;
 
+    /**
+     * Crea el servicio.
+     *
+     * @param props propiedades de herramientas externas
+     */
     public ExternalToolsService(ExternalToolsProperties props) {
         this.props = props;
     }
 
-    // =======================
-    // FABRIC
-    // =======================
-
-    /** Método principal (el que ya tenías) */
+    /**
+     * Ejecuta la sincronización de todos los registros hacia Fabric, usando el script configurado.
+     *
+     * @return resultado de ejecución del proceso
+     */
     public ExecResult runFabricSyncAll() {
         String workdir = safe(props.getFabric().getWorkdir());
         String script = safe(props.getFabric().getScript());
 
-        // node sync-db-to-ledger.js --all
-        String cmd = "node " + script + " --all";
+        String cmd = "node " + shellQuote(script) + " --all";
         return runCommand(workdir, cmd);
     }
 
-    /** Método principal (el que ya tenías) */
+    /**
+     * Ejecuta sincronización hacia Fabric para una persona específica.
+     *
+     * @param idType tipo de identificación
+     * @param idNumber número de identificación
+     * @return resultado de ejecución del proceso
+     */
     public ExecResult runFabricSyncPerson(String idType, String idNumber) {
         String workdir = safe(props.getFabric().getWorkdir());
         String script = safe(props.getFabric().getScript());
 
-        // node sync-db-to-ledger.js --person CC 1019983896
-        String cmd = "node " + script + " --person " + safe(idType) + " " + safe(idNumber);
+        String cmd = "node " + shellQuote(script) + " --person " + shellQuote(idType) + " " + shellQuote(idNumber);
         return runCommand(workdir, cmd);
     }
 
-    // ✅ Aliases para compatibilidad con tu AdminController (errores: runFabricAll/runFabricPerson)
+    /**
+     * Alias de compatibilidad: sincronización total Fabric.
+     *
+     * @return resultado de ejecución
+     */
     public ExecResult runFabricAll() {
         return runFabricSyncAll();
     }
 
+    /**
+     * Alias de compatibilidad: sincronización de persona Fabric.
+     *
+     * @param idType tipo de identificación
+     * @param idNumber número de identificación
+     * @return resultado de ejecución
+     */
     public ExecResult runFabricPerson(String idType, String idNumber) {
         return runFabricSyncPerson(idType, idNumber);
     }
 
-    // =======================
-    // INDY
-    // =======================
-
+    /**
+     * Ejecuta la emisión de credenciales Indy a partir de la base de datos, usando el script configurado.
+     *
+     * @return resultado de ejecución del proceso
+     */
     public ExecResult runIndyIssueFromDb() {
         String workdir = safe(props.getIndy().getWorkdir());
         String venvActivate = safe(props.getIndy().getVenvActivate());
         String script = safe(props.getIndy().getScript());
 
-        // cd workdir && source venv/bin/activate && python3 issue_credentials_from_db.py
-        // Nota: corremos en bash -lc para que "source" funcione
-        String cmd = "cd " + shellQuote(workdir) + " && " + venvActivate + " && python3 " + script;
+        String cmd = "cd " + shellQuote(workdir) + " && " + venvActivate + " && python3 " + shellQuote(script);
         return runCommand(workdir, cmd);
     }
 
-    // ✅ Alias por si en tu controller está como runIndyIssue()
+    /**
+     * Alias de compatibilidad: emisión Indy.
+     *
+     * @return resultado de ejecución
+     */
     public ExecResult runIndyIssue() {
         return runIndyIssueFromDb();
     }
 
-    // =======================
-    // EJECUCIÓN GENÉRICA
-    // =======================
-
+    /**
+     * Ejecuta un comando del sistema usando {@code bash -lc} y captura stdout/stderr.
+     *
+     * @param workdir directorio de trabajo; si es nulo o vacío, se usa el directorio por defecto del proceso
+     * @param cmd comando a ejecutar
+     * @return resultado de ejecución con salida estándar y de error
+     */
     private ExecResult runCommand(String workdir, String cmd) {
         List<String> command = List.of("bash", "-lc", cmd);
 
@@ -91,7 +122,6 @@ public class ExternalToolsService {
         try {
             Process p = pb.start();
 
-            // Leer stdout/stderr en paralelo para evitar bloqueos
             Thread tOut = new Thread(() -> readStream(p.getInputStream(), out));
             Thread tErr = new Thread(() -> readStream(p.getErrorStream(), err));
             tOut.start();
@@ -104,11 +134,17 @@ public class ExternalToolsService {
             return new ExecResult(workdir, cmd, code, out.toString(), err.toString());
 
         } catch (Exception e) {
-            err.append("Exception ejecutando comando: ").append(e.getMessage()).append('\n');
+            err.append("Excepción ejecutando comando: ").append(e.getMessage()).append('\n');
             return new ExecResult(workdir, cmd, code, out.toString(), err.toString());
         }
     }
 
+    /**
+     * Lee un {@link java.io.InputStream} y acumula su contenido en un {@link StringBuilder}.
+     *
+     * @param is stream de entrada
+     * @param sb acumulador de salida
+     */
     private void readStream(java.io.InputStream is, StringBuilder sb) {
         try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
             String line;
@@ -116,24 +152,34 @@ public class ExternalToolsService {
                 sb.append(line).append('\n');
             }
         } catch (Exception ex) {
-            sb.append("Exception leyendo stream: ").append(ex.getMessage()).append('\n');
+            sb.append("Excepción leyendo stream: ").append(ex.getMessage()).append('\n');
         }
     }
 
+    /**
+     * Normaliza una cadena para evitar nulos y recortar espacios.
+     *
+     * @param s cadena original
+     * @return cadena segura
+     */
     private String safe(String s) {
         return s == null ? "" : s.trim();
     }
 
-    // Para rutas con espacios cuando construimos "cd ..."
+    /**
+     * Realiza quoting seguro para argumentos en shell.
+     *
+     * @param s argumento
+     * @return argumento entrecomillado para shell
+     */
     private String shellQuote(String s) {
-        if (s == null) return "";
-        // envuelve en comillas simples y escapa comillas simples internas
+        if (s == null) return "''";
         return "'" + s.replace("'", "'\"'\"'") + "'";
     }
 
-    // =======================
-    // DTO RESULTADO (Thymeleaf friendly)
-    // =======================
+    /**
+     * Resultado de una ejecución externa.
+     */
     public static class ExecResult {
         private final String workingDir;
         private final String command;
@@ -141,6 +187,15 @@ public class ExternalToolsService {
         private final String stdout;
         private final String stderr;
 
+        /**
+         * Construye un resultado de ejecución.
+         *
+         * @param workingDir directorio de trabajo usado
+         * @param command comando ejecutado
+         * @param exitCode código de salida del proceso
+         * @param stdout salida estándar
+         * @param stderr salida de error
+         */
         public ExecResult(String workingDir, String command, int exitCode, String stdout, String stderr) {
             this.workingDir = workingDir;
             this.command = command;
@@ -149,24 +204,10 @@ public class ExternalToolsService {
             this.stderr = stderr;
         }
 
-        public String getWorkingDir() {
-            return workingDir;
-        }
-
-        public String getCommand() {
-            return command;
-        }
-
-        public int getExitCode() {
-            return exitCode;
-        }
-
-        public String getStdout() {
-            return stdout;
-        }
-
-        public String getStderr() {
-            return stderr;
-        }
+        public String getWorkingDir() { return workingDir; }
+        public String getCommand() { return command; }
+        public int getExitCode() { return exitCode; }
+        public String getStdout() { return stdout; }
+        public String getStderr() { return stderr; }
     }
 }

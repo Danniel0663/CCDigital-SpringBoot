@@ -4,15 +4,33 @@ import co.edu.unbosque.ccdigital.entity.PersonDocumentStatus;
 
 import java.time.LocalDate;
 
+/**
+ * DTO utilizado por la API para crear un registro de documento asociado a una persona.
+ *
+ * <p>Incluye metadatos del documento y campos de soporte para almacenamiento/huella
+ * (ruta, tipo MIME y hash SHA-256) cuando aplique.</p>
+ */
 public class PersonDocumentRequest {
+
     private Long personId;
     private Long documentId;
     private PersonDocumentStatus status;
     private LocalDate issueDate;
     private LocalDate expiryDate;
 
+    /**
+     * Ruta o referencia de almacenamiento del archivo (cuando se almacena fuera de la BD).
+     */
     private String storagePath;
+
+    /**
+     * Tipo MIME del archivo asociado.
+     */
     private String mimeType;
+
+    /**
+     * Hash SHA-256 en formato hexadecimal.
+     */
     private String hashSha256;
 
     public Long getPersonId() { return personId; }
