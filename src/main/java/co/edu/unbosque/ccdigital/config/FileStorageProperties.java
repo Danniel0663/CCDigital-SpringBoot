@@ -13,7 +13,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * ccdigital.fs.base-path=/home/ccdigital/CCDigitalBlock/storage
  * </pre>
  *
- * <p>El valor de {@link #basePath} se utiliza como directorio raíz para guardar y/o
+ * <p>El valor de {@link basePath} se utiliza como directorio raíz para guardar y/o
  * localizar archivos asociados al proyecto.</p>
  *
  * @author Danniel
