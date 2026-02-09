@@ -36,7 +36,7 @@ public class CcDigitalApplication {
     /**
      * Método principal (entry point) que ejecuta el arranque de la aplicación.
      * <p>
-     * Este método delega en {@link SpringApplication de run para
+     * Este método delega en {@link SpringApplication} de run para
      * inicializar el contenedor de Spring, cargar los beans, aplicar la configuración
      * y dejar la aplicación lista para atender solicitudes.
      * </p>
