@@ -1,9 +1,11 @@
 package co.edu.unbosque.ccdigital;
 
-import co.edu.unbosque.ccdigital.config.FileStorageProperties;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
+import co.edu.unbosque.ccdigital.config.FileStorageProperties;
 
 /**
  * Punto de entrada principal de la aplicación <b>CCDigital</b>.
