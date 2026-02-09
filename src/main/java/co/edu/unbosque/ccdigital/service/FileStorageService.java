@@ -16,22 +16,54 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.Normalizer;
 
+/**
+ * Servicio encargado del almacenamiento y recuperación de archivos en el sistema de archivos local.
+ *
+ * <p>Este servicio utiliza la propiedad {@code ccdigital.fs.basePath} (inyectada vía
+ * {@link FileStorageProperties}) como directorio raíz para guardar archivos. Los archivos se almacenan
+ * dentro de una carpeta por persona, y adicionalmente se calculan metadatos como:</p>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
+ */
 @Service
 public class FileStorageService {
 
+    /**
+     * Propiedades de almacenamiento de archivos (basePath).
+     */
     private final FileStorageProperties properties;
 
+    /**
+     * Crea una instancia del servicio.
+     *
+     * @param properties propiedades de almacenamiento
+     */
     public FileStorageService(FileStorageProperties properties) {
         this.properties = properties;
     }
 
+    /**
+     * Obtiene el directorio base configurado, convertido a {@link Path} absoluto y normalizado.
+     *
+     * @return ruta base absoluta y normalizada
+     */
     private Path getBasePath() {
         return Paths.get(properties.getBasePath())
                 .toAbsolutePath()
                 .normalize();
     }
 
-    /** Crea (si no existe) la carpeta de la persona: ApellidosNombres */
+    /**
+     * Crea (si no existe) la carpeta de la persona dentro del {@code basePath}.
+     *
+     * <p>El nombre de la carpeta se genera por {@link #buildPersonFolderName(Person)}.</p>
+     *
+     * @param person persona para la cual se asegura el directorio
+     * @return ruta de la carpeta de la persona
+     * @throws IllegalStateException si no es posible crear el directorio
+     */
     public Path ensurePersonFolder(Person person) {
         try {
             String folderName = buildPersonFolderName(person);
@@ -43,6 +75,13 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * Construye el nombre de carpeta para una persona usando Apellidos + Nombres,
+     * removiendo espacios y caracteres no permitidos.
+     *
+     * @param person persona fuente
+     * @return nombre de carpeta seguro (ASCII alfanumérico)
+     */
     private String buildPersonFolderName(Person person) {
         String last = person.getLastName() != null ? person.getLastName() : "";
         String first = person.getFirstName() != null ? person.getFirstName() : "";
@@ -55,7 +94,18 @@ public class FileStorageService {
         return joined;
     }
 
-    /** Ruta relativa (desde basePath) para un archivo de esa persona. */
+    /**
+     * Construye la ruta relativa (desde {@code basePath}) para un archivo de una persona.
+     *
+     * <p>Ejemplo de salida: {@code ApellidoNombre/documento.pdf}</p>
+     *
+     * <p>La ruta se normaliza a separador {@code /} para que sea consistente al persistirse
+     * en base de datos independientemente del sistema operativo.</p>
+     *
+     * @param person persona propietaria
+     * @param filename nombre del archivo
+     * @return ruta relativa en formato con {@code /}
+     */
     public String buildRelativePath(Person person, String filename) {
         Path base = getBasePath();
         Path personFolder = ensurePersonFolder(person);
@@ -65,8 +115,12 @@ public class FileStorageService {
     }
 
     /**
-     * Copia el archivo al disco en la carpeta de la persona, calcula tamaño y hash,
-     * y devuelve esos datos.
+     * Almacena un archivo en disco dentro de la carpeta de la persona, calculando metadatos.
+     *
+     * @param person persona propietaria del archivo
+     * @param file archivo recibido (multipart)
+     * @return información del archivo almacenado
+     * @throws IllegalStateException si ocurre un error guardando el archivo
      */
     public StoredFileInfo storePersonFile(Person person, MultipartFile file) {
         String originalName = file.getOriginalFilename();
@@ -95,6 +149,13 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * Calcula el hash SHA-256 de un archivo en disco.
+     *
+     * @param file ruta del archivo
+     * @return hash SHA-256 en hexadecimal (minúsculas)
+     * @throws IllegalStateException si no se puede leer el archivo o no existe el algoritmo
+     */
     private String calculateSha256(Path file) {
         try (InputStream in = Files.newInputStream(file)) {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -114,15 +175,22 @@ public class FileStorageService {
         }
     }
 
-    // ==== descarga ====
-
+    /**
+     * Resuelve la ruta absoluta del archivo a partir del {@link FileRecord# getStoragePath()}.
+     *
+     * <p>El {@code storagePath} se espera como ruta relativa a {@code basePath}. Para evitar problemas
+     * por rutas guardadas con separadores de Windows ({@code \}), se normaliza a {@code /} antes de resolver.</p>
+     *
+     * @param fileRecord registro de archivo con ruta relativa persistida
+     * @return ruta absoluta y normalizada del archivo en disco
+     * @throws IllegalStateException si el {@code storagePath} está vacío
+     */
     public Path resolvePath(FileRecord fileRecord) {
         String relative = fileRecord.getStoragePath();
         if (relative == null || relative.isBlank()) {
             throw new IllegalStateException("storagePath vacío para FileRecord id=" + fileRecord.getId());
         }
 
-        // ✅ Corrección mínima: aceptar rutas guardadas con "\" (Windows) y "/" (Linux)
         relative = relative.replace("\\", "/");
 
         return getBasePath()
@@ -131,17 +199,53 @@ public class FileStorageService {
                 .toAbsolutePath();
     }
 
+    /**
+     * Carga un archivo como {@link Resource} para ser retornado por controladores (descarga/visualización).
+     *
+     * @param fileRecord registro de archivo
+     * @return recurso basado en sistema de archivos
+     */
     public Resource loadAsResource(FileRecord fileRecord) {
         Path path = resolvePath(fileRecord);
         return new FileSystemResource(path);
     }
 
+    /**
+     * DTO simple con información del archivo almacenado en disco.
+     *
+     * <p>Se utiliza típicamente al momento de persistir un {@link FileRecord} o asociar un archivo
+     * a un {@code PersonDocument}.</p>
+     */
     public static class StoredFileInfo {
+
+        /**
+         * Ruta relativa desde {@code basePath} en formato con {@code /}.
+         */
         private final String relativePath;
+
+        /**
+         * Tamaño del archivo en bytes.
+         */
         private final long size;
+
+        /**
+         * Hash SHA-256 del archivo en hexadecimal.
+         */
         private final String sha256;
+
+        /**
+         * Nombre original del archivo cargado.
+         */
         private final String originalName;
 
+        /**
+         * Crea una instancia con metadatos del archivo almacenado.
+         *
+         * @param relativePath ruta relativa desde {@code basePath}
+         * @param size tamaño en bytes
+         * @param sha256 hash SHA-256 hex
+         * @param originalName nombre original del archivo
+         */
         public StoredFileInfo(String relativePath, long size, String sha256, String originalName) {
             this.relativePath = relativePath;
             this.size = size;
@@ -149,9 +253,32 @@ public class FileStorageService {
             this.originalName = originalName;
         }
 
-        public String getRelativePath() { return relativePath; }
-        public long getSize() { return size; }
-        public String getSha256() { return sha256; }
-        public String getOriginalName() { return originalName; }
+        /**
+         * @return ruta relativa desde {@code basePath}
+         */
+        public String getRelativePath() {
+            return relativePath;
+        }
+
+        /**
+         * @return tamaño del archivo en bytes
+         */
+        public long getSize() {
+            return size;
+        }
+
+        /**
+         * @return hash SHA-256 en hexadecimal
+         */
+        public String getSha256() {
+            return sha256;
+        }
+
+        /**
+         * @return nombre original del archivo
+         */
+        public String getOriginalName() {
+            return originalName;
+        }
     }
 }
