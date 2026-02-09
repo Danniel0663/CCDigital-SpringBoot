@@ -5,11 +5,7 @@ import co.edu.unbosque.ccdigital.entity.PersonDocumentStatus;
 import java.time.LocalDate;
 
 /**
- * DTO utilizado para capturar los datos del formulario de carga de documentos
- * asociados a una persona en la interfaz web.
- *
- * <p>Este formulario normalmente se usa junto con un archivo (por ejemplo, {@code MultipartFile})
- * enviado en la misma petición. Aquí se almacenan únicamente los metadatos del documento:</p>
+ * DTO utilizado para capturar los datos del formulario de carga de documentos en el módulo de Emisores (Issuer).
  *
  * <p><b>Valor por defecto:</b> {@link #status} se inicializa como {@link PersonDocumentStatus#VIGENTE}.</p>
  *
@@ -17,11 +13,20 @@ import java.time.LocalDate;
  * @author Yeison
  * @since 3.0
  */
-public class DocumentUploadForm {
+public class IssuerUploadForm {
 
     /**
-     * Identificador de la definición del documento seleccionado en el formulario
-     * (catálogo de {@code DocumentDefinition}).
+     * Identificador del emisor (issuer) que realiza la carga del documento.
+     */
+    private Long issuerId;
+
+    /**
+     * Identificador de la persona a la cual se asociará el documento cargado.
+     */
+    private Long personId;
+
+    /**
+     * Identificador de la definición de documento seleccionada (catálogo).
      */
     private Long documentId;
 
@@ -41,6 +46,42 @@ public class DocumentUploadForm {
      * Fecha de vencimiento del documento (si aplica).
      */
     private LocalDate expiryDate;
+
+    /**
+     * Retorna el id del emisor que realiza la carga.
+     *
+     * @return id del emisor
+     */
+    public Long getIssuerId() {
+        return issuerId;
+    }
+
+    /**
+     * Establece el id del emisor que realiza la carga.
+     *
+     * @param issuerId id del emisor
+     */
+    public void setIssuerId(Long issuerId) {
+        this.issuerId = issuerId;
+    }
+
+    /**
+     * Retorna el id de la persona asociada a la carga.
+     *
+     * @return id de la persona
+     */
+    public Long getPersonId() {
+        return personId;
+    }
+
+    /**
+     * Establece el id de la persona asociada a la carga.
+     *
+     * @param personId id de la persona
+     */
+    public void setPersonId(Long personId) {
+        this.personId = personId;
+    }
 
     /**
      * Retorna el id de la definición de documento seleccionada.
