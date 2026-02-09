@@ -9,23 +9,6 @@
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
-  <style>
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .badge-soft {
-      border: 1px solid rgba(0,0,0,.08);
-      background: #f8f9fa;
-      color: #212529;
-    }
-    .truncate {
-      max-width: 340px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: inline-block;
-      vertical-align: bottom;
-    }
-  </style>
 </head>
 
 <body class="bg-light">
@@ -41,11 +24,15 @@
       <a class="btn btn-sm btn-outline-primary" th:href="@{/admin/sync}">
         <i class="bi bi-arrow-repeat"></i> Sync
       </a>
+      <a class="btn btn-sm btn-outline-dark" href="/issuer">
+        <i class="bi bi-building me-1"></i>Módulo Emisor
+      </a>
     </div>
   </div>
 </nav>
 
 <main class="container py-4">
+
   <!-- Header persona -->
   <div class="bg-white border rounded-4 shadow-sm p-4 mb-3">
     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
@@ -63,279 +50,165 @@
       </div>
 
       <div class="text-muted small">
-        <div>
-          <i class="bi bi-envelope me-1"></i>
-          <span th:text="${person.email}">correo</span>
-        </div>
-        <div>
-          <i class="bi bi-telephone me-1"></i>
-          <span th:text="${person.phone}">tel</span>
-        </div>
+        <div><i class="bi bi-envelope me-1"></i><span th:text="${person.email}"></span></div>
+        <div><i class="bi bi-telephone me-1"></i><span th:text="${person.phone}"></span></div>
       </div>
+    </div>
+
+    <hr class="my-3">
+
+    <div class="alert alert-info mb-0">
+      <i class="bi bi-info-circle me-2"></i>
+      Los documentos se cargan desde el <b>Módulo Emisor</b>. Aquí solo se <b>aprueban/rechazan</b>.
     </div>
   </div>
 
-  <div class="row g-3">
-    <!-- Upload -->
-    <div class="col-12 col-lg-5">
-      <div class="bg-white border rounded-4 shadow-sm p-4">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h2 class="h6 text-uppercase text-muted mb-0">Subir documento</h2>
-          <span class="badge badge-soft">
-            <i class="bi bi-info-circle me-1"></i>Queda en PENDING
-          </span>
-        </div>
-
-        <form th:action="@{/admin/persons/{id}/upload(id=${person.id})}"
-              method="post"
-              enctype="multipart/form-data"
-              th:object="${uploadForm}"
-              class="row g-3">
-
-          <div class="col-12">
-            <label class="form-label">Tipo documento (catálogo)</label>
-            <select class="form-select" th:field="*{documentId}" required>
-              <option th:each="d : ${definitions}"
-                      th:value="${d.id}"
-                      th:text="${d.title + ' - ' + d.issuingEntity}">
-              </option>
-            </select>
-            <div class="form-text">
-              El emisor se toma automáticamente del <b>issuingEntity</b> del documento.
-            </div>
-          </div>
-
-          <div class="col-12">
-            <label class="form-label">Estado</label>
-            <select class="form-select" th:field="*{status}">
-              <option value="VIGENTE">VIGENTE</option>
-              <option value="VENCIDO">VENCIDO</option>
-              <option value="EN_TRÁMITE">EN_TRÁMITE</option>
-              <option value="ANULADO">ANULADO</option>
-            </select>
-          </div>
-
-          <div class="col-md-6">
-            <label class="form-label">Fecha expedición</label>
-            <input class="form-control" th:field="*{issueDate}" type="date"/>
-          </div>
-
-          <div class="col-md-6">
-            <label class="form-label">Fecha vencimiento</label>
-            <input class="form-control" th:field="*{expiryDate}" type="date"/>
-          </div>
-
-          <div class="col-12">
-            <label class="form-label">Archivo</label>
-            <input class="form-control" type="file" name="file" required/>
-            <div class="form-text">Se guarda ruta + hash SHA256 automáticamente.</div>
-          </div>
-
-          <div class="col-12">
-            <button type="submit" class="btn btn-primary w-100">
-              <i class="bi bi-cloud-upload me-2"></i>Subir documento
-            </button>
-          </div>
-        </form>
-      </div>
+  <!-- Documentos -->
+  <div class="bg-white border rounded-4 shadow-sm p-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="h6 text-uppercase text-muted mb-0">Documentos de la persona</h2>
+      <span class="badge text-bg-light border" th:text="${#lists.size(docs)} + ' registros'">0</span>
     </div>
 
-    <!-- Documentos -->
-    <div class="col-12 col-lg-7">
-      <div class="bg-white border rounded-4 shadow-sm p-4">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h2 class="h6 text-uppercase text-muted mb-0">Documentos de la persona</h2>
-          <span class="badge text-bg-light border"
-                th:text="${#lists.size(docs)} + ' registros'">0</span>
-        </div>
+    <div th:if="${#lists.isEmpty(docs)}" class="text-center text-muted py-4">
+      No hay documentos aún.
+    </div>
 
-        <div th:if="${#lists.isEmpty(docs)}" class="text-center text-muted py-4">
-          No hay documentos aún.
-        </div>
-
-        <div class="accordion" id="docsAccordion" th:if="${!#lists.isEmpty(docs)}">
-          <div class="accordion-item" th:each="pd,iter : ${docs}">
-            <h2 class="accordion-header" th:id="${'h' + pd.id}">
-              <button class="accordion-button collapsed" type="button"
-                      data-bs-toggle="collapse"
-                      th:attr="data-bs-target=${'#c' + pd.id}"
-                      aria-expanded="false">
-
-                <div class="w-100 d-flex flex-wrap justify-content-between align-items-center gap-2">
-                  <div class="fw-semibold">
-                    #<span th:text="${pd.id}"></span>
-                    <span class="text-muted fw-normal ms-2">
-                      <span th:text="${pd.documentDefinition.title}">Documento</span>
-                      <span class="text-muted">·</span>
-                      <span th:text="${pd.documentDefinition.issuingEntity}">Entidad</span>
-                    </span>
-                  </div>
-
-                  <div class="d-flex flex-wrap align-items-center gap-2">
-                    <!-- Estado del documento (VIGENTE/VENCIDO/...) -->
-                    <span class="badge text-bg-secondary" th:text="${pd.status}"></span>
-
-                    <!-- Review Status -->
-                    <span class="badge"
-                          th:text="${pd.reviewStatus}"
-                          th:classappend="${
-                            pd.reviewStatus.name() == 'APPROVED' ? ' text-bg-success' :
-                            (pd.reviewStatus.name() == 'REJECTED' ? ' text-bg-danger' : ' text-bg-warning')
-                          }">
-                      PENDING
-                    </span>
-
-                    <span class="text-muted small">
-                      Issue: <span th:text="${pd.issueDate}"></span>
-                      · Expiry: <span th:text="${pd.expiryDate}"></span>
-                    </span>
-                  </div>
+    <div class="accordion" id="docsAccordion" th:if="${!#lists.isEmpty(docs)}">
+      <div class="accordion-item" th:each="pd : ${docs}">
+        <h2 class="accordion-header" th:id="${'h' + pd.id}">
+          <button class="accordion-button collapsed" type="button"
+                  data-bs-toggle="collapse"
+                  th:attr="data-bs-target=${'#c' + pd.id}"
+                  aria-expanded="false">
+            <div class="w-100 d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <div>
+                <div class="fw-semibold">
+                  #<span th:text="${pd.id}"></span>
+                  · <span th:text="${pd.documentDefinition.title}">Documento</span>
                 </div>
-
-              </button>
-            </h2>
-
-            <div class="accordion-collapse collapse"
-                 th:id="${'c' + pd.id}"
-                 data-bs-parent="#docsAccordion">
-              <div class="accordion-body">
-
-                <!-- Resumen emisor + revisión -->
-                <div class="row g-2 mb-3">
-                  <div class="col-12 col-md-6">
-                    <div class="border rounded-3 p-3 bg-light">
-                      <div class="text-muted small text-uppercase">Emisor resuelto</div>
-                      <div class="fw-semibold">
-                        <span th:if="${pd.issuerEntity != null}"
-                              th:text="${pd.issuerEntity.name}">Emisor</span>
-                        <span th:if="${pd.issuerEntity == null}" class="text-muted">
-                          (No resuelto aún)
-                        </span>
-                      </div>
-                      <div class="text-muted small mt-1">
-                        Fuente: <span th:text="${pd.documentDefinition.issuingEntity}">issuingEntity</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-12 col-md-6">
-                    <div class="border rounded-3 p-3 bg-light">
-                      <div class="text-muted small text-uppercase">Última revisión</div>
-                      <div class="fw-semibold">
-                        <span th:if="${pd.reviewedAt != null}" th:text="${pd.reviewedAt}">fecha</span>
-                        <span th:if="${pd.reviewedAt == null}" class="text-muted">(Sin revisar)</span>
-                      </div>
-                      <div class="text-muted small mt-1">
-                        Notas:
-                        <span th:if="${pd.reviewNotes != null && !#strings.isEmpty(pd.reviewNotes)}"
-                              th:text="${pd.reviewNotes}">nota</span>
-                        <span th:if="${pd.reviewNotes == null || #strings.isEmpty(pd.reviewNotes)}"
-                              class="text-muted">(Sin notas)</span>
-                      </div>
-                    </div>
-                  </div>
+                <div class="text-muted small">
+                  Emisor: <span th:text="${pd.issuerEntity != null ? pd.issuerEntity.name : '—'}">—</span>
+                  · Catálogo: <span th:text="${pd.documentDefinition.issuingEntity}">—</span>
                 </div>
+              </div>
 
-                <!-- Archivos -->
-                <div class="table-responsive mb-3">
-                  <table class="table table-sm align-middle mb-0">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Archivo</th>
-                        <th>MIME</th>
-                        <th class="text-end">Tamaño</th>
-                        <th>SHA256</th>
-                        <th class="text-end">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr th:each="f : ${pd.files}">
-                        <td class="fw-semibold">
-                          <span class="truncate" th:text="${f.originalName}">archivo</span>
-                        </td>
-                        <td class="text-muted" th:text="${f.mimeType}">mime</td>
-                        <td class="text-end text-muted">
-                          <span th:text="${f.byteSize}">0</span> bytes
-                        </td>
-                        <td>
-                          <code class="small mono" th:text="${f.hashSha256}">hash</code>
-                        </td>
-                        <td class="text-end">
-                          <a class="btn btn-sm btn-outline-primary"
-                             th:href="@{/api/person-documents/{pdId}/files/{fileId}(pdId=${pd.id},fileId=${f.id})}"
-                             target="_blank">
-                            <i class="bi bi-download me-1"></i>Ver
-                          </a>
-                        </td>
-                      </tr>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <!-- estado del documento -->
+                <span class="badge text-bg-secondary" th:text="${pd.status}"></span>
 
-                      <tr th:if="${#lists.isEmpty(pd.files)}">
-                        <td colspan="5" class="text-center text-muted py-3">
-                          No hay archivos asociados a este PersonDocument.
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <!-- review status badge -->
+                <span class="badge"
+                      th:text="${pd.reviewStatus}"
+                      th:classappend="
+                        ${pd.reviewStatus.name() == 'APPROVED'} ? ' text-bg-success' :
+                        (${pd.reviewStatus.name() == 'REJECTED'} ? ' text-bg-danger' : ' text-bg-warning')">
+                  PENDING
+                </span>
 
-                <!-- Revisión (sin login) -->
-                <div class="border rounded-4 p-3">
-                  <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="fw-semibold">
-                      <i class="bi bi-clipboard-check me-2"></i>Revisar documento
-                    </div>
-                    <span class="text-muted small">
-                      (Actualiza review_status / reviewed_at / review_notes)
-                    </span>
-                  </div>
-
-                  <form th:action="@{/admin/person-documents/{pdId}/review(pdId=${pd.id})}"
-                        method="post"
-                        class="row g-2 align-items-end">
-
-                    <!-- para redirigir de vuelta (útil en el controller) -->
-                    <input type="hidden" name="personId" th:value="${person.id}"/>
-
-                    <div class="col-12 col-md-4">
-                      <label class="form-label small text-muted mb-1">Estado de revisión</label>
-                      <select class="form-select" name="status" required>
-                        <option value="PENDING"  th:selected="${pd.reviewStatus.name() == 'PENDING'}">PENDING</option>
-                        <option value="APPROVED" th:selected="${pd.reviewStatus.name() == 'APPROVED'}">APPROVED</option>
-                        <option value="REJECTED" th:selected="${pd.reviewStatus.name() == 'REJECTED'}">REJECTED</option>
-                      </select>
-                    </div>
-
-                    <div class="col-12 col-md-6">
-                      <label class="form-label small text-muted mb-1">Notas (opcional)</label>
-                      <input type="text"
-                             class="form-control"
-                             name="notes"
-                             maxlength="500"
-                             th:value="${pd.reviewNotes}"
-                             placeholder="Ej: Documento legible, válido, coincide con datos..."/>
-                    </div>
-
-                    <div class="col-12 col-md-2 d-grid">
-                      <button type="submit" class="btn btn-outline-dark">
-                        <i class="bi bi-save2 me-1"></i>Guardar
-                      </button>
-                    </div>
-
-                    <div class="col-12">
-                      <div class="form-text">
-                        Nota: sin login, el sistema deja <b>reviewed_by_user</b> en NULL (como en tu service).
-                      </div>
-                    </div>
-                  </form>
-                </div>
-
+                <span class="text-muted small">
+                  Issue: <span th:text="${pd.issueDate}"></span>
+                  · Expiry: <span th:text="${pd.expiryDate}"></span>
+                </span>
               </div>
             </div>
+          </button>
+        </h2>
+
+        <div class="accordion-collapse collapse"
+             th:id="${'c' + pd.id}"
+             data-bs-parent="#docsAccordion">
+          <div class="accordion-body">
+
+            <!-- Archivos -->
+            <div class="table-responsive mb-3">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                  <th>Archivo</th>
+                  <th>MIME</th>
+                  <th class="text-end">Tamaño</th>
+                  <th>SHA256</th>
+                  <th class="text-end">Acción</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="f : ${pd.files}">
+                  <td class="fw-semibold" th:text="${f.originalName}"></td>
+                  <td class="text-muted" th:text="${f.mimeType}"></td>
+                  <td class="text-end text-muted">
+                    <span th:text="${f.byteSize}"></span> bytes
+                  </td>
+                  <td>
+                    <code class="small" th:text="${f.hashSha256}"></code>
+                  </td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary"
+                       th:href="@{/api/person-documents/{pdId}/files/{fileId}(pdId=${pd.id},fileId=${f.id})}"
+                       target="_blank">
+                      <i class="bi bi-download me-1"></i>Ver
+                    </a>
+                  </td>
+                </tr>
+
+                <tr th:if="${#lists.isEmpty(pd.files)}">
+                  <td colspan="5" class="text-center text-muted py-3">
+                    No hay archivos asociados a este PersonDocument.
+                  </td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Revisión -->
+            <div class="p-3 border rounded-3 bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-semibold">
+                  <i class="bi bi-clipboard-check me-2"></i>Revisión (Admin)
+                </div>
+                <div class="text-muted small">
+                  Revisado: <span th:text="${pd.reviewedAt != null ? pd.reviewedAt : '—'}">—</span>
+                </div>
+              </div>
+
+              <form th:action="@{/admin/person-documents/{personDocId}/review(personDocId=${pd.id})}"
+                    method="post"
+                    class="row g-2">
+                <input type="hidden" name="personId" th:value="${person.id}"/>
+
+                <div class="col-12 col-lg-4">
+                  <label class="form-label small text-muted mb-1">Estado</label>
+                  <select class="form-select" name="status" required>
+                    <option value="PENDING"  th:selected="${pd.reviewStatus.name() == 'PENDING'}">PENDING</option>
+                    <option value="APPROVED" th:selected="${pd.reviewStatus.name() == 'APPROVED'}">APPROVED</option>
+                    <option value="REJECTED" th:selected="${pd.reviewStatus.name() == 'REJECTED'}">REJECTED</option>
+                  </select>
+                </div>
+
+                <div class="col-12 col-lg-8">
+                  <label class="form-label small text-muted mb-1">Observaciones</label>
+                  <input class="form-control" type="text" name="notes"
+                         maxlength="500"
+                         th:value="${pd.reviewNotes}"
+                         placeholder="Ej: Documento ilegible / Falta firma / OK"/>
+                </div>
+
+                <div class="col-12 d-flex gap-2">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-2"></i>Guardar revisión
+                  </button>
+                  <span class="text-muted small align-self-center">
+                    (El campo “reviewed_by_user” queda null hasta implementar login)
+                  </span>
+                </div>
+              </form>
+            </div>
+
           </div>
         </div>
-
       </div>
     </div>
+
   </div>
 </main>
 
