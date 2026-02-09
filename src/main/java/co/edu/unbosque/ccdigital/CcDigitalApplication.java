@@ -33,15 +33,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 })
 public class CcDigitalApplication {
 
-    /**
-     * Método principal (entry point) que ejecuta el arranque de la aplicación.
-     * <p>
-     * Este método delega en {@link SpringApplication de run para
-     * inicializar el contenedor de Spring, cargar los beans, aplicar la configuración
-     * y dejar la aplicación lista para atender solicitudes.
-     * </p>
+	 /**
+     * Punto de entrada principal de la aplicación.
      *
-     * @param args argumentos de línea de comandos utilizados durante el arranque.
+     * @param args argumentos de línea de comandos.
      */
     public static void main(String[] args) {
         SpringApplication.run(CcDigitalApplication.class, args);

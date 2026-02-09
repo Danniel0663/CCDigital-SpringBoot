@@ -176,7 +176,7 @@ public class FileStorageService {
     }
 
     /**
-     * Resuelve la ruta absoluta del archivo a partir del {@link FileRecord# getStoragePath()}.
+     * Resuelve la ruta absoluta del archivo a partir del {@link FileRecord#getStoragePath()}.
      *
      * <p>El {@code storagePath} se espera como ruta relativa a {@code basePath}. Para evitar problemas
      * por rutas guardadas con separadores de Windows ({@code \}), se normaliza a {@code /} antes de resolver.</p>

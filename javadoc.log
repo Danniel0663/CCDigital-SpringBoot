@@ -1,0 +1,40 @@
+[INFO] Error stacktraces are turned on.
+[INFO] Scanning for projects...
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for co.edu.unbosque:CCDigital:jar:1.0.0
+[WARNING] 'build.plugins.plugin.version' for org.springframework.boot:spring-boot-maven-plugin is missing. @ line 66, column 15
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
+[INFO] 
+[INFO] ---------------------< co.edu.unbosque:CCDigital >----------------------
+[INFO] Building CCDigital 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ CCDigital ---
+[INFO] Deleting /home/ccdigital/workspace/CCDigital-SpringBoot/target
+[INFO] 
+[INFO] >>> javadoc:3.6.3:javadoc (default-cli) > generate-sources @ CCDigital >>>
+[INFO] 
+[INFO] <<< javadoc:3.6.3:javadoc (default-cli) < generate-sources @ CCDigital <<<
+[INFO] 
+[INFO] 
+[INFO] --- javadoc:3.6.3:javadoc (default-cli) @ CCDigital ---
+[INFO] No previous run data found, generating javadoc.
+[WARNING] Javadoc Warnings
+[WARNING] /home/ccdigital/workspace/CCDigital-SpringBoot/src/main/java/co/edu/unbosque/ccdigital/controller/IssuerController.java:131: warning: no @param for ra
+[WARNING] public String search(@ModelAttribute("searchForm") IssuerSearchForm form,
+[WARNING] ^
+[WARNING] /home/ccdigital/workspace/CCDigital-SpringBoot/src/main/java/co/edu/unbosque/ccdigital/controller/IssuerController.java:160: warning: no @return
+[WARNING] public String upload(@ModelAttribute("uploadForm") IssuerUploadForm form,
+[WARNING] ^
+[WARNING] 2 warnings
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  5.419 s
+[INFO] Finished at: 2026-02-09T13:07:33-05:00
+[INFO] ------------------------------------------------------------------------
