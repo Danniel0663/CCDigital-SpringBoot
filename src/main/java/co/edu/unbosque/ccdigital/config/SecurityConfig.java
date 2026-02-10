@@ -18,13 +18,40 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
+/**
+ * Configuración de seguridad para la aplicación.
+ *
+ * <p>Define dos cadenas (filter chains) con reglas independientes:
+ * <ul>
+ *   <li><b>Admin/Gobierno</b>: rutas /admin/**, /api/** y /login/admin</li>
+ *   <li><b>Issuer</b>: rutas /issuer/** y /login/issuer</li>
+ * </ul>
+ *
+ * <p>La autenticación se resuelve contra base de datos:
+ * <ul>
+ *   <li>Tabla <code>users</code> para usuarios Admin/Gobierno (login por email o full_name)</li>
+ *   <li>Tabla <code>entity_users</code> para usuarios de emisores (login por email)</li>
+ * </ul>
+ *
+ * <p>CSRF:
+ * <ul>
+ *   <li>Se habilita repositorio de token por cookie para permitir formularios con soporte frontend.</li>
+ *   <li>En Admin se ignora CSRF para <code>/api/**</code> (útil si el API es consumido por herramientas/scripts).
+ *       Si el API se consume desde navegador con sesión, conviene mantener CSRF también en /api/**.</li>
+ * </ul>
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     /**
-     * Tus hashes en BD son bcrypt tipo "$2a$10$..." sin prefijo "{bcrypt}",
-     * por eso usamos BCryptPasswordEncoder directamente.
+     * Define el codificador de contraseñas.
+     *
+     * <p>Los hashes almacenados en base de datos están en formato BCrypt
+     * (por ejemplo: <code>$2a$10$...</code>) sin prefijo <code>{bcrypt}</code>,
+     * por lo que se usa {@link BCryptPasswordEncoder} directamente.
+     *
+     * @return {@link PasswordEncoder} basado en BCrypt.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -32,9 +59,24 @@ public class SecurityConfig {
     }
 
     /**
-     * Carga usuarios desde BD:
-     * - users: login por email o full_name (admin, gobierno, etc.)
-     * - entity_users: login por email (emisores)
+     * Servicio de carga de usuarios autenticables.
+     *
+     * <p>Reglas:
+     * <ul>
+     *   <li><b>Admin/Gobierno</b>: busca en <code>users</code> por email o full_name. Carga roles desde BD.</li>
+     *   <li><b>Issuer</b>: busca en <code>entity_users</code> por email y expone el rol ROLE_ISSUER.</li>
+     * </ul>
+     *
+     * <p>Notas de implementación:
+     * <ul>
+     *   <li>Si el usuario está inactivo (<code>is_active=false</code>), se marca como deshabilitado.</li>
+     *   <li>Para Admin/Gobierno el username principal preferido es el email; si no existe, se usa fullName.</li>
+     *   <li>Para Issuer se retorna un {@link IssuerPrincipal} con <code>issuerId</code> asociado.</li>
+     * </ul>
+     *
+     * @param appUserRepo repositorio de usuarios Admin/Gobierno.
+     * @param entityUserRepo repositorio de usuarios Issuer.
+     * @return implementación de {@link UserDetailsService}.
      */
     @Bean
     public UserDetailsService userDetailsService(AppUserRepository appUserRepo,
@@ -42,7 +84,7 @@ public class SecurityConfig {
         return rawUsername -> {
             String username = rawUsername == null ? "" : rawUsername.trim();
 
-            // 1) Gobierno/Admin
+            // 1) Admin/Gobierno: login por email o full_name
             AppUser u = appUserRepo
                     .findFirstByEmailIgnoreCaseOrFullNameIgnoreCase(username, username)
                     .orElse(null);
@@ -52,25 +94,25 @@ public class SecurityConfig {
                     throw new UsernameNotFoundException("El usuario no tiene password configurado: " + username);
                 }
 
-                String role = normalizeRole(u.getRole()); // ejemplo: GOBIERNO
+                String role = normalizeRole(u.getRole());
                 boolean disabled = (u.getIsActive() != null && !u.getIsActive());
 
                 String principalName = (u.getEmail() != null && !u.getEmail().isBlank())
                         ? u.getEmail()
                         : u.getFullName();
 
-                User.UserBuilder b = User.withUsername(principalName)
+                User.UserBuilder builder = User.withUsername(principalName)
                         .password(u.getPasswordHash())
                         .roles(role);
 
                 if (disabled) {
-                    b.disabled(true);
+                    builder.disabled(true);
                 }
 
-                return b.build();
+                return builder.build();
             }
 
-            // 2) Emisor
+            // 2) Issuer: login por email
             EntityUser eu = entityUserRepo.findByEmailIgnoreCase(username)
                     .orElseThrow(() -> new UsernameNotFoundException("Emisor no encontrado: " + username));
 
@@ -83,15 +125,48 @@ public class SecurityConfig {
         };
     }
 
+    /**
+     * Normaliza el rol leído desde base de datos para uso con {@link User#roles(String...)}.
+     *
+     * <p>Spring Security agrega el prefijo <code>ROLE_</code> automáticamente.
+     * Por ejemplo, si en BD se almacena <code>GOBIERNO</code>, en runtime se tendrá
+     * la autoridad <code>ROLE_GOBIERNO</code>.
+     *
+     * @param role rol leído desde BD.
+     * @return rol normalizado en mayúsculas. Si es null o vacío, retorna <code>GOBIERNO</code>.
+     */
     private String normalizeRole(String role) {
         if (role == null) return "GOBIERNO";
         String r = role.trim();
         return r.isEmpty() ? "GOBIERNO" : r.toUpperCase();
     }
 
-    // =========================
-    // ADMIN / GOBIERNO
-    // =========================
+    /**
+     * Cadena de seguridad para Admin/Gobierno.
+     *
+     * <p>Aplica a:
+     * <ul>
+     *   <li><code>/admin/**</code></li>
+     *   <li><code>/api/**</code></li>
+     *   <li><code>/login/admin</code></li>
+     * </ul>
+     *
+     * <p>Autorización:
+     * <ul>
+     *   <li><code>/login/admin</code> y <code>/error</code> permitidos sin autenticación</li>
+     *   <li><code>/api/**</code> y el resto de <code>/admin/**</code> requieren ROLE_ADMIN o ROLE_GOBIERNO</li>
+     * </ul>
+     *
+     * <p>CSRF:
+     * <ul>
+     *   <li>Token almacenado en cookie (HttpOnly=false) para facilitar consumo desde UI.</li>
+     *   <li><code>/api/**</code> queda excluido de CSRF por configuración.</li>
+     * </ul>
+     *
+     * @param http configuración de seguridad HTTP.
+     * @return {@link SecurityFilterChain} para Admin/Gobierno.
+     * @throws Exception si ocurre un error configurando la cadena.
+     */
     @Bean
     @Order(1)
     public SecurityFilterChain adminChain(HttpSecurity http) throws Exception {
@@ -118,16 +193,36 @@ public class SecurityConfig {
                 )
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        // Quita esta línea si quieres CSRF también en /api/**
                         .ignoringRequestMatchers("/api/**")
                 );
 
         return http.build();
     }
 
-    // =========================
-    // ISSUER
-    // =========================
+    /**
+     * Cadena de seguridad para Issuers (emisores).
+     *
+     * <p>Aplica a:
+     * <ul>
+     *   <li><code>/issuer/**</code></li>
+     *   <li><code>/login/issuer</code></li>
+     * </ul>
+     *
+     * <p>Autorización:
+     * <ul>
+     *   <li><code>/login/issuer</code> y <code>/error</code> permitidos sin autenticación</li>
+     *   <li>Resto requiere ROLE_ISSUER</li>
+     * </ul>
+     *
+     * <p>CSRF:
+     * <ul>
+     *   <li>Token almacenado en cookie (HttpOnly=false).</li>
+     * </ul>
+     *
+     * @param http configuración de seguridad HTTP.
+     * @return {@link SecurityFilterChain} para Issuer.
+     * @throws Exception si ocurre un error configurando la cadena.
+     */
     @Bean
     @Order(2)
     public SecurityFilterChain issuerChain(HttpSecurity http) throws Exception {
