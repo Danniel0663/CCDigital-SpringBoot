@@ -28,10 +28,11 @@
 
 				</span>
 
-				<form method="post" action="/issuer/logout" class="m-0">
-					<button class="btn btn-sm btn-outline-danger" type="submit">
-						<i class="bi bi-box-arrow-right"></i> Salir
-					</button>
+				<form th:action="@{/issuer/logout}" method="post" style="margin: 0;">
+					<input type="hidden" th:name="${_csrf.parameterName}"
+						th:value="${_csrf.token}" />
+					<button type="submit" style="padding: 8px 10px;">Cerrar
+						sesión</button>
 				</form>
 			</div>
 		</div>

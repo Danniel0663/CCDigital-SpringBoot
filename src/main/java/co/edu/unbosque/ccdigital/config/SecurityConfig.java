@@ -16,34 +16,15 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
-/**
- * Configuración de seguridad de la aplicación.
- *
- * <p>Define los mecanismos de autenticación y autorización para los perfiles de uso:</p>
- * <ul>
- *   <li>Administración y APIs: rutas bajo {@code /admin/**} y {@code /api/**}</li>
- *   <li>Emisores: rutas bajo {@code /issuer/**}</li>
- * </ul>
- *
- * <p>La autenticación se resuelve desde base de datos mediante {@link UserDetailsService}:</p>
- * <ul>
- *   <li>Usuarios administrativos: tabla de usuarios de aplicación</li>
- *   <li>Usuarios emisores: tabla de usuarios de entidad emisora</li>
- * </ul>
- *
- * @since 1.0.0
- */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     /**
-     * Proveedor de codificación de contraseñas basado en BCrypt.
-     *
-     * <p>Se asume que los hashes en base de datos corresponden al formato BCrypt (por ejemplo, {@code $2a$10...}).</p>
-     *
-     * @return codificador de contraseñas
+     * Tus hashes en BD son bcrypt tipo "$2a$10$..." sin prefijo "{bcrypt}",
+     * por eso usamos BCryptPasswordEncoder directamente.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -51,57 +32,50 @@ public class SecurityConfig {
     }
 
     /**
-     * Servicio de carga de usuarios para autenticación.
-     *
-     * <p>Resuelve credenciales de:</p>
-     * <ul>
-     *   <li>Usuarios administrativos: búsqueda por email o nombre completo</li>
-     *   <li>Usuarios emisores: búsqueda por email</li>
-     * </ul>
-     *
-     * @param appUserRepo repositorio de usuarios administrativos
-     * @param entityUserRepo repositorio de usuarios emisores
-     * @return servicio de detalles de usuario
+     * Carga usuarios desde BD:
+     * - users: login por email o full_name (admin, gobierno, etc.)
+     * - entity_users: login por email (emisores)
      */
     @Bean
     public UserDetailsService userDetailsService(AppUserRepository appUserRepo,
                                                  EntityUserRepository entityUserRepo) {
-
         return rawUsername -> {
             String username = rawUsername == null ? "" : rawUsername.trim();
 
+            // 1) Gobierno/Admin
             AppUser u = appUserRepo
                     .findFirstByEmailIgnoreCaseOrFullNameIgnoreCase(username, username)
                     .orElse(null);
 
             if (u != null) {
                 if (u.getPasswordHash() == null || u.getPasswordHash().isBlank()) {
-                    throw new UsernameNotFoundException("El usuario no tiene contraseña configurada: " + username);
+                    throw new UsernameNotFoundException("El usuario no tiene password configurado: " + username);
                 }
 
-                String role = normalizeRole(u.getRole());
+                String role = normalizeRole(u.getRole()); // ejemplo: GOBIERNO
                 boolean disabled = (u.getIsActive() != null && !u.getIsActive());
 
                 String principalName = (u.getEmail() != null && !u.getEmail().isBlank())
                         ? u.getEmail()
                         : u.getFullName();
 
-                User.UserBuilder builder = User.withUsername(principalName)
+                User.UserBuilder b = User.withUsername(principalName)
                         .password(u.getPasswordHash())
                         .roles(role);
 
                 if (disabled) {
-                    builder.disabled(true);
+                    b.disabled(true);
                 }
 
-                return builder.build();
+                return b.build();
             }
 
+            // 2) Emisor
             EntityUser eu = entityUserRepo.findByEmailIgnoreCase(username)
                     .orElseThrow(() -> new UsernameNotFoundException("Emisor no encontrado: " + username));
 
             if (eu.getPasswordHash() == null || eu.getPasswordHash().isBlank()) {
-                throw new UsernameNotFoundException("El emisor no tiene contraseña configurada: " + username);
+                throw new UsernameNotFoundException("El emisor no tiene password configurado: " + username);
             }
 
             boolean enabled = !(eu.getIsActive() != null && !eu.getIsActive());
@@ -109,26 +83,15 @@ public class SecurityConfig {
         };
     }
 
-    /**
-     * Normaliza el rol para su uso con {@code roles(...)} en Spring Security.
-     *
-     * @param role rol almacenado en persistencia
-     * @return rol en mayúsculas; por defecto {@code GOBIERNO}
-     */
     private String normalizeRole(String role) {
         if (role == null) return "GOBIERNO";
         String r = role.trim();
-        if (r.isEmpty()) return "GOBIERNO";
-        return r.toUpperCase();
+        return r.isEmpty() ? "GOBIERNO" : r.toUpperCase();
     }
 
-    /**
-     * Cadena de seguridad para rutas administrativas y API.
-     *
-     * @param http configuración de seguridad HTTP
-     * @return filtro de seguridad construido
-     * @throws Exception errores de configuración
-     */
+    // =========================
+    // ADMIN / GOBIERNO
+    // =========================
     @Bean
     @Order(1)
     public SecurityFilterChain adminChain(HttpSecurity http) throws Exception {
@@ -149,19 +112,22 @@ public class SecurityConfig {
                 .logout(logout -> logout
                         .logoutUrl("/admin/logout")
                         .logoutSuccessUrl("/login/admin?logout")
+                        .invalidateHttpSession(true)
+                        .clearAuthentication(true)
+                        .deleteCookies("JSESSIONID")
                 )
-                .csrf(csrf -> csrf.disable());
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        // Quita esta línea si quieres CSRF también en /api/**
+                        .ignoringRequestMatchers("/api/**")
+                );
 
         return http.build();
     }
 
-    /**
-     * Cadena de seguridad para rutas de emisor.
-     *
-     * @param http configuración de seguridad HTTP
-     * @return filtro de seguridad construido
-     * @throws Exception errores de configuración
-     */
+    // =========================
+    // ISSUER
+    // =========================
     @Bean
     @Order(2)
     public SecurityFilterChain issuerChain(HttpSecurity http) throws Exception {
@@ -181,8 +147,13 @@ public class SecurityConfig {
                 .logout(logout -> logout
                         .logoutUrl("/issuer/logout")
                         .logoutSuccessUrl("/login/issuer?logout")
+                        .invalidateHttpSession(true)
+                        .clearAuthentication(true)
+                        .deleteCookies("JSESSIONID")
                 )
-                .csrf(csrf -> csrf.disable());
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                );
 
         return http.build();
     }
