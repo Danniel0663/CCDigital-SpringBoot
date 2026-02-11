@@ -8,29 +8,40 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * API REST para consultar definiciones de documentos.
+ * Controlador REST para la consulta del catálogo de definiciones de documentos.
  *
- * @since 1.0.0
+ * <p>Expone endpoints bajo {@code /api/document-definitions} para listar y consultar
+ * definiciones de documentos disponibles en el sistema según el modelo {@link DocumentDefinition}).</p>
+ *
+ * <p>Este controlador está orientado a consumo por clientes web/JS, integraciones o módulos
+ * internos que requieran consultar el catálogo.</p>
+ *
+ * @author Danniel 
+ * @author Yeison
+ * @since 3.0
  */
 @RestController
 @RequestMapping("/api/document-definitions")
 public class DocumentDefinitionController {
 
+    /**
+     * Servicio de negocio encargado de consultar definiciones de documentos.
+     */
     private final DocumentDefinitionService service;
 
     /**
-     * Constructor con inyección del servicio de definiciones.
+     * Construye el controlador inyectando el servicio requerido.
      *
-     * @param service servicio de definiciones de documentos
+     * @param service servicio para operaciones sobre {@link DocumentDefinition}
      */
     public DocumentDefinitionController(DocumentDefinitionService service) {
         this.service = service;
     }
 
     /**
-     * Lista todas las definiciones de documento.
+     * Lista todas las definiciones de documentos registradas en el sistema.
      *
-     * @return lista de definiciones
+     * @return lista de {@link DocumentDefinition}
      */
     @GetMapping
     public List<DocumentDefinition> listAll() {
@@ -40,8 +51,11 @@ public class DocumentDefinitionController {
     /**
      * Obtiene una definición de documento por su identificador.
      *
-     * @param id identificador de la definición
-     * @return definición si existe; 404 en caso contrario
+     * <p>Si existe, retorna {@code 200 OK} con el cuerpo de la definición.
+     * Si no existe, retorna {@code 404 Not Found}.</p>
+     *
+     * @param id identificador interno de la definición
+     * @return {@link ResponseEntity} con la definición encontrada o 404 si no existe
      */
     @GetMapping("/{id}")
     public ResponseEntity<DocumentDefinition> getById(@PathVariable Long id) {

@@ -11,17 +11,32 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Servicio de dominio para gestión de entidades emisoras.
+ * Servicio de negocio para la gestión de entidades emisoras ({@link IssuingEntity}).
  *
- * <p>Incluye operaciones de consulta, resolución/creación por nombre y administración
- * de documentos habilitados por emisor.</p>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 @Service
 public class IssuingEntityService {
 
+    /**
+     * Repositorio de acceso a datos para {@link IssuingEntity}.
+     */
     private final IssuingEntityRepository repo;
+
+    /**
+     * Servicio del catálogo de documentos, usado para validar/recuperar definiciones.
+     */
     private final DocumentDefinitionService documentDefinitionService;
 
+    /**
+     * Crea una instancia del servicio.
+     *
+     * @param repo repositorio de emisores
+     * @param documentDefinitionService servicio del catálogo de documentos
+     */
     public IssuingEntityService(IssuingEntityRepository repo,
                                 DocumentDefinitionService documentDefinitionService) {
         this.repo = repo;
@@ -29,9 +44,12 @@ public class IssuingEntityService {
     }
 
     /**
-     * Obtiene estadísticas agregadas de emisores.
+     * Retorna estadísticas agregadas de emisores para el módulo administrativo.
      *
-     * @return lista de estadísticas
+     * <p>La consulta es provista por {@link IssuingEntityRepository#findIssuerStats()} y retorna una proyección
+     * ({@link IssuingEntityRepository.IssuerStats})</p>
+     *
+     * @return lista de estadísticas por emisor
      */
     public List<IssuingEntityRepository.IssuerStats> stats() {
         return repo.findIssuerStats();
@@ -40,9 +58,9 @@ public class IssuingEntityService {
     /**
      * Obtiene un emisor por id.
      *
-     * @param id identificador del emisor
-     * @return emisor
-     * @throws IllegalArgumentException si no existe
+     * @param id id del emisor
+     * @return emisor encontrado
+     * @throws IllegalArgumentException si no existe un emisor con el id indicado
      */
     public IssuingEntity getById(Long id) {
         return repo.findById(id)
@@ -50,18 +68,20 @@ public class IssuingEntityService {
     }
 
     /**
-     * Lista todas las entidades.
+     * Retorna todos los emisores registrados (sin filtros).
      *
-     * @return lista completa
+     * @return lista completa de emisores
      */
     public List<IssuingEntity> findAll() {
         return repo.findAll();
     }
 
     /**
-     * Lista emisores aprobados.
+     * Lista emisores aprobados para el módulo "issuer".
      *
-     * @return lista de emisores con estado APROBADA
+     * <p>Filtra por {@link EntityType#EMISOR} y {@link EntityStatus#APROBADA}, ordenando por nombre ascendente.</p>
+     *
+     * @return lista de emisores aprobados
      */
     @Transactional(readOnly = true)
     public List<IssuingEntity> listApprovedEmitters() {
@@ -69,10 +89,10 @@ public class IssuingEntityService {
     }
 
     /**
-     * Resuelve un emisor por nombre. Si no existe, lo crea como emisor aprobado.
+     * <p>Si el nombre es {@code null} o está en blanco, retorna {@code null}.</p>
      *
      * @param name nombre del emisor
-     * @return entidad emisora encontrada o creada; null si el nombre es vacío
+     * @return emisor existente o recién creado; {@code null} si el nombre es inválido
      */
     @Transactional
     public IssuingEntity resolveEmitterByName(String name) {
@@ -89,9 +109,12 @@ public class IssuingEntityService {
     }
 
     /**
-     * Asegura que el emisor tenga habilitado un tipo de documento.
+     * Asegura que un emisor tenga asociado un documento permitido.
      *
-     * @param issuer emisor
+     * <p>Valida que el documento exista en el catálogo, revisa si ya está asociado al emisor
+     * y si no lo está, lo agrega y persiste el emisor.</p>
+     *
+     * @param issuer emisor al cual se le desea asociar el documento
      * @param documentId id del documento del catálogo
      * @throws IllegalArgumentException si el documento no existe
      */
@@ -110,9 +133,11 @@ public class IssuingEntityService {
     }
 
     /**
-     * Elimina la relación entre un emisor y un tipo de documento.
+     * Remueve la asociación entre un emisor y un documento permitido.
      *
-     * @param issuer emisor
+     * <p>Elimina el documento de la colección {@code issuer.documentDefinitions} por id y persiste el emisor.</p>
+     *
+     * @param issuer emisor del cual se desea remover el documento
      * @param documentId id del documento a remover
      */
     @Transactional

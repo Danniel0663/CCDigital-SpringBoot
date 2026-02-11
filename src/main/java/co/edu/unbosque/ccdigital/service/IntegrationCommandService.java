@@ -7,19 +7,26 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 /**
- * Servicio para ejecutar comandos de integración mediante shell.
+ * Servicio de integración que ejecuta comandos del sistema operativo para invocar herramientas externas.
  *
- * <p>Este servicio encapsula ejecución de procesos usando {@code /bin/bash -lc} y retorna
- * la salida como texto. Está orientado a integraciones puntuales con Fabric e Indy.</p>
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 @Service
 public class IntegrationCommandService {
 
     /**
-     * Ejecuta un comando en shell y retorna la salida combinada.
+     * Ejecuta un comando del sistema usando {@code /bin/bash -lc} y retorna su salida en texto.
      *
-     * @param command comando a ejecutar
-     * @return salida del proceso junto con el exit code
+     * <p>La salida incluye todas las líneas generadas por el proceso y al final agrega el
+     * código de salida (exit code).</p>
+     *
+     * <p><b>Implementación:</b> combina stdout+stderr en un mismo stream
+     * ({@code pb.redirectErrorStream(true)}).</p>
+     *
+     * @param command comando completo a ejecutar en bash
+     * @return salida del comando (incluye exit code) o un mensaje de error si falla la ejecución
      */
     private String runCommand(String command) {
         try {
@@ -40,15 +47,21 @@ public class IntegrationCommandService {
             output.append("\nExit code: ").append(exitCode);
             return output.toString();
         } catch (IOException | InterruptedException e) {
+            
             Thread.currentThread().interrupt();
             return "Error ejecutando comando: " + e.getMessage();
         }
     }
 
     /**
-     * Sincroniza todos los registros hacia Fabric.
+     * Ejecuta la sincronización completa hacia Hyperledger Fabric.
      *
-     * @return salida del proceso
+     * <p>Comando ejecutado (hardcoded):</p>
+     * <pre>
+	 * cd /home/ccdigital/fabric/fabric-samples/test-network/client &amp;&amp; node sync-db-to-ledger.js --all
+	 * </pre>
+     *
+     * @return salida del comando y código de salida
      */
     public String syncFabricAll() {
         String cmd = "cd /home/ccdigital/fabric/fabric-samples/test-network/client&& node sync-db-to-ledger.js --all";
@@ -56,11 +69,11 @@ public class IntegrationCommandService {
     }
 
     /**
-     * Sincroniza una persona específica hacia Fabric.
+     * Ejecuta la sincronización hacia Hyperledger Fabric para una persona específica.
      *
-     * @param idType tipo de identificación
+     * @param idType tipo de identificación (ej. {@code CC}, {@code TI})
      * @param idNumber número de identificación
-     * @return salida del proceso
+     * @return salida del comando y código de salida
      */
     public String syncFabricPerson(String idType, String idNumber) {
         String cmd = "cd /home/ccdigital/fabric/fabric-samples/test-network/client && node sync-db-to-ledger.js --person "
@@ -69,9 +82,9 @@ public class IntegrationCommandService {
     }
 
     /**
-     * Emite credenciales Indy para todos los registros desde base de datos.
+     * Ejecuta la emisión de credenciales Indy desde base de datos.
      *
-     * @return salida del proceso
+     * @return salida del comando y código de salida
      */
     public String syncIndyIssueAll() {
         String cmd = "cd /home/ccdigital/cdigital-indy-python && " +

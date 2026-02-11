@@ -1,51 +1,60 @@
 package co.edu.unbosque.ccdigital.controller;
 
 import co.edu.unbosque.ccdigital.entity.IssuingEntity;
-import co.edu.unbosque.ccdigital.repository.EntityUserRepository;
 import co.edu.unbosque.ccdigital.service.DocumentDefinitionService;
-import co.edu.unbosque.ccdigital.service.IssuerAccountService;
 import co.edu.unbosque.ccdigital.service.IssuingEntityService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Controlador MVC administrativo para gestionar emisores y sus permisos.
+ * Controlador web para la administración de entidades emisoras (Issuers)
+ * dentro del módulo administrativo.
  *
- * @since 1.0.0
+ * <p>Expone endpoints bajo el prefijo {@code /admin/issuers} para:</p>
+ *
+ * <p><b>Responsabilidad:</b> este controlador enruta peticiones y arma el {@link Model} para las vistas.
+ * La lógica de negocio (consultas, validaciones y persistencia) se delega a
+ * {@link IssuingEntityService} y {@link DocumentDefinitionService}.</p>
+ *
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 @Controller
 @RequestMapping("/admin/issuers")
 public class IssuerAdminController {
 
+    /**
+     * Servicio de negocio encargado de operaciones sobre {@link IssuingEntity}.
+     */
     private final IssuingEntityService issuerService;
-    private final DocumentDefinitionService documentService;
-    private final IssuerAccountService issuerAccountService;
-    private final EntityUserRepository entityUserRepository;
 
     /**
-     * Constructor con inyección de dependencias.
+     * Servicio para consultar el catálogo completo de definiciones de documentos disponibles.
+     */
+    private final DocumentDefinitionService documentService;
+
+    /**
+     * Construye el controlador de administración de emisores inyectando sus dependencias.
      *
-     * @param issuerService servicio de emisores
-     * @param documentService servicio de definiciones de documentos
-     * @param issuerAccountService servicio de credenciales de emisores
-     * @param entityUserRepository repositorio de usuarios emisores
+     * @param issuerService servicio para operaciones sobre emisores
+     * @param documentService servicio para consultar definiciones de documentos
      */
     public IssuerAdminController(IssuingEntityService issuerService,
-                                 DocumentDefinitionService documentService,
-                                 IssuerAccountService issuerAccountService,
-                                 EntityUserRepository entityUserRepository) {
+                                 DocumentDefinitionService documentService) {
         this.issuerService = issuerService;
         this.documentService = documentService;
-        this.issuerAccountService = issuerAccountService;
-        this.entityUserRepository = entityUserRepository;
     }
 
     /**
-     * Muestra el listado y estadísticas generales de emisores.
+     * Muestra la vista principal de emisores.
      *
-     * @param model modelo MVC
-     * @return vista de emisores
+     * <p>Agrega al {@link Model}:</p>
+     *
+     * @param model modelo de Spring MVC usado para enviar atributos a la vista
+     * @return nombre de la vista de listado/estadísticas de emisores
      */
     @GetMapping
     public String list(Model model) {
@@ -54,33 +63,36 @@ public class IssuerAdminController {
     }
 
     /**
-     * Muestra el detalle de un emisor, su usuario asociado y documentos disponibles.
+     * Muestra el detalle de un emisor y el catálogo completo de documentos para permitir
+     * asignación/remoción desde la UI.
      *
-     * @param id identificador del emisor
-     * @param model modelo MVC
-     * @param credOk indicador de operación exitosa
-     * @param credErr mensaje de error si aplica
-     * @return vista de detalle de emisor
+     * <p>Agrega al {@link Model}:</p>
+     * <ul>
+     *   <li>{@code issuer}: emisor consultado por id.</li>
+     *   <li>{@code allDocs}: listado de todas las definiciones de documentos disponibles.</li>
+     * </ul>
+     *
+     * @param id identificador interno del emisor
+     * @param model modelo de Spring MVC
+     * @return nombre de la vista de detalle del emisor
      */
     @GetMapping("/{id}")
-    public String detail(@PathVariable Long id, Model model,
-                         @RequestParam(value = "credOk", required = false) String credOk,
-                         @RequestParam(value = "credErr", required = false) String credErr) {
+    public String detail(@PathVariable Long id, Model model) {
         IssuingEntity issuer = issuerService.getById(id);
         model.addAttribute("issuer", issuer);
-        model.addAttribute("entityUser", entityUserRepository.findById(id).orElse(null));
         model.addAttribute("allDocs", documentService.findAll());
-        model.addAttribute("credOk", credOk);
-        model.addAttribute("credErr", credErr);
         return "admin/issuer-detail";
     }
 
     /**
-     * Asocia un tipo de documento permitido a un emisor.
+     * Asocia una definición de documento a un emisor.
      *
-     * @param id identificador del emisor
-     * @param documentId identificador del documento
-     * @return redirección al detalle del emisor
+     * <p>Esta operación delega en {@link IssuingEntityService#ensureIssuerHasDocument(IssuingEntity, Long)}
+     * para garantizar idempotencia.</p>
+     *
+     * @param id identificador interno del emisor
+     * @param documentId identificador interno de la definición de documento a asociar
+     * @return redirección al detalle del emisor: {@code /admin/issuers/{id}}
      */
     @PostMapping("/{id}/documents/add")
     public String addDoc(@PathVariable Long id, @RequestParam Long documentId) {
@@ -90,36 +102,19 @@ public class IssuerAdminController {
     }
 
     /**
-     * Elimina la asociación de un tipo de documento permitido para un emisor.
+     * Remueve la asociación entre un emisor y una definición de documento.
      *
-     * @param id identificador del emisor
-     * @param documentId identificador del documento
-     * @return redirección al detalle del emisor
+     * <p>La operación delega en {@link IssuingEntityService#removeIssuerDocument(IssuingEntity, Long)}
+     * para eliminar la relación.</p>
+     *
+     * @param id identificador interno del emisor
+     * @param documentId identificador interno de la definición de documento a remover
+     * @return redirección al detalle del emisor: {@code /admin/issuers/{id}}
      */
     @PostMapping("/{id}/documents/remove")
     public String removeDoc(@PathVariable Long id, @RequestParam Long documentId) {
         IssuingEntity issuer = issuerService.getById(id);
         issuerService.removeIssuerDocument(issuer, documentId);
         return "redirect:/admin/issuers/" + id;
-    }
-
-    /**
-     * Establece credenciales de acceso para el usuario emisor.
-     *
-     * @param id identificador del emisor
-     * @param email correo del usuario emisor
-     * @param password contraseña a registrar
-     * @return redirección al detalle del emisor indicando resultado
-     */
-    @PostMapping("/{id}/credentials")
-    public String saveCredentials(@PathVariable Long id,
-                                  @RequestParam("email") String email,
-                                  @RequestParam("password") String password) {
-        try {
-            issuerAccountService.setCredentials(id, email, password);
-            return "redirect:/admin/issuers/" + id + "?credOk=1";
-        } catch (Exception ex) {
-            return "redirect:/admin/issuers/" + id + "?credErr=" + ex.getMessage();
-        }
     }
 }

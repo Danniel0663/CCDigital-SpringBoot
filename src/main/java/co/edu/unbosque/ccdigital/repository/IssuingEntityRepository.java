@@ -12,47 +12,78 @@ import java.util.Optional;
 /**
  * Repositorio JPA para la entidad {@link IssuingEntity}.
  *
- * <p>Incluye búsquedas por atributos funcionales (tipo/estado) y una consulta de
- * agregación para estadísticas de emisores.</p>
+ * <p>Este repositorio centraliza el acceso a datos de la tabla {@code entities} (emisores)
+ * e incluye métodos para:</p>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Long> {
 
     /**
-     * Busca una entidad por tipo y nombre, ignorando mayúsculas/minúsculas.
+     * Busca una entidad emisora por su tipo y por su nombre, ignorando mayúsculas y minúsculas.
      *
-     * @param entityType tipo de entidad
+     * <p>Útil para evitar duplicados en el registro (por ejemplo, si quieres validar si ya existe un emisor
+     * antes de crearlo).</p>
+     *
+     * @param entityType tipo de entidad (por ejemplo {@link EntityType#EMISOR})
      * @param name nombre de la entidad
-     * @return {@link Optional} con la entidad encontrada o vacío si no existe
+     * @return {@link Optional} con la entidad si existe; vacío si no existe
      */
     Optional<IssuingEntity> findByEntityTypeAndNameIgnoreCase(EntityType entityType, String name);
 
     /**
-     * Lista entidades filtrando por tipo y estado, ordenadas por nombre.
+     * Lista entidades por tipo y estado, ordenadas por nombre ascendente.
      *
-     * @param entityType tipo de entidad
-     * @param status estado de entidad
-     * @return lista de entidades
+     * <p>Se usa típicamente en el módulo "issuer" para listar emisores aprobados
+     * (por ejemplo: {@code entityType=EMISOR} y {@code status=APROBADA}).</p>
+     *
+     * @param entityType tipo de entidad (por ejemplo {@link EntityType#EMISOR})
+     * @param status estado de aprobación (por ejemplo {@link EntityStatus#APROBADA})
+     * @return lista de emisores filtrados y ordenados por nombre
      */
     List<IssuingEntity> findByEntityTypeAndStatusOrderByNameAsc(EntityType entityType, EntityStatus status);
 
     /**
-     * Proyección para estadísticas agregadas de emisores.
+     * Proyección (interface-based projection) para el resumen estadístico de emisores.
+     *
+     * <p>Los métodos deben coincidir con los alias definidos en la consulta nativa
+     * de {@link #findIssuerStats()}.</p>
      */
     interface IssuerStats {
+
+        /**
+         * @return id del emisor
+         */
         Long getId();
+
+        /**
+         * @return nombre del emisor
+         */
         String getName();
+
+        /**
+         * @return cantidad de documentos emitidos/radicados por el emisor (conteo de person_documents)
+         */
         Long getDocumentosEmitidos();
+
+        /**
+         * @return cantidad de tipos de documento autorizados para el emisor (distinct en tabla puente)
+         */
         Long getTiposDocumento();
     }
 
     /**
-     * Retorna estadísticas de emisores:
-     * <ul>
-     *   <li>Total de documentos emitidos (person_documents asociados)</li>
-     *   <li>Total de tipos de documento habilitados (relación entity_document_definitions)</li>
-     * </ul>
+     * Retorna estadísticas agregadas por emisor para el módulo administrativo.
      *
-     * @return lista de estadísticas ordenadas por documentos emitidos descendente y nombre ascendente
+     * <p>La consulta calcula:</p>
+     *
+     * <p>Incluye emisores aunque no tengan documentos emitidos (por uso de {@code LEFT JOIN}).</p>
+     * <p>Filtra únicamente entidades con {@code entity_type = 'EMISOR'}.</p>
+     * <p>Ordena por documentos emitidos descendente y luego por nombre ascendente.</p>
+     *
+     * @return lista de estadísticas por emisor
      */
     @Query(value =
             "SELECT " +

@@ -1,43 +1,27 @@
-# ===== Java / Maven =====
-target/
-*.class
-*.log
-
-# Maven backup files
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-
-# ===== Gradle (por si acaso) =====
-.gradle/
-build/
-
-# ===== IDEs =====
-# Eclipse
-.project
+cat > .gitignore <<EOF
 .classpath
+.project
 .settings/
-.factorypath
-
-# IntelliJ
-.idea/
-*.iml
-*.ipr
-*.iws
-out/
-
-# VS Code
-.vscode/
-
-# ===== OS =====
+# OS
 .DS_Store
 Thumbs.db
 
-# ===== Env / secrets =====
+# IDEs
+.vscode/
+.idea/
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
 .env
-*.local
+
+# Java
+target/
+*.class
+
+# Otros
+.env
+EOF

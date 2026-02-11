@@ -10,24 +10,33 @@ import java.util.List;
 /**
  * Repositorio JPA para la entidad {@link DocumentDefinition}.
  *
- * <p>Incluye consultas específicas para obtener el catálogo de documentos permitido
- * para una entidad emisora.</p>
+ * <p>Extiende {@link JpaRepository} para proveer operaciones CRUD sobre la tabla {@code documents}
+ * (definiciones/catálogo de documentos).</p>
+ *
+ * <p>Incluye una consulta personalizada para obtener los documentos que un emisor específico
+ * tiene permitidos, basada en la tabla puente {@code entity_document_definitions}.</p>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 public interface DocumentDefinitionRepository extends JpaRepository<DocumentDefinition, Long> {
 
     /**
-     * Obtiene la lista de definiciones de documento permitidas para un emisor, a partir
-     * de la tabla de relación {@code entity_document_definitions}.
+     * Retorna las definiciones de documentos permitidas para un emisor.
      *
-     * @param issuerId identificador del emisor (entity_id)
-     * @return lista de documentos permitidos, ordenados por título
+     * <p>La autorización se define por la tabla puente {@code entity_document_definitions},
+     * que relaciona:</p>
+     *
+     * <p>La lista se retorna ordenada por {@code d.title}.</p>
+     *
+     * @param issuerId id del emisor (entity) para el cual se consultan documentos permitidos
+     * @return lista de {@link DocumentDefinition} permitidas para el emisor
      */
-    @Query(value =
-            "SELECT d.* " +
+    @Query(value = "SELECT d.* " +
             "FROM documents d " +
             "JOIN entity_document_definitions edd ON edd.document_id = d.id " +
             "WHERE edd.entity_id = :issuerId " +
-            "ORDER BY d.title",
-            nativeQuery = true)
+            "ORDER BY d.title", nativeQuery = true)
     List<DocumentDefinition> findAllowedByIssuer(@Param("issuerId") Long issuerId);
 }

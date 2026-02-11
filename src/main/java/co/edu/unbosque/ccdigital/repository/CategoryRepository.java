@@ -5,6 +5,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
  * Repositorio JPA para la entidad {@link Category}.
+ *
+ * <p>Provee operaciones CRUD y consultas básicas sobre la tabla {@code categories}
+ * mediante {@link JpaRepository}:</p>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 }

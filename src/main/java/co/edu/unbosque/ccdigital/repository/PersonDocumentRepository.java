@@ -11,23 +11,23 @@ import java.util.Optional;
 /**
  * Repositorio JPA para la entidad {@link PersonDocument}.
  *
- * <p>Incluye consultas con {@code fetch join} para cargar archivos y relaciones
- * asociadas evitando problemas de inicialización perezosa.</p>
+ * <p>Extiende {@link JpaRepository} para proveer operaciones CRUD sobre la tabla {@code person_documents}
+ * (documentos asociados a personas).</p>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 public interface PersonDocumentRepository extends JpaRepository<PersonDocument, Long> {
 
     /**
-     * Lista documentos de una persona incluyendo:
-     * <ul>
-     *   <li>Archivos asociados</li>
-     *   <li>Definición del documento</li>
-     *   <li>Entidad emisora</li>
-     * </ul>
+     * Retorna los documentos asociados a una persona.
      *
-     * <p>El {@code distinct} evita duplicados por la relación uno-a-muchos con archivos.</p>
+     * <p>Se utiliza típicamente para mostrar el detalle de la persona con su listado de documentos,
+     * evitando múltiples consultas adicionales (N+1).</p>
      *
-     * @param personId identificador de la persona
-     * @return lista de documentos de la persona con relaciones cargadas
+     * @param personId id de la persona
+     * @return lista de {@link PersonDocument} con sus relaciones cargadas
      */
     @Query("select distinct pd " +
            "from PersonDocument pd " +
@@ -38,10 +38,13 @@ public interface PersonDocumentRepository extends JpaRepository<PersonDocument, 
     List<PersonDocument> findByPersonIdWithFiles(@Param("personId") Long personId);
 
     /**
-     * Obtiene un documento por id incluyendo archivos, definición y emisor.
+     * Obtiene un {@link PersonDocument} por su id.
      *
-     * @param id identificador del documento de persona
-     * @return {@link Optional} con el documento si existe
+     * <p>Útil para endpoints de detalle/descarga donde se requiere validar el archivo asociado
+     * al documento y acceder a metadatos sin disparar consultas adicionales.</p>
+     *
+     * @param id id del {@link PersonDocument}
+     * @return {@link Optional} con el documento si existe; vacío si no existe
      */
     @Query("select pd " +
            "from PersonDocument pd " +

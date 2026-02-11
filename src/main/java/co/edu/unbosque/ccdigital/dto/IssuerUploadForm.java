@@ -5,50 +5,153 @@ import co.edu.unbosque.ccdigital.entity.PersonDocumentStatus;
 import java.time.LocalDate;
 
 /**
- * DTO para carga de documentos por parte de un emisor.
+ * DTO utilizado para capturar los datos del formulario de carga de documentos en el módulo de Emisores (Issuer).
  *
- * <p>Incluye el identificador de la persona, el tipo de documento autorizado
- * para el emisor y los metadatos del documento.</p>
+ * <p><b>Valor por defecto:</b> {@link #status} se inicializa como {@link PersonDocumentStatus#VIGENTE}.</p>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 public class IssuerUploadForm {
 
     /**
-     * Identificador de la persona a la que se asociará el documento.
+     * Identificador del emisor (issuer) que realiza la carga del documento.
+     */
+    private Long issuerId;
+
+    /**
+     * Identificador de la persona a la cual se asociará el documento cargado.
      */
     private Long personId;
 
     /**
-     * Identificador de la definición del documento a cargar.
+     * Identificador de la definición de documento seleccionada (catálogo).
      */
     private Long documentId;
 
     /**
-     * Estado del documento (por defecto: VIGENTE).
+     * Estado funcional del documento.
+     *
+     * <p>Por defecto se asigna {@link PersonDocumentStatus#VIGENTE}.</p>
      */
     private PersonDocumentStatus status = PersonDocumentStatus.VIGENTE;
 
     /**
-     * Fecha de emisión del documento.
+     * Fecha de expedición/emisión del documento.
      */
     private LocalDate issueDate;
 
     /**
-     * Fecha de vencimiento del documento.
+     * Fecha de vencimiento del documento (si aplica).
      */
     private LocalDate expiryDate;
 
-    public Long getPersonId() { return personId; }
-    public void setPersonId(Long personId) { this.personId = personId; }
+    /**
+     * Retorna el id del emisor que realiza la carga.
+     *
+     * @return id del emisor
+     */
+    public Long getIssuerId() {
+        return issuerId;
+    }
 
-    public Long getDocumentId() { return documentId; }
-    public void setDocumentId(Long documentId) { this.documentId = documentId; }
+    /**
+     * Establece el id del emisor que realiza la carga.
+     *
+     * @param issuerId id del emisor
+     */
+    public void setIssuerId(Long issuerId) {
+        this.issuerId = issuerId;
+    }
 
-    public PersonDocumentStatus getStatus() { return status; }
-    public void setStatus(PersonDocumentStatus status) { this.status = status; }
+    /**
+     * Retorna el id de la persona asociada a la carga.
+     *
+     * @return id de la persona
+     */
+    public Long getPersonId() {
+        return personId;
+    }
 
-    public LocalDate getIssueDate() { return issueDate; }
-    public void setIssueDate(LocalDate issueDate) { this.issueDate = issueDate; }
+    /**
+     * Establece el id de la persona asociada a la carga.
+     *
+     * @param personId id de la persona
+     */
+    public void setPersonId(Long personId) {
+        this.personId = personId;
+    }
 
-    public LocalDate getExpiryDate() { return expiryDate; }
-    public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }
+    /**
+     * Retorna el id de la definición de documento seleccionada.
+     *
+     * @return id de la definición de documento
+     */
+    public Long getDocumentId() {
+        return documentId;
+    }
+
+    /**
+     * Establece el id de la definición de documento seleccionada.
+     *
+     * @param documentId id de la definición de documento
+     */
+    public void setDocumentId(Long documentId) {
+        this.documentId = documentId;
+    }
+
+    /**
+     * Retorna el estado del documento.
+     *
+     * @return estado del documento
+     */
+    public PersonDocumentStatus getStatus() {
+        return status;
+    }
+
+    /**
+     * Establece el estado del documento.
+     *
+     * @param status estado del documento
+     */
+    public void setStatus(PersonDocumentStatus status) {
+        this.status = status;
+    }
+
+    /**
+     * Retorna la fecha de expedición del documento.
+     *
+     * @return fecha de expedición
+     */
+    public LocalDate getIssueDate() {
+        return issueDate;
+    }
+
+    /**
+     * Establece la fecha de expedición del documento.
+     *
+     * @param issueDate fecha de expedición
+     */
+    public void setIssueDate(LocalDate issueDate) {
+        this.issueDate = issueDate;
+    }
+
+    /**
+     * Retorna la fecha de vencimiento del documento.
+     *
+     * @return fecha de vencimiento
+     */
+    public LocalDate getExpiryDate() {
+        return expiryDate;
+    }
+
+    /**
+     * Establece la fecha de vencimiento del documento.
+     *
+     * @param expiryDate fecha de vencimiento
+     */
+    public void setExpiryDate(LocalDate expiryDate) {
+        this.expiryDate = expiryDate;
+    }
 }
