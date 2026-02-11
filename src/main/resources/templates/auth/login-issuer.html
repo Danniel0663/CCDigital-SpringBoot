@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Login Emisor</title>
+</head>
+<body>
+  <main style="max-width:420px; margin:48px auto; font-family: Arial, sans-serif;">
+    <h2>Ingreso Emisor</h2>
+
+    <div th:if="${param.error}" style="margin:12px 0; color:#b00020;">
+      Credenciales inválidas.
+    </div>
+    <div th:if="${param.logout}" style="margin:12px 0; color:#0a7a00;">
+      Sesión cerrada correctamente.
+    </div>
+
+    <form th:action="@{/login/issuer}" method="post" style="display:flex; flex-direction:column; gap:10px;">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+      <label>
+        Correo del emisor
+        <!-- Spring Security espera el campo "username" -->
+        <input name="username" required style="width:100%; padding:8px;"/>
+      </label>
+
+      <label>
+        Contraseña
+        <input type="password" name="password" required style="width:100%; padding:8px;"/>
+      </label>
+
+      <button type="submit" style="padding:10px;">Ingresar</button>
+      <small style="color:#555;">
+        Se valida contra la tabla <code>entity_users</code> (campo <code>email</code>).
+      </small>
+    </form>
+  </main>
+</body>
+</html>

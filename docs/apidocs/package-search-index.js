@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"co.edu.unbosque.ccdigital"},{"l":"co.edu.unbosque.ccdigital.config"},{"l":"co.edu.unbosque.ccdigital.controller"},{"l":"co.edu.unbosque.ccdigital.dto"},{"l":"co.edu.unbosque.ccdigital.entity"},{"l":"co.edu.unbosque.ccdigital.repository"},{"l":"co.edu.unbosque.ccdigital.service"}];updateSearchResults();
