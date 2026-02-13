@@ -20,6 +20,7 @@ __pycache__/
 
 # Java
 target/
+bin/
 *.class
 
 # Otros
