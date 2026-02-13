@@ -20,53 +20,35 @@ import java.util.List;
 /**
  * Controlador web del módulo administrativo (Gobierno) de CCDigital.
  *
- * <p>Expone endpoints bajo el prefijo {@code /admin} para:</p>
- * <ul>
- *   <li>Visualizar el dashboard administrativo.</li>
- *   <li>Gestionar personas (listar, crear, ver detalle).</li>
- *   <li>Subir documentos asociados a una persona.</li>
- *   <li>Ejecutar acciones de sincronización con herramientas externas (Fabric/Indy).</li>
- * </ul>
+ * <p>
+ * Expone endpoints bajo el prefijo {@code /admin} para la operación del panel administrativo,
+ * incluyendo gestión de personas, gestión documental y ejecución de procesos de sincronización
+ * con herramientas externas.
+ * </p>
  *
- * <p> La lógica de negocio se delega a servicios, el controlador se encarga
- * principalmente de enrutar peticiones HTTP, armar el {@link Model} y redireccionar
- * a las vistas correspondientes.</p>
+ * <p>
+ * La lógica de negocio se delega a los servicios; este controlador se encarga de enrutar peticiones,
+ * poblar el {@link Model} y retornar vistas o redirecciones.
+ * </p>
  *
- * @author Danniel
- * @author Yeison 
  * @since 3.0
  */
 @Controller
 @RequestMapping("/admin")
 public class AdminController {
 
-    /**
-     * Servicio de gestión de personas (CRUD y utilidades relacionadas, como creación de carpeta).
-     */
     private final PersonService personService;
-
-    /**
-     * Servicio de gestión de documentos asociados a personas.
-     */
     private final PersonDocumentService personDocumentService;
-
-    /**
-     * Servicio de definiciones de documentos (catálogo, reglas o metadatos de documentos).
-     */
     private final DocumentDefinitionService documentDefinitionService;
-
-    /**
-     * Servicio que encapsula la ejecución de herramientas externas como son los scripts de Fabric e Indy.
-     */
     private final ExternalToolsService externalToolsService;
 
     /**
-     * Construye el controlador administrativo inyectando las dependencias requeridas.
+     * Constructor del controlador administrativo.
      *
      * @param personService servicio para operaciones sobre {@link Person}
      * @param personDocumentService servicio para operaciones sobre {@link PersonDocument}
      * @param documentDefinitionService servicio de definiciones/catálogos de documentos
-     * @param externalToolsService servicio de ejecución de herramientas externas Fabric y Indy
+     * @param externalToolsService servicio de ejecución de herramientas externas
      */
     public AdminController(PersonService personService,
                            PersonDocumentService personDocumentService,
@@ -79,15 +61,16 @@ public class AdminController {
     }
 
     /**
-     * Vista de dashboard del módulo administrativo.
+     * Retorna la vista principal del dashboard administrativo.
      *
      * <p>Rutas soportadas:</p>
      * <ul>
+     *   <li>{@code GET /admin}</li>
      *   <li>{@code GET /admin/}</li>
      *   <li>{@code GET /admin/dashboard}</li>
      * </ul>
      *
-     * @return nombre de la vista del dashboard administrativo
+     * @return nombre de la vista del dashboard
      */
     @GetMapping({"", "/", "/dashboard"})
     public String dashboard() {
@@ -95,17 +78,17 @@ public class AdminController {
     }
 
     /**
-     * Muestra la vista de listado de personas y carga los elementos requeridos por el formulario de creación.
+     * Muestra la vista de listado de personas y carga los elementos necesarios para el formulario de creación.
      *
-     * <p>Agrega al {@link Model}:</p>
+     * <p>Agrega al modelo:</p>
      * <ul>
-     *   <li>{@code people}: listado de personas existentes.</li>
-     *   <li>{@code form}: formulario vacío {@link PersonCreateForm} para la creación.</li>
-     *   <li>{@code idTypes}: valores disponibles de {@link IdType} para el selector en la UI.</li>
+     *   <li>{@code people}: listado de personas existentes</li>
+     *   <li>{@code form}: formulario vacío {@link PersonCreateForm}</li>
+     *   <li>{@code idTypes}: valores de {@link IdType}</li>
      * </ul>
      *
-     * @param model modelo de Spring MVC usado para enviar atributos a la vista
-     * @return nombre de la vista de listado de personas
+     * @param model modelo de Spring MVC
+     * @return nombre de la vista de personas
      */
     @GetMapping("/persons")
     public String persons(Model model) {
@@ -118,13 +101,7 @@ public class AdminController {
     /**
      * Muestra el formulario dedicado para crear una nueva persona.
      *
-     * <p>Agrega al {@link Model}:</p>
-     * <ul>
-     *   <li>{@code form}: instancia vacía de {@link PersonCreateForm}.</li>
-     *   <li>{@code idTypes}: valores disponibles de {@link IdType}.</li>
-     * </ul>
-     *
-     * @param model modelo de Spring MVC usado para enviar atributos a la vista
+     * @param model modelo de Spring MVC
      * @return nombre de la vista del formulario de persona
      */
     @GetMapping("/persons/new")
@@ -135,13 +112,14 @@ public class AdminController {
     }
 
     /**
-     * Crea una nueva persona con la información recibida desde la UI.
+     * Crea una nueva persona a partir de los datos capturados en el formulario.
      *
-     * <p>La creación delega al servicio {@link PersonService}, el cual puede realizar tareas adicionales
-     * como crear una carpeta asociada a la persona (por ejemplo, para almacenamiento de archivos).</p>
+     * <p>
+     * La creación delega a {@link PersonService#createPersonAndFolder(Person)}.
+     * </p>
      *
      * @param form datos capturados desde el formulario de creación
-     * @return redirección al detalle de la persona recién creada
+     * @return redirección al detalle de la persona creada
      */
     @PostMapping("/persons")
     public String createPerson(@ModelAttribute("form") PersonCreateForm form) {
@@ -161,12 +139,6 @@ public class AdminController {
     /**
      * Muestra el detalle de una persona y su listado de documentos asociados.
      *
-     * <p>Agrega al {@link Model}:</p>
-     * <ul>
-     *   <li>{@code person}: entidad {@link Person} consultada por id.</li>
-     *   <li>{@code docs}: lista de {@link PersonDocument} asociados a la persona.</li>
-     * </ul>
-     *
      * @param id identificador interno de la persona
      * @param model modelo de Spring MVC
      * @return nombre de la vista de detalle de persona
@@ -184,17 +156,18 @@ public class AdminController {
     /**
      * Carga (upload) un documento para una persona específica.
      *
-     * <p>Este endpoint recibe metadatos del documento mediante {@link DocumentUploadForm}
-     * y el archivo físico como {@link MultipartFile}. La persistencia y almacenamiento
-     * se delegan a {@link PersonDocumentService}.</p>
+     * <p>
+     * Recibe metadatos mediante {@link DocumentUploadForm} y el archivo físico como {@link MultipartFile}.
+     * La persistencia y el almacenamiento se delegan a {@link PersonDocumentService}.
+     * </p>
      *
-     * @param id de la persona a la cual se asociará el documento
-     * @param uploadForm formulario con metadatos
-     * @param file archivo cargado desde el formulario HTML
-     * @return redirección al detalle de la persona: {@code /admin/persons/{id}}
+     * @param id identificador de la persona a la cual se asociará el documento
+     * @param uploadForm formulario con metadatos del documento
+     * @param file archivo cargado desde la UI
+     * @return redirección al detalle de la persona
      */
     @PostMapping("/persons/{id}/upload")
-    public String uploadDoc(@PathVariable Long id,
+    public String uploadDoc(@PathVariable("id") Long id,
                             @ModelAttribute("uploadForm") DocumentUploadForm uploadForm,
                             @RequestParam("file") MultipartFile file) {
 
@@ -209,16 +182,9 @@ public class AdminController {
 
         return "redirect:/admin/persons/" + id;
     }
-    
+
     /**
-     * Muestra la página de sincronización (Sync) del módulo administrativo.
-     *
-     * <p>Agrega al {@link Model}:</p>
-     * <ul>
-     *   <li>{@code personForm}: formulario vacío {@link SyncPersonForm}.</li>
-     *   <li>{@code idTypes}: valores de {@link IdType}.</li>
-     *   <li>{@code result}: resultado nulo evitando valores nulos.</li>
-     * </ul>
+     * Muestra la página de sincronización del módulo administrativo.
      *
      * @param model modelo de Spring MVC
      * @return nombre de la vista de sincronización
@@ -232,10 +198,7 @@ public class AdminController {
     }
 
     /**
-     * Ejecuta la sincronización completa hacia Hyperledger Fabric (todas las personas/documentos).
-     *
-     * <p>Invoca {@link ExternalToolsService#runFabricSyncAll()} y retorna a la misma vista de sync
-     * con el resultado de ejecución.</p>
+     * Ejecuta la sincronización completa hacia Hyperledger Fabric.
      *
      * @param model modelo de Spring MVC
      * @return nombre de la vista de sincronización
@@ -251,10 +214,9 @@ public class AdminController {
     }
 
     /**
-     * Ejecuta la sincronización hacia Hyperledger Fabric para una persona específica,
-     * identificada por tipo y número de documento.
+     * Ejecuta la sincronización hacia Hyperledger Fabric para una persona específica.
      *
-     * @param form formulario con el {@link IdType} y el número de identificación
+     * @param form formulario con {@link IdType} y número de identificación
      * @param model modelo de Spring MVC
      * @return nombre de la vista de sincronización con el resultado
      */
@@ -270,10 +232,7 @@ public class AdminController {
     }
 
     /**
-     * Ejecuta la emisión de credenciales en Indy a partir de la información existente en base de datos.
-     *
-     * <p>Este endpoint está ruteado bajo {@code POST /admin/sync/indy/issue} para evitar duplicidad
-     * de prefijo {@code /admin}. Retorna a la misma vista de sincronización con el resultado.</p>
+     * Ejecuta la emisión de credenciales Indy a partir de la información disponible en el sistema.
      *
      * @param model modelo de Spring MVC
      * @return nombre de la vista de sincronización con el resultado

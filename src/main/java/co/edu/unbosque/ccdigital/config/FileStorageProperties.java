@@ -3,12 +3,14 @@ package co.edu.unbosque.ccdigital.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Propiedades de configuración para el almacenamiento de archivos en el sistema.
+ * Propiedades de configuración para el almacenamiento de archivos.
  *
- * <p>Esta clase mapea propiedades definidas en {@code application.properties} o
- * {@code application.yml} usando el prefijo {@code ccdigital.fs}.</p>
+ * <p>
+ * Mapea la configuración bajo el prefijo {@code ccdigital.fs}. El valor configurado se utiliza
+ * como directorio raíz para guardar y localizar archivos asociados al proyecto.
+ * </p>
  *
- * <h2>Ejemplo (application.properties)</h2>
+ * <h2>Ejemplo</h2>
  * <pre>
  * ccdigital.fs.base-path=/home/ccdigital/CCDigitalBlock/storage
  * </pre>
@@ -26,8 +28,7 @@ public class FileStorageProperties {
     /**
      * Ruta base donde la aplicación almacenará y buscará archivos.
      *
-     * <p>Debe ser una ruta válida en el sistema operativo donde se ejecuta la aplicación
-     * y el proceso debe contar con permisos de lectura y escritura.</p>
+     * <p>El proceso debe contar con permisos de lectura y escritura sobre esta ruta.</p>
      */
     private String basePath;
 

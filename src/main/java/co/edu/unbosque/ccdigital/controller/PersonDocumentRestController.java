@@ -12,37 +12,31 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Controlador REST para la gestión de documentos asociados a personas y descarga de archivos.
+ * Controlador REST para gestión de documentos asociados a personas y descarga de archivos.
  *
- * <p>Expone endpoints bajo el prefijo {@code /api}</p>
+ * <p>
+ * Expone endpoints bajo {@code /api} para consultar documentos y descargar archivos asociados.
+ * </p>
  *
- * <p><b>Descarga de archivos:</b> el endpoint de descarga valida que el {@code fileId}
- * pertenezca al {@code PersonDocument} indicado por {@code personDocId} antes de cargar el
- * recurso con {@link FileStorageService}.</p>
+ * <p>
+ * El endpoint de descarga valida que el archivo pertenezca al documento de persona indicado
+ * antes de cargar el recurso desde {@link FileStorageService}.
+ * </p>
  *
- * @author Danniel
- * @author Yeison
  * @since 1.0
  */
 @RestController
 @RequestMapping("/api")
 public class PersonDocumentRestController {
 
-    /**
-     * Servicio de negocio para operaciones sobre documentos asociados a personas.
-     */
     private final PersonDocumentService personDocumentService;
-
-    /**
-     * Servicio de almacenamiento/carga de archivos desde el sistema (o repositorio configurado).
-     */
     private final FileStorageService fileStorageService;
 
     /**
-     * Construye el controlador REST inyectando dependencias.
+     * Constructor del controlador.
      *
      * @param personDocumentService servicio para documentos de persona
-     * @param fileStorageService servicio para cargar archivos como {@link Resource}
+     * @param fileStorageService servicio de almacenamiento de archivos
      */
     public PersonDocumentRestController(PersonDocumentService personDocumentService,
                                         FileStorageService fileStorageService) {
@@ -54,27 +48,22 @@ public class PersonDocumentRestController {
      * Lista los documentos asociados a una persona.
      *
      * @param personId identificador interno de la persona
-     * @return lista de {@link PersonDocument} asociados a la persona
+     * @return lista de documentos asociados a la persona
      */
     @GetMapping("/persons/{personId}/documents")
-    public List<PersonDocument> listByPerson(@PathVariable Long personId) {
+    public List<PersonDocument> listByPerson(@PathVariable("personId") Long personId) {
         return personDocumentService.listByPerson(personId);
     }
 
     /**
      * Crea un documento asociado a una persona usando un request JSON.
      *
-     * <p>Endpoint: {@code POST /api/persons/{personId}/documents}</p>
-     *
-     * <p>El {@code personId} se toma de la ruta y se fuerza en el {@link PersonDocumentRequest}
-     * para asegurar consistencia.</p>
-     *
      * @param personId identificador interno de la persona
-     * @param request request con la información necesaria para crear el documento
-     * @return {@link PersonDocument} creado
+     * @param request request con la información del documento
+     * @return documento creado
      */
     @PostMapping("/persons/{personId}/documents")
-    public PersonDocument createForPerson(@PathVariable Long personId,
+    public PersonDocument createForPerson(@PathVariable("personId") Long personId,
                                           @RequestBody PersonDocumentRequest request) {
         request.setPersonId(personId);
         return personDocumentService.create(request);
@@ -83,36 +72,36 @@ public class PersonDocumentRestController {
     /**
      * Obtiene un documento de persona por su identificador.
      *
-     * @param id identificador interno del {@link PersonDocument}
-     * @return documento asociado a persona
+     * @param id identificador del documento
+     * @return documento encontrado
      */
     @GetMapping("/person-documents/{id}")
-    public PersonDocument getPersonDocument(@PathVariable Long id) {
+    public PersonDocument getPersonDocument(@PathVariable("id") Long id) {
         return personDocumentService.getById(id);
     }
 
     /**
      * Descarga o visualiza (inline) un archivo asociado a un documento de persona.
-     * 
-     * @param personDocId id del {@link PersonDocument} propietario del archivo
+     *
+     * @param personDocId id del documento de persona propietario del archivo
      * @param fileId id del archivo a descargar/visualizar
-     * @return {@link ResponseEntity} con el {@link Resource} del archivo
-     * @throws IllegalArgumentException si el archivo no pertenece al {@link PersonDocument} indicado
+     * @return respuesta HTTP con el recurso del archivo
+     * @throws IllegalArgumentException si el archivo no pertenece al documento indicado
      */
     @GetMapping("/person-documents/{personDocId}/files/{fileId}")
-    public ResponseEntity<Resource> downloadFile(@PathVariable Long personDocId,
-                                                 @PathVariable Long fileId) {
+    public ResponseEntity<Resource> downloadFile(@PathVariable("personDocId") Long personDocId,
+                                                 @PathVariable("fileId") Long fileId) {
 
         PersonDocument pd = personDocumentService.getById(personDocId);
 
         FileRecord fileRecord = pd.getFiles().stream()
                 .filter(f -> f.getId().equals(fileId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Archivo no pertenece a este PersonDocument"));
+                .orElseThrow(() -> new IllegalArgumentException("Archivo no pertenece al documento indicado."));
 
         Resource resource = fileStorageService.loadAsResource(fileRecord);
 
-        String contentType = fileRecord.getMimeType() != null
+        String contentType = (fileRecord.getMimeType() != null && !fileRecord.getMimeType().isBlank())
                 ? fileRecord.getMimeType()
                 : "application/octet-stream";
 

@@ -13,6 +13,14 @@ import java.util.Optional;
  * <p>Esta capa encapsula el acceso al repositorio {@link DocumentDefinitionRepository} y expone
  * operaciones típicas para:</p>
  *
+ * <ul>
+ *   <li>Consultar el catálogo completo de definiciones.</li>
+ *   <li>Consultar una definición específica por id.</li>
+ *   <li>Persistir (crear/actualizar) definiciones de documentos.</li>
+ *   <li>Consultar definiciones permitidas para un emisor (issuer) usando la tabla puente
+ *       {@code entity_document_definitions}.</li>
+ * </ul>
+ *
  * <p>Se usa tanto desde controladores REST (API) como desde controladores MVC.</p>
  *
  * @author Danniel
@@ -39,7 +47,7 @@ public class DocumentDefinitionService {
     /**
      * Retorna las definiciones de documentos permitidas para un emisor.
      *
-     * <p>Se apoya en la consulta nativa del repositorio, que usa la tabla puente
+     * <p>Se apoya en una consulta del repositorio, que usa la tabla puente
      * {@code entity_document_definitions} para filtrar por {@code issuerId}.</p>
      *
      * @param issuerId id del emisor (entidad) para el cual se consultan documentos permitidos
@@ -71,7 +79,8 @@ public class DocumentDefinitionService {
     /**
      * Guarda o actualiza una definición de documento.
      *
-     * <p>Si {@code def.id} es {@code null}, crea un nuevo registro. Si no, actualiza el existente.</p>
+     * <p>Si {@code def.id} es {@code null}, crea un nuevo registro.
+     * Si no es {@code null}, actualiza el existente.</p>
      *
      * @param def definición de documento a persistir
      * @return definición persistida (con id asignado si era nuevo)

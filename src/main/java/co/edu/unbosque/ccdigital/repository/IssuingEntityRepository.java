@@ -10,10 +10,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Repositorio JPA para la entidad {@link IssuingEntity}.
+ * Repositorio JPA para {@link IssuingEntity}.
  *
- * <p>Este repositorio centraliza el acceso a datos de la tabla {@code entities} (emisores)
- * e incluye métodos para:</p>
+ * <p>
+ * Centraliza el acceso a datos de la tabla {@code entities} (emisores) e incluye métodos para:
+ * validar duplicados por nombre/tipo, listar emisores por estado y generar estadísticas agregadas.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -22,10 +24,11 @@ import java.util.Optional;
 public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Long> {
 
     /**
-     * Busca una entidad emisora por su tipo y por su nombre, ignorando mayúsculas y minúsculas.
+     * Busca una entidad emisora por tipo y por nombre, ignorando mayúsculas/minúsculas.
      *
-     * <p>Útil para evitar duplicados en el registro (por ejemplo, si quieres validar si ya existe un emisor
-     * antes de crearlo).</p>
+     * <p>
+     * Útil para evitar duplicados al registrar emisores.
+     * </p>
      *
      * @param entityType tipo de entidad (por ejemplo {@link EntityType#EMISOR})
      * @param name nombre de la entidad
@@ -36,8 +39,9 @@ public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Lo
     /**
      * Lista entidades por tipo y estado, ordenadas por nombre ascendente.
      *
-     * <p>Se usa típicamente en el módulo "issuer" para listar emisores aprobados
-     * (por ejemplo: {@code entityType=EMISOR} y {@code status=APROBADA}).</p>
+     * <p>
+     * Se usa típicamente para listar emisores aprobados en el módulo de emisores o administrativo.
+     * </p>
      *
      * @param entityType tipo de entidad (por ejemplo {@link EntityType#EMISOR})
      * @param status estado de aprobación (por ejemplo {@link EntityStatus#APROBADA})
@@ -48,8 +52,10 @@ public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Lo
     /**
      * Proyección (interface-based projection) para el resumen estadístico de emisores.
      *
-     * <p>Los métodos deben coincidir con los alias definidos en la consulta nativa
-     * de {@link #findIssuerStats()}.</p>
+     * <p>
+     * Los métodos deben coincidir con los alias definidos en la consulta nativa de
+     * {@link #findIssuerStats()}.
+     * </p>
      */
     interface IssuerStats {
 
@@ -69,7 +75,7 @@ public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Lo
         Long getDocumentosEmitidos();
 
         /**
-         * @return cantidad de tipos de documento autorizados para el emisor (distinct en tabla puente)
+         * @return cantidad de tipos de documento autorizados (distinct document_id en tabla puente)
          */
         Long getTiposDocumento();
     }
@@ -77,11 +83,18 @@ public interface IssuingEntityRepository extends JpaRepository<IssuingEntity, Lo
     /**
      * Retorna estadísticas agregadas por emisor para el módulo administrativo.
      *
-     * <p>La consulta calcula:</p>
+     * <p>La consulta calcula por cada emisor:</p>
+     * <ul>
+     *   <li>{@code documentosEmitidos}: total de registros en {@code person_documents} asociados al emisor.</li>
+     *   <li>{@code tiposDocumento}: total de definiciones autorizadas en {@code entity_document_definitions}.</li>
+     * </ul>
      *
-     * <p>Incluye emisores aunque no tengan documentos emitidos (por uso de {@code LEFT JOIN}).</p>
-     * <p>Filtra únicamente entidades con {@code entity_type = 'EMISOR'}.</p>
-     * <p>Ordena por documentos emitidos descendente y luego por nombre ascendente.</p>
+     * <p>Características:</p>
+     * <ul>
+     *   <li>Incluye emisores aunque no tengan documentos emitidos (uso de {@code LEFT JOIN}).</li>
+     *   <li>Filtra únicamente {@code entity_type = 'EMISOR'}.</li>
+     *   <li>Ordena por {@code documentosEmitidos} descendente y luego por {@code name} ascendente.</li>
+     * </ul>
      *
      * @return lista de estadísticas por emisor
      */

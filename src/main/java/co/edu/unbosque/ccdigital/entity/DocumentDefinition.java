@@ -8,10 +8,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad JPA que representa una definición (catálogo) de documento dentro de CCDigital.
+ * Entidad JPA que representa una definición de documento dentro del catálogo.
  *
- * <p>Se mapea a la tabla {@code documents}. Un {@code DocumentDefinition} describe el tipo de documento
- * que puede existir en el sistema</p>
+ * <p>
+ * Se mapea a la tabla {@code documents}. Una definición describe el tipo de documento que el sistema
+ * puede gestionar, incluyendo su título, entidad emisora en texto y metadatos de referencia.
+ * </p>
+ *
+ * <p>
+ * Los campos {@code created_at} y {@code updated_at} son gestionados por la base de datos.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -22,33 +28,34 @@ import java.util.List;
 public class DocumentDefinition {
 
     /**
-     * Identificador interno de la definición de documento (PK).
+     * Identificador interno de la definición (PK).
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     /**
-     * Categoría a la que pertenece esta definición de documento.
+     * Categoría a la que pertenece la definición.
      *
-     * <p>Relación Many-to-One. Se carga de forma perezosa para evitar traer la categoría
-     * automáticamente en todos los escenarios.</p>
+     * <p>Columna: {@code category_id}. Carga perezosa para reducir consultas innecesarias.</p>
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
     /**
-     * Título del documento (nombre descriptivo del tipo de documento).
+     * Título descriptivo del tipo de documento.
+     *
+     * <p>Columna: {@code title}.</p>
      */
     @Column(name = "title", nullable = false, length = 400)
     private String title;
 
     /**
-     * Nombre (texto) de la entidad emisora del documento.
+     * Nombre de la entidad emisora en texto.
      *
-     * <p>Este campo es el "issuing entity" en texto, diferente del concepto de {@link IssuingEntity}
-     * que representa emisores aprobados y registrados.</p>
+     * <p>Columna: {@code issuing_entity}. Este campo es texto y no reemplaza el concepto de
+     * {@link IssuingEntity}.</p>
      */
     @Column(name = "issuing_entity", nullable = false, length = 300)
     private String issuingEntity;
@@ -60,101 +67,53 @@ public class DocumentDefinition {
     private String description;
 
     /**
-     * URL de referencia o fuente del documento (si aplica).
+     * URL de referencia o fuente asociada.
+     *
+     * <p>Columna: {@code source_url}.</p>
      */
     @Column(name = "source_url", length = 600)
     private String sourceUrl;
 
     /**
-     * Bandera que indica si la definición está activa y disponible para uso en el sistema.
+     * Indicador de disponibilidad de la definición en el sistema.
+     *
+     * <p>Columna: {@code is_active}.</p>
      */
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
     /**
-     * Fecha/hora de creación del registro (gestionada por la base de datos).
+     * Fecha/hora de creación del registro, gestionada por base de datos.
      */
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
     /**
-     * Fecha/hora de última actualización del registro (gestionada por la base de datos).
+     * Fecha/hora de última actualización del registro, gestionada por base de datos.
      */
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
     /**
-     * Lista de documentos de persona ({@link PersonDocument}) creados a partir de esta definición.
-     *
-     * <p><b>Importante:</b> El valor de {@code mappedBy} debe coincidir con el nombre del atributo
-     * en {@link PersonDocument} que referencia a {@code DocumentDefinition}.</p>
-     *
+     * Documentos de persona creados a partir de esta definición.
      */
     @OneToMany(mappedBy = "documentDefinition", cascade = CascadeType.ALL, orphanRemoval = false)
     @JsonIgnore
     private List<PersonDocument> personDocuments = new ArrayList<>();
 
     /**
-     * Archivos asociados a esta definición de documento (si el modelo los usa para adjuntos del catálogo).
-     *
-     * <p>Se marca con {@link JsonIgnore} para evitar cargas y ciclos al serializar.</p>
+     * Archivos asociados a la definición (si el modelo utiliza adjuntos de catálogo).
      */
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = false)
     @JsonIgnore
     private List<FileRecord> files = new ArrayList<>();
 
     /**
-     * Emisores aprobados que pueden emitir esta definición de documento.
-     *
-     * <p>Relación Many-to-Many inversa, mapeada por el atributo {@code documentDefinitions}
-     * en {@link IssuingEntity}.</p>
-     *
+     * Emisores autorizados para emitir esta definición.
      */
     @ManyToMany(mappedBy = "documentDefinitions")
     @JsonIgnore
     private List<IssuingEntity> issuers = new ArrayList<>();
-
-    /**
-     * Retorna la lista de emisores asociados.
-     *
-     * @return lista de emisores
-     */
-    public List<IssuingEntity> getIssuers() {
-        return issuers;
-    }
-
-    /**
-     * Establece la lista de emisores asociados.
-     *
-     * @param issuers lista de emisores
-     */
-    public void setIssuers(List<IssuingEntity> issuers) {
-        this.issuers = issuers;
-    }
-
-    /**
-     * Establece la fecha de creación.
-     *
-     * <p>Generalmente este campo lo gestiona la base de datos. Este setter existe por compatibilidad
-     * con frameworks y serialización, pero se recomienda no asignarlo manualmente en la lógica de negocio.</p>
-     *
-     * @param createdAt fecha de creación
-     */
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    /**
-     * Establece la fecha de actualización.
-     *
-     * <p>Este campo lo gestiona la base de datos. Este setter existe por compatibilidad
-     * con frameworks/serialización, pero se recomienda no asignarlo manualmente en la lógica de negocio.</p>
-     *
-     * @param updatedAt fecha de actualización
-     */
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 
     /**
      * Retorna el id de la definición.
@@ -168,8 +127,6 @@ public class DocumentDefinition {
     /**
      * Establece el id de la definición.
      *
-     * <p>Normalmente no se asigna manualmente porque es autogenerado.</p>
-     *
      * @param id id de la definición
      */
     public void setId(Long id) {
@@ -179,7 +136,7 @@ public class DocumentDefinition {
     /**
      * Retorna la categoría asociada.
      *
-     * @return categoría del documento
+     * @return categoría
      */
     public Category getCategory() {
         return category;
@@ -188,7 +145,7 @@ public class DocumentDefinition {
     /**
      * Establece la categoría asociada.
      *
-     * @param category categoría del documento
+     * @param category categoría
      */
     public void setCategory(Category category) {
         this.category = category;
@@ -197,7 +154,7 @@ public class DocumentDefinition {
     /**
      * Retorna el título del documento.
      *
-     * @return título del documento
+     * @return título
      */
     public String getTitle() {
         return title;
@@ -206,34 +163,34 @@ public class DocumentDefinition {
     /**
      * Establece el título del documento.
      *
-     * @param title título del documento
+     * @param title título
      */
     public void setTitle(String title) {
         this.title = title;
     }
 
     /**
-     * Retorna el nombre (texto) de la entidad emisora.
+     * Retorna la entidad emisora en texto.
      *
-     * @return entidad emisora (texto)
+     * @return entidad emisora
      */
     public String getIssuingEntity() {
         return issuingEntity;
     }
 
     /**
-     * Establece el nombre (texto) de la entidad emisora.
+     * Establece la entidad emisora en texto.
      *
-     * @param issuingEntity entidad emisora (texto)
+     * @param issuingEntity entidad emisora
      */
     public void setIssuingEntity(String issuingEntity) {
         this.issuingEntity = issuingEntity;
     }
 
     /**
-     * Retorna la descripción del documento (opcional).
+     * Retorna la descripción del documento.
      *
-     * @return descripción
+     * @return descripción o {@code null}
      */
     public String getDescription() {
         return description;
@@ -249,16 +206,16 @@ public class DocumentDefinition {
     }
 
     /**
-     * Retorna la URL de referencia del documento.
+     * Retorna la URL de referencia.
      *
-     * @return URL de referencia
+     * @return URL de referencia o {@code null}
      */
     public String getSourceUrl() {
         return sourceUrl;
     }
 
     /**
-     * Establece la URL de referencia del documento.
+     * Establece la URL de referencia.
      *
      * @param sourceUrl URL de referencia
      */
@@ -285,25 +242,43 @@ public class DocumentDefinition {
     }
 
     /**
-     * Retorna la fecha de creación del registro.
+     * Retorna la fecha/hora de creación.
      *
-     * @return fecha de creación
+     * @return fecha/hora de creación
      */
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     /**
-     * Retorna la fecha de actualización del registro.
+     * Setter disponible por compatibilidad; se recomienda no asignar manualmente.
      *
-     * @return fecha de actualización
+     * @param createdAt fecha/hora de creación
+     */
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    /**
+     * Retorna la fecha/hora de actualización.
+     *
+     * @return fecha/hora de actualización
      */
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
 
     /**
-     * Retorna la lista de documentos de persona asociados a esta definición.
+     * Setter disponible por compatibilidad; se recomienda no asignar manualmente.
+     *
+     * @param updatedAt fecha/hora de actualización
+     */
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    /**
+     * Retorna los documentos de persona asociados a esta definición.
      *
      * @return lista de documentos de persona
      */
@@ -312,7 +287,7 @@ public class DocumentDefinition {
     }
 
     /**
-     * Establece la lista de documentos de persona asociados a esta definición.
+     * Establece los documentos de persona asociados.
      *
      * @param personDocuments lista de documentos de persona
      */
@@ -321,7 +296,7 @@ public class DocumentDefinition {
     }
 
     /**
-     * Retorna la lista de archivos asociados a esta definición.
+     * Retorna los archivos asociados a la definición.
      *
      * @return lista de archivos
      */
@@ -330,11 +305,29 @@ public class DocumentDefinition {
     }
 
     /**
-     * Establece la lista de archivos asociados a esta definición.
+     * Establece los archivos asociados a la definición.
      *
      * @param files lista de archivos
      */
     public void setFiles(List<FileRecord> files) {
         this.files = files;
+    }
+
+    /**
+     * Retorna los emisores autorizados para esta definición.
+     *
+     * @return lista de emisores
+     */
+    public List<IssuingEntity> getIssuers() {
+        return issuers;
+    }
+
+    /**
+     * Establece los emisores autorizados para esta definición.
+     *
+     * @param issuers lista de emisores
+     */
+    public void setIssuers(List<IssuingEntity> issuers) {
+        this.issuers = issuers;
     }
 }

@@ -11,8 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Servicio para administración de credenciales de usuarios emisores.
  *
- * <p>Gestiona la persistencia en {@code entity_users} y garantiza unicidad de email
- * entre emisores.</p>
+ * <p>Responsabilidades:</p>
+ * <ul>
+ *   <li>Crear o actualizar el registro de {@link EntityUser} asociado a un emisor.</li>
+ *   <li>Aplicar hashing de contraseña con {@link PasswordEncoder}.</li>
+ *   <li>Garantizar unicidad de email entre emisores.</li>
+ * </ul>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 @Service
 public class IssuerAccountService {
@@ -21,6 +29,13 @@ public class IssuerAccountService {
     private final EntityUserRepository entityUserRepo;
     private final PasswordEncoder encoder;
 
+    /**
+     * Constructor con inyección de dependencias.
+     *
+     * @param issuerRepo repositorio de emisores
+     * @param entityUserRepo repositorio de usuarios de emisor
+     * @param encoder encoder para hashing de contraseñas
+     */
     public IssuerAccountService(IssuingEntityRepository issuerRepo,
                                 EntityUserRepository entityUserRepo,
                                 PasswordEncoder encoder) {
@@ -32,7 +47,14 @@ public class IssuerAccountService {
     /**
      * Asigna o actualiza credenciales para un emisor.
      *
-     * <p>Si no existe registro en {@code entity_users} para el {@code issuerId}, se crea.</p>
+     * <p>Comportamiento:</p>
+     * <ul>
+     *   <li>Valida parámetros obligatorios.</li>
+     *   <li>Valida que el emisor exista.</li>
+     *   <li>Valida que el email no esté asignado a otro emisor.</li>
+     *   <li>Crea {@link EntityUser} si no existe para ese {@code issuerId} o actualiza el existente.</li>
+     *   <li>Persiste el hash de contraseña (no guarda la contraseña en texto plano).</li>
+     * </ul>
      *
      * @param issuerId identificador del emisor
      * @param email correo del usuario emisor

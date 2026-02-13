@@ -13,6 +13,14 @@ import java.util.List;
 /**
  * Servicio de negocio para la gestión de entidades emisoras ({@link IssuingEntity}).
  *
+ * <p>Responsabilidades:</p>
+ * <ul>
+ *   <li>Listar emisores por filtros de negocio (aprobados, tipo, etc.).</li>
+ *   <li>Resolver un emisor por nombre (crear si no existe).</li>
+ *   <li>Administrar la relación emisor - tipos de documento permitidos
+ *       (tabla puente {@code entity_document_definitions}).</li>
+ *   <li>Exponer estadísticas agregadas para módulo administrativo.</li>
+ * </ul>
  *
  * @author Danniel
  * @author Yeison
@@ -47,7 +55,7 @@ public class IssuingEntityService {
      * Retorna estadísticas agregadas de emisores para el módulo administrativo.
      *
      * <p>La consulta es provista por {@link IssuingEntityRepository#findIssuerStats()} y retorna una proyección
-     * ({@link IssuingEntityRepository.IssuerStats})</p>
+     * {@link IssuingEntityRepository.IssuerStats}.</p>
      *
      * @return lista de estadísticas por emisor
      */
@@ -77,7 +85,7 @@ public class IssuingEntityService {
     }
 
     /**
-     * Lista emisores aprobados para el módulo "issuer".
+     * Lista emisores aprobados para el módulo issuer.
      *
      * <p>Filtra por {@link EntityType#EMISOR} y {@link EntityStatus#APROBADA}, ordenando por nombre ascendente.</p>
      *
@@ -89,7 +97,14 @@ public class IssuingEntityService {
     }
 
     /**
-     * <p>Si el nombre es {@code null} o está en blanco, retorna {@code null}.</p>
+     * Resuelve un emisor por nombre dentro del tipo {@link EntityType#EMISOR}.
+     *
+     * <p>Comportamiento:</p>
+     * <ul>
+     *   <li>Si {@code name} es null o está en blanco, retorna {@code null}.</li>
+     *   <li>Si existe, lo retorna.</li>
+     *   <li>Si no existe, crea uno nuevo con estado {@link EntityStatus#APROBADA}.</li>
+     * </ul>
      *
      * @param name nombre del emisor
      * @return emisor existente o recién creado; {@code null} si el nombre es inválido
@@ -112,7 +127,7 @@ public class IssuingEntityService {
      * Asegura que un emisor tenga asociado un documento permitido.
      *
      * <p>Valida que el documento exista en el catálogo, revisa si ya está asociado al emisor
-     * y si no lo está, lo agrega y persiste el emisor.</p>
+     * y, si no lo está, lo agrega y persiste el emisor.</p>
      *
      * @param issuer emisor al cual se le desea asociar el documento
      * @param documentId id del documento del catálogo

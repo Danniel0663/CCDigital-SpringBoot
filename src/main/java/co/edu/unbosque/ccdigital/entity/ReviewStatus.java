@@ -1,29 +1,25 @@
 package co.edu.unbosque.ccdigital.entity;
 
 /**
- * Enum que representa el estado del flujo de revisión para un registro que requiere validación.
+ * Estado del flujo de revisión administrativa.
  *
- * <p>En CCDigital se utiliza, por ejemplo, para {@code PersonDocument} cuando un documento es cargado
- * y debe pasar por revisión administrativa antes de considerarse aprobado.</p>
- * 
+ * <p>
+ * Se utiliza para registros que requieren validación, por ejemplo en {@code PersonDocument}, cuando
+ * un documento es cargado y debe ser aprobado o rechazado por un revisor.
+ * </p>
+ *
  * @author Danniel
  * @author Yeison
  * @since 3.0
  */
 public enum ReviewStatus {
 
-    /**
-     * Pendiente de revisión.
-     */
+    /** Pendiente de revisión. */
     PENDING,
 
-    /**
-     * Revisado y aprobado.
-     */
+    /** Revisado y aprobado. */
     APPROVED,
 
-    /**
-     * Revisado y rechazado.
-     */
+    /** Revisado y rechazado. */
     REJECTED
 }

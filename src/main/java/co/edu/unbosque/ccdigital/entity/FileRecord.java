@@ -5,14 +5,17 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * Entidad JPA que representa un archivo almacenado en el sistema.
+ * Entidad JPA que representa un archivo almacenado y sus metadatos.
  *
- * <p>Se mapea a la tabla {@code files}. Un {@code FileRecord} contiene metadatos del archivo
- * (nombre original, tipo MIME, tamaño, hash SHA-256, versión, usuario que subió el archivo)</p>
+ * <p>
+ * Se mapea a la tabla {@code files}. Un {@code FileRecord} almacena información del archivo (nombre original,
+ * tipo MIME, tamaño, hash SHA-256, versión) y la estrategia de persistencia del contenido (ruta, blob o S3).
+ * </p>
  *
- * <p><b>Campos gestionados por la base de datos:</b> {@link #createdAt} está marcado como
- * {@code insertable=false, updatable=false} porque se asume que la base de datos asigna el timestamp
- * automáticamente trigger.</p>
+ * <p>
+ * El campo {@code uploaded_at} es gestionado por la base de datos; por lo tanto, se marca como
+ * {@code insertable=false, updatable=false}.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -30,31 +33,31 @@ public class FileRecord {
     private Long id;
 
     /**
-     * Definición/catálogo de documento al que se asocia el archivo.
+     * Definición/catálogo de documento asociada al archivo.
      *
-     * <p>Columna: {@code document_id} (referencia a {@code documents.id}).</p>
+     * <p>Columna: {@code document_id} (FK a {@code documents.id}).</p>
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_id", nullable = false)
     private DocumentDefinition document;
 
     /**
-     * Documento específico de una persona al que pertenece el archivo (si aplica).
+     * Documento específico de persona al que pertenece el archivo (si aplica).
      *
-     * <p>Columna: {@code person_document_id} (referencia a {@code person_documents.id}).</p>
+     * <p>Columna: {@code person_document_id} (FK a {@code person_documents.id}).</p>
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "person_document_id")
     private PersonDocument personDocument;
 
     /**
-     * Nombre original del archivo, tal como fue cargado por el usuario (incluye extensión).
+     * Nombre original del archivo (incluye extensión).
      */
     @Column(name = "original_name", nullable = false, length = 300)
     private String originalName;
 
     /**
-     * Tipo MIME del archivo (por ejemplo: {@code application/pdf}.
+     * Tipo MIME del archivo.
      */
     @Column(name = "mime_type", nullable = false, length = 150)
     private String mimeType;
@@ -66,35 +69,26 @@ public class FileRecord {
     private Long byteSize;
 
     /**
-     * Hash SHA-256 del archivo.
-     *
-     * <p>Se utiliza para verificación de integridad y puede ser base para registros de auditoría
-     * o sincronización con blockchain.</p>
+     * Hash SHA-256 del archivo (hexadecimal).
      */
     @Column(name = "sha256_hex", nullable = false, length = 64)
     private String hashSha256;
 
     /**
-     * Estrategia de almacenamiento del archivo (por ejemplo: en ruta o como blob).
-     *
-     * <p>Se persiste como texto (STRING) en la columna {@code stored_as}.</p>
+     * Estrategia de almacenamiento del contenido del archivo.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "stored_as", nullable = false, length = 10)
     private FileStoredAs storedAs = FileStoredAs.PATH;
 
     /**
-     * Ruta donde se almacena el archivo cuando {@link #storedAs} indica almacenamiento por ruta.
-     *
-     * <p>Columna: {@code file_path}. Puede ser ruta absoluta o relativa según configuración.</p>
+     * Ruta del archivo cuando el contenido se almacena como PATH.
      */
     @Column(name = "file_path", length = 800)
     private String storagePath;
 
     /**
-     * Contenido binario del archivo cuando se almacena en base de datos (BLOB).
-     *
-     * <p>Columna: {@code content}. Se utiliza si {@link #storedAs} indica almacenamiento como blob.</p>
+     * Contenido binario del archivo cuando se almacena como BLOB.
      */
     @Lob
     @Column(name = "content")
@@ -102,24 +96,20 @@ public class FileRecord {
 
     /**
      * Versión del archivo.
-     *
-     * <p>Se incrementa cuando se sube una nueva versión del mismo archivo.</p>
      */
     @Column(name = "version", nullable = false)
     private Integer version = 1;
 
     /**
      * Identificador del usuario que cargó el archivo (si aplica).
-     *
-     * <p>Columna: {@code uploaded_by_user}. Puede ser {@code null} si el origen no es un usuario autenticado.</p>
      */
     @Column(name = "uploaded_by_user")
     private Long uploadedByUserId;
 
     /**
-     * Fecha y hora de carga del archivo (gestionada por base de datos).
+     * Fecha/hora de carga del archivo (gestionada por base de datos).
      *
-     * <p>Columna: {@code uploaded_at}. No se actualiza ni inserta desde JPA.</p>
+     * <p>Columna: {@code uploaded_at}.</p>
      */
     @Column(name = "uploaded_at", nullable = false, updatable = false, insertable = false)
     private LocalDateTime createdAt;
@@ -135,8 +125,6 @@ public class FileRecord {
 
     /**
      * Establece el id del archivo.
-     *
-     * <p>Normalmente no se asigna manualmente porque es autogenerado.</p>
      *
      * @param id id del archivo
      */
@@ -163,7 +151,7 @@ public class FileRecord {
     }
 
     /**
-     * Retorna el documento de persona asociado (si aplica).
+     * Retorna el documento de persona asociado.
      *
      * @return documento de persona o {@code null}
      */
@@ -237,14 +225,14 @@ public class FileRecord {
     /**
      * Retorna el hash SHA-256 del archivo.
      *
-     * @return hash SHA-256
+     * @return hash SHA-256 (hex)
      */
     public String getHashSha256() {
         return hashSha256;
     }
 
     /**
-     * Establece el hash del archivo.
+     * Establece el hash SHA-256 del archivo.
      *
      * @param hashSha256 hash SHA-256
      */
@@ -253,7 +241,7 @@ public class FileRecord {
     }
 
     /**
-     * Retorna la estrategia de almacenamiento.
+     * Retorna la estrategia de almacenamiento del contenido.
      *
      * @return estrategia de almacenamiento
      */
@@ -262,7 +250,7 @@ public class FileRecord {
     }
 
     /**
-     * Establece la estrategia de almacenamiento.
+     * Establece la estrategia de almacenamiento del contenido.
      *
      * @param storedAs estrategia de almacenamiento
      */
@@ -271,16 +259,16 @@ public class FileRecord {
     }
 
     /**
-     * Retorna la ruta de almacenamiento (si aplica).
+     * Retorna la ruta de almacenamiento (cuando aplica).
      *
-     * @return ruta del archivo
+     * @return ruta del archivo o {@code null}
      */
     public String getStoragePath() {
         return storagePath;
     }
 
     /**
-     * Establece la ruta de almacenamiento (si aplica).
+     * Establece la ruta de almacenamiento (cuando aplica).
      *
      * @param storagePath ruta del archivo
      */
@@ -289,16 +277,16 @@ public class FileRecord {
     }
 
     /**
-     * Retorna el contenido binario del archivo.
+     * Retorna el contenido binario del archivo (cuando aplica).
      *
-     * @return contenido binario
+     * @return contenido binario o {@code null}
      */
     public byte[] getContent() {
         return content;
     }
 
     /**
-     * Establece el contenido binario del archivo.
+     * Establece el contenido binario del archivo (cuando aplica).
      *
      * @param content contenido binario
      */
@@ -325,7 +313,7 @@ public class FileRecord {
     }
 
     /**
-     * Retorna el id del usuario que subió el archivo (si aplica).
+     * Retorna el id del usuario que cargó el archivo (si aplica).
      *
      * @return id del usuario o {@code null}
      */
@@ -334,7 +322,7 @@ public class FileRecord {
     }
 
     /**
-     * Establece el id del usuario que subió el archivo (si aplica).
+     * Establece el id del usuario que cargó el archivo (si aplica).
      *
      * @param uploadedByUserId id del usuario
      */
@@ -343,20 +331,18 @@ public class FileRecord {
     }
 
     /**
-     * Retorna la fecha y hora de carga del archivo.
+     * Retorna la fecha/hora de carga del archivo.
      *
-     * @return fecha y hora de carga
+     * @return fecha/hora de carga
      */
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     /**
-     * Establece la fecha y hora de carga.
+     * Setter disponible por compatibilidad; se recomienda no asignar manualmente.
      *
-     * <p>Generalmente la base de datos gestiona este valor. Se recomienda no asignarlo manualmente.</p>
-     *
-     * @param createdAt fecha y hora de carga
+     * @param createdAt fecha/hora de carga
      */
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;

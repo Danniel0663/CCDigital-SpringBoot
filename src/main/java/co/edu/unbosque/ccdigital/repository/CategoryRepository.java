@@ -4,10 +4,11 @@ import co.edu.unbosque.ccdigital.entity.Category;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
- * Repositorio JPA para la entidad {@link Category}.
+ * Repositorio JPA para {@link Category}.
  *
- * <p>Provee operaciones CRUD y consultas básicas sobre la tabla {@code categories}
- * mediante {@link JpaRepository}:</p>
+ * <p>
+ * Provee operaciones CRUD sobre la tabla {@code categories}.
+ * </p>
  *
  * @author Danniel
  * @author Yeison

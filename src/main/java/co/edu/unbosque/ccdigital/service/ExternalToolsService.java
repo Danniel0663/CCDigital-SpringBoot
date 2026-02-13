@@ -1,22 +1,32 @@
 package co.edu.unbosque.ccdigital.service;
 
-import co.edu.unbosque.ccdigital.config.ExternalToolsProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Servicio encargado de ejecutar herramientas externas requeridas por el proyecto CCDigital.
+ * Servicio de integración para ejecutar herramientas externas (por ejemplo, scripts de Fabric/Indy)
+ * y capturar un resultado estructurado.
  *
- * <p>Actualmente soporta ejecución de comandos para:</p>
+ * <p>Este servicio centraliza:</p>
+ * <ul>
+ *   <li>La construcción y ejecución de comandos mediante {@link ProcessBuilder}.</li>
+ *   <li>La captura de stdout y stderr en paralelo para evitar bloqueos por buffers.</li>
+ *   <li>El control de timeout para procesos que no finalizan.</li>
+ *   <li>La configuración vía properties (workdir, binarios, scripts y timeout).</li>
+ * </ul>
  *
- * <p>Los parámetros de ejecución (directorios, scripts, activación de venv) se cargan desde configuración
- * usando {@link ExternalToolsProperties} (por ejemplo en {@code application.properties} con prefijo
- * {@code ccdigital.tools}).</p>
+ * <p>Las rutas y nombres de scripts se inyectan con {@link Value} a partir del archivo de configuración
+ * (por ejemplo, {@code application.properties} / {@code application.yml}).</p>
  *
  * @author Danniel
  * @author Yeison
@@ -26,280 +36,389 @@ import java.util.List;
 public class ExternalToolsService {
 
     /**
-     * Propiedades externas para ejecución de herramientas (Fabric/Indy).
-     */
-    private final ExternalToolsProperties props;
-
-    /**
-     * Constructor con inyección de dependencias.
+     * Resultado estándar para ejecución de comandos externos.
      *
-     * @param props propiedades de herramientas externas
-     */
-    public ExternalToolsService(ExternalToolsProperties props) {
-        this.props = props;
-    }
-    
-    /**
-     * Ejecuta la sincronización completa hacia Hyperledger Fabric.
+     * <p>Se usa como DTO para devolver:
+     * código de salida, salida estándar, error estándar y metadatos del comando.</p>
      *
-     * <p>El directorio de trabajo y el nombre del script se toman de:
-     * {@code ccdigital.tools.fabric.workdir} y {@code ccdigital.tools.fabric.script}.</p>
-     *
-     * @return resultado de ejecución con código de salida y salida estándar/error
-     */
-    public ExecResult runFabricSyncAll() {
-        String workdir = safe(props.getFabric().getWorkdir());
-        String script = safe(props.getFabric().getScript());
-
-        // node sync-db-to-ledger.js --all
-        String cmd = "node " + script + " --all";
-        return runCommand(workdir, cmd);
-    }
-
-    /**
-     * Ejecuta la sincronización hacia Hyperledger Fabric para una persona específica.
-     * 
-     * @param idType tipo de identificación (por ejemplo: {@code CC}, {@code TI}, etc.)
-     * @param idNumber número de identificación
-     * @return resultado de ejecución con código de salida y salida estándar/error
-     */
-    public ExecResult runFabricSyncPerson(String idType, String idNumber) {
-        String workdir = safe(props.getFabric().getWorkdir());
-        String script = safe(props.getFabric().getScript());
-
-        // node sync-db-to-ledger.js --person CC 1019983896
-        String cmd = "node " + script + " --person " + safe(idType) + " " + safe(idNumber);
-        return runCommand(workdir, cmd);
-    }
-
-    /**
-     * Alias de compatibilidad para controladores antiguos.
-     *
-     * <p>Equivale a {@link #runFabricSyncAll()}.</p>
-     *
-     * @return resultado de ejecución
-     */
-    public ExecResult runFabricAll() {
-        return runFabricSyncAll();
-    }
-
-    /**
-     * Alias de compatibilidad para controladores antiguos.
-     *
-     * <p>Equivale a {@link #runFabricSyncPerson(String, String)}.</p>
-     *
-     * @param idType tipo de identificación
-     * @param idNumber número de identificación
-     * @return resultado de ejecución
-     */
-    public ExecResult runFabricPerson(String idType, String idNumber) {
-        return runFabricSyncPerson(idType, idNumber);
-    }
-
-    /**
-     * Ejecuta el proceso de emisión de credenciales en Indy tomando datos desde base de datos.
-     *
-     * <p>Se ejecuta usando {@code bash -lc} para que {@code source} y variables de entorno funcionen.</p>
-     *
-     * @return resultado de ejecución con código de salida y salida estándar/error
-     */
-    public ExecResult runIndyIssueFromDb() {
-        String workdir = safe(props.getIndy().getWorkdir());
-        String venvActivate = safe(props.getIndy().getVenvActivate());
-        String script = safe(props.getIndy().getScript());
-
-        // cd workdir && source venv/bin/activate && python3 issue_credentials_from_db.py
-        // Nota: corremos en bash -lc para que "source" funcione
-        String cmd = "cd " + shellQuote(workdir) + " && " + venvActivate + " && python3 " + script;
-        return runCommand(workdir, cmd);
-    }
-
-    /**
-     * Alias de compatibilidad para controladores que llamen a {@code runIndyIssue()}.
-     *
-     * <p>Equivale a {@link #runIndyIssueFromDb()}.</p>
-     *
-     * @return resultado de ejecución
-     */
-    public ExecResult runIndyIssue() {
-        return runIndyIssueFromDb();
-    }
-
-    /**
-     * Ejecuta un comando en un directorio de trabajo opcional usando {@code bash -lc}.
-     *
-     * <p>Se capturan stdout y stderr en paralelo para evitar bloqueos por buffers.</p>
-     *
-     * @param workdir directorio donde se ejecutará el comando (puede ser vacío/nulo)
-     * @param cmd comando a ejecutar (string que se pasa a {@code bash -lc})
-     * @return resultado de ejecución con salida y código de retorno
-     */
-    private ExecResult runCommand(String workdir, String cmd) {
-        List<String> command = List.of("bash", "-lc", cmd);
-
-        ProcessBuilder pb = new ProcessBuilder(command);
-        if (workdir != null && !workdir.isBlank()) {
-            pb.directory(new File(workdir));
-        }
-        pb.redirectErrorStream(false);
-
-        StringBuilder out = new StringBuilder();
-        StringBuilder err = new StringBuilder();
-        int code = -1;
-
-        try {
-            Process p = pb.start();
-
-            // Leer stdout/stderr en paralelo para evitar bloqueos
-            Thread tOut = new Thread(() -> readStream(p.getInputStream(), out));
-            Thread tErr = new Thread(() -> readStream(p.getErrorStream(), err));
-            tOut.start();
-            tErr.start();
-
-            code = p.waitFor();
-            tOut.join();
-            tErr.join();
-
-            return new ExecResult(workdir, cmd, code, out.toString(), err.toString());
-
-        } catch (Exception e) {
-            err.append("Exception ejecutando comando: ").append(e.getMessage()).append('\n');
-            return new ExecResult(workdir, cmd, code, out.toString(), err.toString());
-        }
-    }
-
-    /**
-     * Lee un {@link java.io.InputStream} línea por línea y lo acumula en un {@link StringBuilder}.
-     *
-     * @param is stream de entrada
-     * @param sb acumulador donde se agregan las líneas
-     */
-    private void readStream(java.io.InputStream is, StringBuilder sb) {
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                sb.append(line).append('\n');
-            }
-        } catch (Exception ex) {
-            sb.append("Exception leyendo stream: ").append(ex.getMessage()).append('\n');
-        }
-    }
-
-    /**
-     * Normaliza un string para evitar {@code null} y espacios extremos.
-     *
-     * @param s texto de entrada
-     * @return string sin {@code null} y con {@code trim()}
-     */
-    private String safe(String s) {
-        return s == null ? "" : s.trim();
-    }
-
-    /**
-     * Encapsula un texto en comillas simples para uso en comandos de shell (por ejemplo en {@code cd}),
-     * escapando comillas simples internas.
-     *
-     * @param s texto a encapsular
-     * @return texto seguro para usar en shell dentro de comillas simples
-     */
-    private String shellQuote(String s) {
-        if (s == null) return "";
-        // envuelve en comillas simples y escapa comillas simples internas
-        return "'" + s.replace("'", "'\"'\"'") + "'";
-    }
-
-    /**
-     * DTO que representa el resultado de ejecutar un comando externo.
-     *
-     * <p>Contiene información útil para depuración</p>
+     * <p>Controladores/servicios consumidores lo referencian como
+     * {@code ExternalToolsService.ExecResult}.</p>
      */
     public static class ExecResult {
 
         /**
-         * Directorio de trabajo donde se ejecutó el comando.
-         */
-        private final String workingDir;
-
-        /**
-         * Comando ejecutado (string pasado a {@code bash -lc}).
-         */
-        private final String command;
-
-        /**
-         * Código de salida del proceso. Por convención, {@code 0} indica éxito.
+         * Código de salida del proceso (0 indica éxito por convención).
          */
         private final int exitCode;
 
         /**
-         * Salida estándar del proceso.
+         * Salida estándar (stdout) capturada del proceso.
          */
         private final String stdout;
 
         /**
-         * Salida de error del proceso.
+         * Salida de error (stderr) capturada del proceso.
          */
         private final String stderr;
 
         /**
-         * Crea un resultado de ejecución.
+         * Instante en que se inició la ejecución del proceso.
+         */
+        private final Instant startedAt;
+
+        /**
+         * Instante en que finalizó la ejecución del proceso (o se interrumpió por timeout/error).
+         */
+        private final Instant finishedAt;
+
+        /**
+         * Comando ejecutado, representado como lista de tokens.
+         */
+        private final List<String> command;
+
+        /**
+         * Construye un resultado de ejecución.
          *
-         * @param workingDir directorio de trabajo
-         * @param command comando ejecutado
          * @param exitCode código de salida
          * @param stdout salida estándar
          * @param stderr salida de error
+         * @param startedAt instante de inicio
+         * @param finishedAt instante de fin
+         * @param command comando ejecutado (tokens)
          */
-        public ExecResult(String workingDir, String command, int exitCode, String stdout, String stderr) {
-            this.workingDir = workingDir;
-            this.command = command;
+        public ExecResult(int exitCode, String stdout, String stderr,
+                          Instant startedAt, Instant finishedAt, List<String> command) {
             this.exitCode = exitCode;
             this.stdout = stdout;
             this.stderr = stderr;
+            this.startedAt = startedAt;
+            this.finishedAt = finishedAt;
+            this.command = command;
         }
 
         /**
-         * Retorna el directorio de trabajo.
-         *
-         * @return directorio de trabajo
+         * @return código de salida del proceso
          */
-        public String getWorkingDir() {
-            return workingDir;
-        }
+        public int getExitCode() { return exitCode; }
 
         /**
-         * Retorna el comando ejecutado.
-         *
-         * @return comando ejecutado
+         * @return stdout capturado
          */
-        public String getCommand() {
-            return command;
-        }
+        public String getStdout() { return stdout; }
 
         /**
-         * Retorna el código de salida.
-         *
-         * @return código de salida
+         * @return stderr capturado
          */
-        public int getExitCode() {
-            return exitCode;
-        }
+        public String getStderr() { return stderr; }
 
         /**
-         * Retorna la salida estándar.
-         *
-         * @return stdout
+         * @return instante de inicio
          */
-        public String getStdout() {
-            return stdout;
-        }
+        public Instant getStartedAt() { return startedAt; }
 
         /**
-         * Retorna la salida de error.
-         *
-         * @return stderr
+         * @return instante de fin
          */
-        public String getStderr() {
-            return stderr;
+        public Instant getFinishedAt() { return finishedAt; }
+
+        /**
+         * @return comando ejecutado como lista de tokens
+         */
+        public List<String> getCommand() { return command; }
+
+        /**
+         * Indica si la ejecución fue exitosa según la convención de exitCode 0.
+         *
+         * @return {@code true} si {@code exitCode == 0}, en caso contrario {@code false}
+         */
+        public boolean isOk() { return exitCode == 0; }
+    }
+
+    // ============================
+    // Properties para scripts externos
+    // ============================
+
+    /**
+     * Directorio de trabajo (workdir) donde se ejecutan los scripts de Fabric.
+     * Si está vacío, la ejecución retorna un error controlado.
+     */
+    @Value("${external-tools.fabric.workdir:}")
+    private String fabricWorkdir;
+
+    /**
+     * Binario de Node.js. Por defecto se usa {@code node}.
+     */
+    @Value("${external-tools.fabric.node-bin:node}")
+    private String nodeBin;
+
+    /**
+     * Script para sincronización global hacia Fabric.
+     * Debe ser una ruta relativa a {@code fabricWorkdir} (recomendado) o una ruta absoluta.
+     */
+    @Value("${external-tools.fabric.sync-all-script:}")
+    private String fabricSyncAllScript;
+
+    /**
+     * Script para sincronización por persona hacia Fabric.
+     * Debe ser una ruta relativa a {@code fabricWorkdir} (recomendado) o una ruta absoluta.
+     */
+    @Value("${external-tools.fabric.sync-person-script:}")
+    private String fabricSyncPersonScript;
+
+    /**
+     * Directorio de trabajo (workdir) donde se ejecutan scripts de Indy (Python).
+     */
+    @Value("${external-tools.indy.workdir:}")
+    private String indyWorkdir;
+
+    /**
+     * Comando para activar el entorno virtual de Python (venv).
+     * Se ejecuta dentro de {@code bash -lc ...}.
+     */
+    @Value("${external-tools.indy.venv-activate:source venv/bin/activate}")
+    private String indyVenvActivate;
+
+    /**
+     * Script de emisión (issuer) para Indy (Python).
+     */
+    @Value("${external-tools.indy.script:issue_credentials_from_db.py}")
+    private String indyScript;
+
+    /**
+     * Timeout global en segundos para la ejecución de comandos externos.
+     */
+    @Value("${external-tools.default-timeout-seconds:180}")
+    private long timeoutSeconds;
+
+    // ============================
+    // API expuesta para invocación
+    // ============================
+
+    /**
+     * Ejecuta la sincronización global hacia Fabric.
+     *
+     * <p>Forma esperada del comando:</p>
+     * <pre>
+     * node &lt;sync-all-script&gt; --all
+     * </pre>
+     *
+     * @return {@link ExecResult} con stdout/stderr y exitCode
+     */
+    public ExecResult runFabricSyncAll() {
+        if (isBlank(fabricWorkdir)) {
+            return controlledError("Falta configurar external-tools.fabric.workdir");
         }
+        if (isBlank(fabricSyncAllScript)) {
+            return controlledError("Falta configurar external-tools.fabric.sync-all-script");
+        }
+
+        return exec(List.of(nodeBin, fabricSyncAllScript, "--all"), fabricWorkdir, Map.of());
+    }
+
+    /**
+     * Ejecuta la sincronización hacia Fabric para una persona.
+     *
+     * <p>Forma esperada del comando:</p>
+     * <pre>
+     * node &lt;sync-person-script&gt; --person &lt;idType&gt; &lt;idNumber&gt;
+     * </pre>
+     *
+     * @param idType tipo de identificación (ej. {@code CC}, {@code TI})
+     * @param idNumber número de identificación
+     * @return {@link ExecResult} con stdout/stderr y exitCode
+     */
+    public ExecResult runFabricSyncPerson(String idType, String idNumber) {
+        if (isBlank(fabricWorkdir)) {
+            return controlledError("Falta configurar external-tools.fabric.workdir");
+        }
+        if (isBlank(fabricSyncPersonScript)) {
+            return controlledError("Falta configurar external-tools.fabric.sync-person-script");
+        }
+        if (isBlank(idType) || isBlank(idNumber)) {
+            return controlledError("idType e idNumber son obligatorios para runFabricSyncPerson");
+        }
+
+        return exec(
+                List.of(nodeBin, fabricSyncPersonScript, "--person", safe(idType), safe(idNumber)),
+                fabricWorkdir,
+                Map.of()
+        );
+    }
+
+    /**
+     * Ejecuta la emisión de credenciales Indy (issuer) desde un script Python.
+     *
+     * <p>Forma esperada del comando (ejecutado en bash):</p>
+     * <pre>
+     * cd &lt;indyWorkdir&gt; &amp;&amp; source venv/bin/activate &amp;&amp; python3 issue_credentials_from_db.py
+     * </pre>
+     *
+     * @return {@link ExecResult} con stdout/stderr y exitCode
+     */
+    public ExecResult runIndyIssueFromDb() {
+        if (isBlank(indyWorkdir)) {
+            return controlledError("Falta configurar external-tools.indy.workdir");
+        }
+        if (isBlank(indyScript)) {
+            return controlledError("Falta configurar external-tools.indy.script");
+        }
+
+        String cmd = safe(indyVenvActivate) + " && python3 " + indyScript;
+        return exec(List.of("bash", "-lc", cmd), indyWorkdir, Map.of());
+    }
+
+    // ============================
+    // Ejecución genérica de comandos
+    // ============================
+
+    /**
+     * Ejecuta un comando externo y retorna un {@link ExecResult} estructurado.
+     *
+     * <p>Consideraciones de ejecución:</p>
+     * <ul>
+     *   <li>Si {@code workdir} no está en blanco, se usa como directorio de trabajo del proceso.</li>
+     *   <li>{@code extraEnv} se mezcla sobre el entorno del proceso (si aplica).</li>
+     *   <li>stdout y stderr se consumen en paralelo.</li>
+     *   <li>Si no finaliza en {@code timeoutSeconds}, se fuerza terminación y se retorna exitCode 124.</li>
+     * </ul>
+     *
+     * @param command tokens del comando, por ejemplo {@code List.of("node","script.js","--all")}
+     * @param workdir directorio de trabajo (puede ser vacío)
+     * @param extraEnv variables de entorno adicionales (puede ser vacío)
+     * @return resultado de ejecución con metadatos y salidas
+     */
+    public ExecResult exec(List<String> command, String workdir, Map<String, String> extraEnv) {
+        Instant start = Instant.now();
+        StringBuilder out = new StringBuilder();
+        StringBuilder err = new StringBuilder();
+
+        Process p = null;
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(command);
+
+            if (!isBlank(workdir)) {
+                pb.directory(new File(workdir));
+            }
+
+            Map<String, String> env = pb.environment();
+            if (extraEnv != null && !extraEnv.isEmpty()) {
+                env.putAll(extraEnv);
+            }
+
+            p = pb.start();
+
+            Thread tOut = streamToStringBuilder(p.getInputStream(), out);
+            Thread tErr = streamToStringBuilder(p.getErrorStream(), err);
+
+            boolean finished = p.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            if (!finished) {
+                p.destroyForcibly();
+                joinQuietly(tOut, 1000);
+                joinQuietly(tErr, 1000);
+
+                Instant end = Instant.now();
+                return new ExecResult(
+                        124,
+                        out.toString(),
+                        err + "\nTimeout ejecutando comando (>" + timeoutSeconds + "s)\n",
+                        start,
+                        end,
+                        new ArrayList<>(command)
+                );
+            }
+
+            int code = p.exitValue();
+
+            joinQuietly(tOut, 2000);
+            joinQuietly(tErr, 2000);
+
+            Instant end = Instant.now();
+            return new ExecResult(code, out.toString(), err.toString(), start, end, new ArrayList<>(command));
+
+        } catch (Exception ex) {
+            Instant end = Instant.now();
+            return new ExecResult(
+                    1,
+                    out.toString(),
+                    err + "\n" + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "\n",
+                    start,
+                    end,
+                    command != null ? new ArrayList<>(command) : List.of()
+            );
+        } finally {
+            if (p != null) {
+                try { p.getInputStream().close(); } catch (Exception ignored) {}
+                try { p.getErrorStream().close(); } catch (Exception ignored) {}
+                try { p.getOutputStream().close(); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    /**
+     * Construye un {@link ExecResult} de error controlado (sin ejecutar proceso).
+     *
+     * @param message detalle del error de configuración/validación
+     * @return resultado con exitCode 2 y stderr con el mensaje
+     */
+    private ExecResult controlledError(String message) {
+        Instant now = Instant.now();
+        return new ExecResult(2, "", message, now, now, List.of());
+    }
+
+    /**
+     * Consume un {@link java.io.InputStream} y lo agrega línea por línea a un {@link StringBuilder}.
+     *
+     * <p>Se ejecuta en un hilo daemon para evitar bloqueo del proceso por buffers llenos.</p>
+     *
+     * @param is stream a consumir
+     * @param sb acumulador de texto
+     * @return hilo iniciado que realiza la lectura
+     */
+    private static Thread streamToStringBuilder(java.io.InputStream is, StringBuilder sb) {
+        Thread t = new Thread(() -> {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    sb.append(line).append('\n');
+                }
+            } catch (Exception ignored) {
+                // No se interrumpe la ejecución principal por fallas de lectura del stream
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+        return t;
+    }
+
+    /**
+     * Espera un tiempo limitado a que un hilo finalice sin propagar excepción.
+     *
+     * @param t hilo a esperar (puede ser null)
+     * @param millis milisegundos máximos de espera
+     */
+    private static void joinQuietly(Thread t, long millis) {
+        if (t == null) return;
+        try { t.join(millis); } catch (Exception ignored) {}
+    }
+
+    /**
+     * Indica si una cadena es {@code null} o está en blanco.
+     *
+     * @param s texto a evaluar
+     * @return {@code true} si es null o blank; en caso contrario {@code false}
+     */
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    /**
+     * Normaliza una cadena para uso como token de comando.
+     *
+     * @param s texto
+     * @return texto recortado o cadena vacía si {@code s} es null
+     */
+    private static String safe(String s) {
+        return s == null ? "" : s.trim();
     }
 }
