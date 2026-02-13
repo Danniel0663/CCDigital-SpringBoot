@@ -6,10 +6,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 /**
- * Repositorio JPA para la entidad {@link AppUser}.
+ * Repositorio JPA para {@link AppUser}.
  *
- * <p>Administra operaciones CRUD sobre la tabla {@code users} y expone consultas
- * auxiliares usadas en el proceso de autenticación.</p>
+ * <p>
+ * Administra operaciones CRUD sobre la tabla {@code users} y expone consultas auxiliares
+ * usadas principalmente en el proceso de autenticación del módulo administrativo.
+ * </p>
+ *
+ * @author Danniel
+ * @author Yeison
+ * @since 3.0
  */
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
@@ -17,7 +23,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
      * Busca el primer usuario que coincida por correo electrónico o por nombre completo,
      * ignorando mayúsculas/minúsculas.
      *
-     * <p>Se usa para permitir autenticación con email o con {@code full_name}.</p>
+     * <p>
+     * Se utiliza para permitir autenticación con email o con el valor de {@code full_name}.
+     * </p>
      *
      * @param email correo electrónico a comparar
      * @param fullName nombre completo a comparar

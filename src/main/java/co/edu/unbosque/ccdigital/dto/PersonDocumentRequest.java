@@ -5,65 +5,42 @@ import co.edu.unbosque.ccdigital.entity.PersonDocumentStatus;
 import java.time.LocalDate;
 
 /**
- * DTO utilizado para crear o registrar un documento asociado a una persona
- * a través de la API REST.
+ * DTO para crear o registrar un documento asociado a una persona a través de la API REST.
  *
- * <p>Es consumido por un controlador REST como {@code POST /api/persons/{personId}/documents}.
- * En ese caso, el {@code personId} suele venir en la ruta y se fuerza en el request para asegurar
- * consistencia (evitar depender del body para esa relación).</p>
- * 
+ * <p>
+ * Normalmente, el identificador de la persona se toma de la ruta del endpoint y se asigna en el
+ * controlador antes de delegar a la capa de servicio.
+ * </p>
+ *
  * @author Danniel
  * @author Yeison
  * @since 2.0
  */
 public class PersonDocumentRequest {
 
-    /**
-     * Identificador interno de la persona a la que pertenece el documento.
-     */
     private Long personId;
-
-    /**
-     * Identificador de la definición del documento (catálogo de documentos).
-     */
     private Long documentId;
-
-    /**
-     * Estado funcional del documento (por ejemplo: vigente, vencido, etc.).
-     */
     private PersonDocumentStatus status;
-
-    /**
-     * Fecha de expedición/emisión del documento.
-     */
     private LocalDate issueDate;
-
-    /**
-     * Fecha de vencimiento del documento (si aplica).
-     */
     private LocalDate expiryDate;
 
     /**
-     * Ruta/ubicación donde se almacena el archivo en el sistema (relativa o absoluta,
-     * según la estrategia de almacenamiento del proyecto).
+     * Ruta de almacenamiento del archivo (relativa o absoluta según la estrategia del proyecto).
      */
     private String storagePath;
 
     /**
-     * Tipo MIME del archivo almacenado (por ejemplo: {@code application/pdf}, {@code image/png}).
+     * Tipo MIME del archivo (por ejemplo: {@code application/pdf}).
      */
     private String mimeType;
 
     /**
-     * Hash SHA-256 del archivo, usado para integridad/verificación.
-     *
-     * <p>Puede emplearse para comparar el archivo almacenado vs. el original o para registrar
-     * evidencias de integridad como sincronización con blockchain.</p>
+     * Hash SHA-256 del archivo en representación hexadecimal.
      */
     private String hashSha256;
 
     /**
-     * Retorna el id de la persona asociada al documento.
+     * Retorna el identificador de la persona.
      *
      * @return id de la persona
      */
@@ -72,7 +49,7 @@ public class PersonDocumentRequest {
     }
 
     /**
-     * Establece el id de la persona asociada al documento.
+     * Establece el identificador de la persona.
      *
      * @param personId id de la persona
      */
@@ -81,18 +58,18 @@ public class PersonDocumentRequest {
     }
 
     /**
-     * Retorna el id de la definición del documento.
+     * Retorna el identificador de la definición de documento.
      *
-     * @return id de la definición de documento
+     * @return id de la definición del documento
      */
     public Long getDocumentId() {
         return documentId;
     }
 
     /**
-     * Establece el id de la definición del documento.
+     * Establece el identificador de la definición de documento.
      *
-     * @param documentId id de la definición de documento
+     * @param documentId id de la definición del documento
      */
     public void setDocumentId(Long documentId) {
         this.documentId = documentId;
@@ -153,7 +130,7 @@ public class PersonDocumentRequest {
     }
 
     /**
-     * Retorna la ruta/ubicación de almacenamiento del archivo.
+     * Retorna la ruta de almacenamiento del archivo.
      *
      * @return ruta de almacenamiento
      */
@@ -162,7 +139,7 @@ public class PersonDocumentRequest {
     }
 
     /**
-     * Establece la ruta/ubicación de almacenamiento del archivo.
+     * Establece la ruta de almacenamiento del archivo.
      *
      * @param storagePath ruta de almacenamiento
      */
@@ -191,7 +168,7 @@ public class PersonDocumentRequest {
     /**
      * Retorna el hash SHA-256 del archivo.
      *
-     * @return hash SHA-256 (hex)
+     * @return hash SHA-256
      */
     public String getHashSha256() {
         return hashSha256;

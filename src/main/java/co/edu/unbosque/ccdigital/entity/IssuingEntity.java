@@ -7,14 +7,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad JPA que representa una entidad registrada en el sistema con capacidad de operar como emisor.
+ * Entidad JPA que representa una entidad registrada con capacidad de operar como emisor.
  *
- * <p>Se mapea a la tabla {@code entities}. En el contexto de CCDigital, una {@code IssuingEntity}
- * típicamente representa una organización (empresa/institución) que puede emitir documentos o credenciales.</p>
+ * <p>
+ * Se mapea a la tabla {@code entities}. Una {@code IssuingEntity} corresponde a una organización
+ * autorizada para emitir documentos asociados al catálogo.
+ * </p>
  *
- * <p><b>Defaults:</b> Por defecto, la entidad se inicializa como {@link EntityType#EMISOR} y estado
- * {@link EntityStatus#APROBADA}. Si el flujo real del negocio exige aprobación manual, estos valores
- * pueden ajustarse en la capa de servicio.</p>
+ * <p>
+ * El listado de documentos autorizados se modela mediante una relación Many-to-Many en la tabla
+ * puente {@code entity_document_definitions}.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -24,47 +27,21 @@ import java.util.List;
 @Table(name = "entities")
 public class IssuingEntity {
 
-    /**
-     * Identificador interno de la entidad (PK).
-     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * Nombre de la entidad.
-     *
-     * <p>Columna: {@code name}. No nulo. Longitud máxima: 300 caracteres.</p>
-     */
     @Column(name = "name", nullable = false, length = 300)
     private String name;
 
-    /**
-     * Tipo de entidad dentro del sistema.
-     *
-     * <p>Columna: {@code entity_type}. Se persiste como texto (STRING).</p>
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "entity_type", nullable = false, length = 30)
     private EntityType entityType = EntityType.EMISOR;
 
-    /**
-     * Estado de aprobación de la entidad.
-     *
-     * <p>Columna: {@code status}. Se persiste como texto (STRING).</p>
-     * <p>Por defecto: {@link EntityStatus#APROBADA}.</p>
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private EntityStatus status = EntityStatus.APROBADA;
 
-    /**
-     * Definiciones de documentos que esta entidad está autorizada a emitir.
-     *
-     * <p>Relación Many-to-Many mediante la tabla puente {@code entity_document_definitions}:</p>
-     *
-     * <p>Se marca con {@link JsonIgnore} para evitar ciclos al serializar.</p>
-     */
     @ManyToMany
     @JoinTable(
             name = "entity_document_definitions",
@@ -85,8 +62,6 @@ public class IssuingEntity {
 
     /**
      * Establece el id de la entidad.
-     *
-     * <p>Normalmente no se asigna manualmente porque es autogenerado.</p>
      *
      * @param id id de la entidad
      */

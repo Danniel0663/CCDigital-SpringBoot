@@ -15,8 +15,14 @@ import java.util.List;
 /**
  * Servicio de negocio para la gestión de documentos asociados a personas ({@link PersonDocument}).
  *
- * <p>Este servicio centraliza la lógica para crear y consultar {@code PersonDocument}, así como
- * almacenar y asociar archivos ({@link FileRecord}) en el sistema.</p>
+ * <p>Este servicio centraliza la lógica para:</p>
+ * <ul>
+ *   <li>Listar y consultar documentos por persona (con relaciones cargadas).</li>
+ *   <li>Crear registros {@link PersonDocument} desde API (con o sin archivo ya referenciado por path).</li>
+ *   <li>Radicación de documentos desde emisor (issuer) con workflow de revisión.</li>
+ *   <li>Carga administrativa de documentos con almacenamiento físico y metadatos.</li>
+ *   <li>Registrar revisión (aprobación/rechazo/pending) y auditoría mínima.</li>
+ * </ul>
  *
  * @author Danniel
  * @author Yeison
@@ -79,11 +85,20 @@ public class PersonDocumentService {
     }
 
     /**
-     * API: crea un {@link PersonDocument} a partir de un {@link PersonDocumentRequest} y opcionalmente
-     * crea un {@link FileRecord} si el request ya trae {@code storagePath}.
+     * API: crea un {@link PersonDocument} a partir de un {@link PersonDocumentRequest}.
+     *
+     * <p>Comportamiento:</p>
+     * <ul>
+     *   <li>Valida que exista la persona y el tipo de documento del catálogo.</li>
+     *   <li>Resuelve el emisor por nombre (si el catálogo define {@code issuingEntity}).</li>
+     *   <li>Inicializa estado del documento y el workflow de revisión ({@link ReviewStatus#PENDING}).</li>
+     *   <li>Si el request trae {@code storagePath}, crea un {@link FileRecord} básico (storedAs PATH).</li>
+     *   <li>Asegura relación emisor-documento en la tabla puente {@code entity_document_definitions}.</li>
+     * </ul>
      *
      * @param request request con la información del documento
      * @return {@link PersonDocument} persistido
+     * @throws IllegalArgumentException si no existe persona o definición de documento
      */
     @Transactional
     public PersonDocument create(PersonDocumentRequest request) {
@@ -94,7 +109,6 @@ public class PersonDocumentService {
         DocumentDefinition def = documentDefinitionService.findById(request.getDocumentId())
                 .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + request.getDocumentId()));
 
-        // Resolver emisor (issuer) por nombre (issuingEntity del catálogo)
         IssuingEntity issuer = issuingEntityService.resolveEmitterByName(def.getIssuingEntity());
 
         PersonDocument pd = new PersonDocument();
@@ -105,22 +119,15 @@ public class PersonDocumentService {
         pd.setIssueDate(request.getIssueDate());
         pd.setExpiryDate(request.getExpiryDate());
 
-        // NUEVO:
         pd.setIssuerEntity(issuer);
         pd.setReviewStatus(ReviewStatus.PENDING);
 
-        // (por ahora) submitted/reviewed user quedan null hasta implementar login
-        // pd.setSubmittedByEntityUserId(null);
-        // pd.setReviewedByUserId(null);
-
         PersonDocument saved = personDocumentRepository.save(pd);
 
-        // Asegurar relación emisor-documento (tabla entity_document_definitions)
         if (issuer != null) {
             issuingEntityService.ensureIssuerHasDocument(issuer, def.getId());
         }
 
-        // Si viene storagePath, crear FileRecord básico
         if (request.getStoragePath() != null && !request.getStoragePath().isBlank()) {
             FileRecord fr = new FileRecord();
             fr.setPersonDocument(saved);
@@ -134,7 +141,6 @@ public class PersonDocumentService {
             fr.setVersion(1);
             fileRecordRepository.save(fr);
 
-            // para que quede reflejado en el objeto en memoria
             saved.addFile(fr);
         }
 
@@ -143,6 +149,16 @@ public class PersonDocumentService {
 
     /**
      * ISSUER: el emisor carga un documento para una persona y queda en revisión ({@link ReviewStatus#PENDING}).
+     *
+     * <p>Flujo:</p>
+     * <ol>
+     *   <li>Valida parámetros obligatorios.</li>
+     *   <li>Valida que el documento esté permitido para el emisor.</li>
+     *   <li>Crea el {@link PersonDocument} con {@link ReviewStatus#PENDING}.</li>
+     *   <li>Almacena el archivo en disco con {@link FileStorageService} (hash + size + path relativo).</li>
+     *   <li>Crea el {@link FileRecord} asociado (storedAs PATH).</li>
+     *   <li>Asegura la relación emisor-documento en la tabla puente.</li>
+     * </ol>
      *
      * @param issuerId id del emisor que radica el documento
      * @param personId id de la persona destinataria
@@ -170,7 +186,6 @@ public class PersonDocumentService {
 
         IssuingEntity issuer = issuingEntityService.getById(issuerId);
 
-        // Validación: documento permitido para ese emisor
         boolean allowed = documentDefinitionService.findAllowedByIssuer(issuerId).stream()
                 .anyMatch(d -> d.getId() != null && d.getId().equals(documentId));
 
@@ -184,7 +199,6 @@ public class PersonDocumentService {
         DocumentDefinition def = documentDefinitionService.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + documentId));
 
-        // 1) Crear person_document
         PersonDocument pd = new PersonDocument();
         pd.setPerson(person);
         pd.setDocumentDefinition(def);
@@ -192,17 +206,14 @@ public class PersonDocumentService {
         pd.setIssueDate(issueDate);
         pd.setExpiryDate(expiryDate);
 
-        // Emisor + workflow
         pd.setIssuerEntity(issuer);
         pd.setReviewStatus(ReviewStatus.PENDING);
-        pd.setSubmittedByEntityUserId(null); // login después
+        pd.setSubmittedByEntityUserId(null);
 
         PersonDocument savedPd = personDocumentRepository.save(pd);
 
-        // 2) Guardar archivo en carpeta de la persona + hash
         FileStorageService.StoredFileInfo info = fileStorageService.storePersonFile(person, file);
 
-        // 3) Crear FileRecord
         String mime = (file.getContentType() != null) ? file.getContentType() : "application/octet-stream";
 
         FileRecord fr = new FileRecord();
@@ -219,7 +230,6 @@ public class PersonDocumentService {
         fileRecordRepository.save(fr);
         savedPd.addFile(fr);
 
-        // Asegurar relación issuer-document (por si acaso)
         issuingEntityService.ensureIssuerHasDocument(issuer, def.getId());
 
         return savedPd;
@@ -228,6 +238,16 @@ public class PersonDocumentService {
     /**
      * ADMIN: carga un documento para una persona desde el módulo administrativo.
      *
+     * <p>Flujo:</p>
+     * <ol>
+     *   <li>Valida que existan persona y tipo de documento.</li>
+     *   <li>Resuelve emisor por nombre desde el catálogo.</li>
+     *   <li>Crea {@link PersonDocument} con {@link ReviewStatus#PENDING}.</li>
+     *   <li>Almacena archivo en disco (hash + size + path relativo).</li>
+     *   <li>Crea {@link FileRecord} asociado (storedAs PATH).</li>
+     *   <li>Asegura relación emisor-documento en tabla puente.</li>
+     * </ol>
+     *
      * @param personId id de la persona
      * @param documentId id del tipo de documento (catálogo)
      * @param status estado funcional del documento (si es null, usa {@link PersonDocumentStatus#VIGENTE})
@@ -235,6 +255,7 @@ public class PersonDocumentService {
      * @param expiryDate fecha de vencimiento
      * @param file archivo cargado (multipart)
      * @return {@link PersonDocument} persistido con su archivo asociado
+     * @throws IllegalArgumentException si no existe persona o documento
      */
     @Transactional
     public PersonDocument uploadForPerson(Long personId,
@@ -252,7 +273,6 @@ public class PersonDocumentService {
 
         IssuingEntity issuer = issuingEntityService.resolveEmitterByName(def.getIssuingEntity());
 
-        // 1) Crear person_document (con issuer + review status)
         PersonDocument pd = new PersonDocument();
         pd.setPerson(person);
         pd.setDocumentDefinition(def);
@@ -261,16 +281,13 @@ public class PersonDocumentService {
         pd.setIssueDate(issueDate);
         pd.setExpiryDate(expiryDate);
 
-        // NUEVO:
         pd.setIssuerEntity(issuer);
         pd.setReviewStatus(ReviewStatus.PENDING);
 
         PersonDocument savedPd = personDocumentRepository.save(pd);
 
-        // 2) Guardar archivo en carpeta de la persona + hash
         FileStorageService.StoredFileInfo info = fileStorageService.storePersonFile(person, file);
 
-        // 3) Crear file record
         String mime = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
 
         FileRecord fr = new FileRecord();
@@ -287,7 +304,6 @@ public class PersonDocumentService {
         fileRecordRepository.save(fr);
         savedPd.addFile(fr);
 
-        // Asegurar relación emisor-documento (tabla entity_document_definitions)
         if (issuer != null) {
             issuingEntityService.ensureIssuerHasDocument(issuer, def.getId());
         }
@@ -315,7 +331,7 @@ public class PersonDocumentService {
         pd.setReviewStatus(status != null ? status : ReviewStatus.PENDING);
         pd.setReviewNotes((notes != null && !notes.isBlank()) ? notes.trim() : null);
         pd.setReviewedAt(LocalDateTime.now());
-        pd.setReviewedByUserId(null); // login después
+        pd.setReviewedByUserId(null);
 
         personDocumentRepository.save(pd);
     }

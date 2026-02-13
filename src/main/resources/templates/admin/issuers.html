@@ -10,7 +10,7 @@
 <body class="bg-light">
 
 <nav class="navbar bg-white border-bottom">
-  <div class="container">
+  <div class="container d-flex justify-content-between align-items-center">
     <a class="navbar-brand fw-semibold text-decoration-none" th:href="@{/admin/dashboard}">
       <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
     </a>
@@ -35,7 +35,7 @@
           <th>Emisor</th>
           <th class="text-end" style="width: 160px;">Docs emitidos</th>
           <th class="text-end" style="width: 160px;">Tipos permitidos</th>
-          <th class="text-end" style="width: 160px;">Acción</th>
+          <th class="text-end" style="width: 170px;">Acción</th>
         </tr>
         </thead>
 
@@ -54,7 +54,7 @@
           <td class="text-end">
             <a class="btn btn-sm btn-outline-primary"
                th:href="@{/admin/issuers/{id}(id=${s.id})}">
-              <i class="bi bi-gear me-1"></i>Gestionar tipos
+              <i class="bi bi-gear me-1"></i>Gestionar
             </a>
           </td>
         </tr>

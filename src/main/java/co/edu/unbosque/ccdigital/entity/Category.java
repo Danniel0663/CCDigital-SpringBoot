@@ -9,8 +9,15 @@ import java.util.List;
 /**
  * Entidad JPA que representa una categoría del catálogo de documentos.
  *
- * <p>Se mapea a la tabla {@code categories}. Una categoría agrupa múltiples definiciones de documentos
- * ({@link DocumentDefinition}) y se utiliza para organizar el catálogo</p>
+ * <p>
+ * Se mapea a la tabla {@code categories}. Una categoría agrupa múltiples definiciones de documentos
+ * ({@link DocumentDefinition}) y se utiliza para organizar el catálogo.
+ * </p>
+ *
+ * <p>
+ * El campo {@code slug} es calculado por la base de datos; por lo tanto, está marcado como
+ * {@code insertable=false, updatable=false}.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -21,7 +28,7 @@ import java.util.List;
 public class Category {
 
     /**
-     * Identificador interno de la categoría (PK).
+     * Identificador interno de la categoría.
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,35 +37,31 @@ public class Category {
     /**
      * Nombre de la categoría.
      *
-     * <p>Debe ser único y no nulo. Longitud máxima: 200 caracteres.</p>
+     * <p>Columna: {@code name}. Único y no nulo.</p>
      */
     @Column(name = "name", nullable = false, unique = true, length = 200)
     private String name;
 
     /**
-     * Slug de la categoría.
+     * Slug calculado por la base de datos a partir de {@link #name}.
      *
-     * <p>Es una versión normalizada de {@link #name} (por ejemplo, en minúsculas y con guiones).
-     * Este valor se calcula en la base de datos, por lo que no se inserta ni actualiza desde JPA.</p>
+     * <p>Columna: {@code slug}. No se escribe desde JPA.</p>
      */
     @Column(name = "slug", length = 220, insertable = false, updatable = false)
     private String slug;
 
     /**
-     * Fecha/hora de creación del registro.
+     * Fecha/hora de creación del registro gestionada por base de datos.
      *
-     * <p>Este valor lo gestiona la base de datos (default/trigger), por lo que no se inserta ni actualiza
-     * desde JPA.</p>
+     * <p>Columna: {@code created_at}. No se escribe desde JPA.</p>
      */
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
     /**
-     * Lista de definiciones de documentos asociadas a la categoría.
+     * Definiciones de documentos asociadas a la categoría.
      *
-     * <p>Relación uno-a-muchos con {@link DocumentDefinition}, mapeada por el atributo {@code category}
-     * en la entidad hija.</p>
-     *
+     * <p>Relación uno-a-muchos, mapeada por {@code category} en {@link DocumentDefinition}.</p>
      */
     @OneToMany(mappedBy = "category")
     private List<DocumentDefinition> documents = new ArrayList<>();
@@ -74,8 +77,6 @@ public class Category {
 
     /**
      * Establece el id de la categoría.
-     *
-     * <p>Normalmente no se asigna manualmente porque es autogenerado por la base de datos.</p>
      *
      * @param id id de la categoría
      */
@@ -102,9 +103,9 @@ public class Category {
     }
 
     /**
-     * Retorna el slug de la categoría.
+     * Retorna el slug calculado por base de datos.
      *
-     * @return slug de la categoría
+     * @return slug
      */
     public String getSlug() {
         return slug;
@@ -113,25 +114,25 @@ public class Category {
     /**
      * Retorna la fecha/hora de creación del registro.
      *
-     * @return fecha de creación
+     * @return fecha/hora de creación
      */
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     /**
-     * Retorna la lista de definiciones de documentos asociadas.
+     * Retorna las definiciones de documentos asociadas.
      *
-     * @return lista de documentos/definiciones
+     * @return lista de definiciones
      */
     public List<DocumentDefinition> getDocuments() {
         return documents;
     }
 
     /**
-     * Establece la lista de definiciones de documentos asociadas.
+     * Establece las definiciones de documentos asociadas.
      *
-     * @param documents lista de definiciones de documentos
+     * @param documents lista de definiciones
      */
     public void setDocuments(List<DocumentDefinition> documents) {
         this.documents = documents;

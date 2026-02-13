@@ -1,11 +1,11 @@
 package co.edu.unbosque.ccdigital.entity;
 
 /**
- * Enum que representa el tipo de entidad dentro del sistema.
+ * Tipo de entidad dentro del sistema.
  *
- * <p>Este tipo se utiliza para clasificar entidades según su rol o función en la plataforma.
- * Actualmente se contempla el tipo {@link #EMISOR}, pero el enum está diseñado para crecer
- * en caso de que el proyecto incorpore más roles.</p>
+ * <p>
+ * Permite clasificar entidades según su rol. En la versión actual se contempla el tipo {@link #EMISOR}.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -13,8 +13,6 @@ package co.edu.unbosque.ccdigital.entity;
  */
 public enum EntityType {
 
-    /**
-     * Entidad emisora autorizada para emitir documentos y credenciales.
-     */
+    /** Entidad emisora autorizada para emitir documentos y credenciales. */
     EMISOR
 }

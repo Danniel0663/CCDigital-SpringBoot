@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -13,17 +13,18 @@
 
 <body class="bg-light">
 <nav class="navbar navbar-expand-lg bg-white border-bottom">
-  <div class="container">
+  <div class="container d-flex justify-content-between align-items-center">
     <span class="navbar-brand fw-semibold">
       <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
     </span>
-  </div>
- <form th:action="@{/admin/logout}" method="post" style="margin:0;">
+
+    <form th:action="@{/admin/logout}" method="post" style="margin:0;">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-      <button type="submit" style="padding:8px 10px;">Cerrar sesión</button>
+      <button class="btn btn-outline-dark btn-sm" type="submit">
+        Cerrar sesión
+      </button>
     </form>
-</form>
-  
+  </div>
 </nav>
 
 <main class="container py-4">
@@ -34,18 +35,17 @@
         <p class="text-muted mb-4">Gestiona personas, documentos y sincronización con Fabric/Indy.</p>
 
         <div class="d-flex flex-wrap gap-2">
-          <a class="btn btn-primary" href="/admin/persons">
+          <a class="btn btn-primary" th:href="@{/admin/persons}">
             <i class="bi bi-people me-2"></i>Personas
           </a>
 
-          <a class="btn btn-outline-primary" href="/admin/sync">
+          <a class="btn btn-outline-primary" th:href="@{/admin/sync}">
             <i class="bi bi-arrow-repeat me-2"></i>Sincronización (Fabric / Indy)
           </a>
-          
-          <a class="btn btn-outline-primary" href="/admin/issuers">
-  			<i class="bi bi-building me-2"></i>Emisores
-		</a>
-          
+
+          <a class="btn btn-outline-primary" th:href="@{/admin/issuers}">
+            <i class="bi bi-building me-2"></i>Emisores
+          </a>
         </div>
       </div>
     </div>
@@ -54,10 +54,10 @@
       <div class="p-4 bg-white border rounded-4 shadow-sm">
         <h2 class="h6 text-uppercase text-muted mb-3">Accesos rápidos</h2>
         <div class="d-grid gap-2">
-          <a class="btn btn-outline-secondary" href="/admin/persons/new">
+          <a class="btn btn-outline-secondary" th:href="@{/admin/persons/new}">
             <i class="bi bi-person-plus me-2"></i>Nueva persona
           </a>
-          <a class="btn btn-outline-secondary" href="/admin/sync">
+          <a class="btn btn-outline-secondary" th:href="@{/admin/sync}">
             <i class="bi bi-hdd-network me-2"></i>Ejecutar Sync
           </a>
         </div>

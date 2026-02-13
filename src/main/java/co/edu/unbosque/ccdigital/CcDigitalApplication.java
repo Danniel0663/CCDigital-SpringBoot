@@ -1,40 +1,39 @@
 package co.edu.unbosque.ccdigital;
 
-import co.edu.unbosque.ccdigital.config.FileStorageProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
- * Punto de entrada principal de la aplicación <b>CCDigital</b>.
+ * Clase de arranque de la aplicación <strong>CCDigital</strong>.
+ *
  * <p>
- * Esta clase inicializa el contexto de Spring Boot  y realiza el arranque de la aplicación,
- * habilitando además la carga de propiedades de configuración asociadas al almacenamiento de archivos.
+ * Inicializa el contexto de Spring Boot y habilita el escaneo de clases anotadas con
+ * {@code @ConfigurationProperties} dentro del paquete base {@code co.edu.unbosque.ccdigital}.
  * </p>
  *
  * <h2>Responsabilidades</h2>
  * <ul>
  *   <li>Arrancar la aplicación Spring Boot.</li>
- *   <li>Habilitar el enlace (binding) de propiedades de configuración mediante {@link EnableConfigurationProperties}.</li>
- * </ul>
- *
- * <h2>Configuración habilitada</h2>
- * <ul>
- *   <li>{@link FileStorageProperties}: propiedades relacionadas con la configuración de almacenamiento de archivos.</li>
+ *   <li>Habilitar el escaneo de propiedades de configuración mediante {@link ConfigurationPropertiesScan}.</li>
  * </ul>
  *
  * @author Danniel
  * @author Yeison
  * @since 1.0
+ * @see SpringApplication
  */
 @SpringBootApplication
-@EnableConfigurationProperties({
-        FileStorageProperties.class
-})
+@ConfigurationPropertiesScan("co.edu.unbosque.ccdigital")
 public class CcDigitalApplication {
 
-	 /**
+    /**
      * Punto de entrada principal de la aplicación.
+     *
+     * <p>
+     * Delega el arranque en {@link SpringApplication#run(Class, String...)} para levantar el
+     * contenedor y registrar los beans definidos en el contexto.
+     * </p>
      *
      * @param args argumentos de línea de comandos.
      */

@@ -5,13 +5,16 @@ import co.edu.unbosque.ccdigital.entity.PersonDocumentStatus;
 import java.time.LocalDate;
 
 /**
- * DTO utilizado para capturar los datos del formulario de carga de documentos
- * asociados a una persona en la interfaz web.
+ * DTO para capturar los metadatos del formulario de carga de documentos asociados a una persona.
  *
- * <p>Este formulario normalmente se usa junto con un archivo (por ejemplo, {@code MultipartFile})
- * enviado en la misma petición. Aquí se almacenan únicamente los metadatos del documento:</p>
+ * <p>
+ * Este DTO representa únicamente los metadatos del documento. El archivo físico se recibe en la misma
+ * petición como {@code MultipartFile} y se procesa en la capa de servicio.
+ * </p>
  *
- * <p><b>Valor por defecto:</b> {@link #status} se inicializa como {@link PersonDocumentStatus#VIGENTE}.</p>
+ * <p>
+ * El estado por defecto es {@link PersonDocumentStatus#VIGENTE}.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -20,15 +23,12 @@ import java.time.LocalDate;
 public class DocumentUploadForm {
 
     /**
-     * Identificador de la definición del documento seleccionado en el formulario
-     * (catálogo de {@code DocumentDefinition}).
+     * Identificador de la definición del documento seleccionada en el catálogo.
      */
     private Long documentId;
 
     /**
      * Estado funcional del documento.
-     *
-     * <p>Por defecto se asigna {@link PersonDocumentStatus#VIGENTE}.</p>
      */
     private PersonDocumentStatus status = PersonDocumentStatus.VIGENTE;
 
@@ -43,7 +43,7 @@ public class DocumentUploadForm {
     private LocalDate expiryDate;
 
     /**
-     * Retorna el id de la definición de documento seleccionada.
+     * Retorna el identificador de la definición de documento seleccionada.
      *
      * @return id de la definición de documento
      */
@@ -52,7 +52,7 @@ public class DocumentUploadForm {
     }
 
     /**
-     * Establece el id de la definición de documento seleccionada.
+     * Establece el identificador de la definición de documento seleccionada.
      *
      * @param documentId id de la definición de documento
      */

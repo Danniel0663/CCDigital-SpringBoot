@@ -3,11 +3,15 @@ package co.edu.unbosque.ccdigital.controller;
 import co.edu.unbosque.ccdigital.dto.IssuerSearchForm;
 import co.edu.unbosque.ccdigital.dto.IssuerUploadForm;
 import co.edu.unbosque.ccdigital.entity.IdType;
+import co.edu.unbosque.ccdigital.entity.IssuingEntity;
 import co.edu.unbosque.ccdigital.entity.Person;
+import co.edu.unbosque.ccdigital.security.IssuerPrincipal;
 import co.edu.unbosque.ccdigital.service.DocumentDefinitionService;
 import co.edu.unbosque.ccdigital.service.IssuingEntityService;
 import co.edu.unbosque.ccdigital.service.PersonDocumentService;
 import co.edu.unbosque.ccdigital.service.PersonService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -17,51 +21,31 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.Collections;
 
 /**
- * Controlador web del módulo de Emisores (Issuer).
+ * Controlador web para el módulo de Emisor (Issuer).
  *
- * <p>Este módulo representa la experiencia de una entidad emisora (empresa/entidad)
- * que puede:</p>
+ * <p>
+ * Permite al emisor autenticado buscar una persona y cargar documentos dentro del conjunto
+ * de definiciones permitidas para su entidad emisora.
+ * </p>
  *
- * <p>Rutas expuestas bajo el prefijo {@code /issuer}.</p>
- *
- * <p><b>Mensajes UI:</b> utiliza {@link RedirectAttributes} con flash attributes
- * {@code msgOk} y {@code msgErr} para mostrar retroalimentación al usuario.</p>
- *
- * @author Danniel
- * @author Yeison 
- * @since 1.0
+ * @since 3.0
  */
 @Controller
 @RequestMapping("/issuer")
 public class IssuerController {
 
-    /**
-     * Servicio para consultar emisores y sus reglas/catálogos.
-     */
     private final IssuingEntityService issuingEntityService;
-
-    /**
-     * Servicio de personas.
-     */
     private final PersonService personService;
-
-    /**
-     * Servicio de documentos de persona.
-     */
     private final PersonDocumentService personDocumentService;
-
-    /**
-     * Servicio para consultar definiciones de documentos y los permitidos por emisor.
-     */
     private final DocumentDefinitionService documentDefinitionService;
 
     /**
-     * Construye el controlador del módulo Issuer inyectando dependencias.
+     * Constructor del controlador.
      *
      * @param issuingEntityService servicio de emisores
      * @param personService servicio de personas
-     * @param personDocumentService servicio de documentos asociados a personas
-     * @param documentDefinitionService servicio de definiciones/catálogos de documentos
+     * @param personDocumentService servicio de documentos de persona
+     * @param documentDefinitionService servicio de definiciones de documentos
      */
     public IssuerController(IssuingEntityService issuingEntityService,
                             PersonService personService,
@@ -74,40 +58,52 @@ public class IssuerController {
     }
 
     /**
-     * Página principal del módulo de emisores.
+     * Obtiene el identificador del emisor autenticado a partir del {@link IssuerPrincipal}.
      *
-     * <p>Carga al {@link Model}:</p>
+     * @return id del emisor autenticado
+     * @throws IllegalStateException si no existe un emisor autenticado en el contexto
+     */
+    private Long currentIssuerId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Object principal = auth != null ? auth.getPrincipal() : null;
+
+        if (principal instanceof IssuerPrincipal ip) {
+            return ip.getIssuerId();
+        }
+        throw new IllegalStateException("No hay un emisor autenticado.");
+    }
+
+    /**
+     * Página principal del emisor.
      *
-     * <p>Si {@code issuerId} y {@code personId} están presentes, se cargan los detalles de la persona
-     * En caso contrario.</p>
+     * <p>
+     * Si se envía {@code personId}, carga la persona y sus documentos para habilitar el flujo de carga.
+     * </p>
      *
-     * @param issuerId id del emisor seleccionado (opcional, llega por query param)
-     * @param personId id de la persona encontrada/seleccionada (opcional, llega por query param)
+     * @param personId id interno de la persona (opcional)
      * @param model modelo de Spring MVC
-     * @param msgOk mensaje de éxito proveniente de flash attributes (opcional)
-     * @param msgErr mensaje de error proveniente de flash attributes (opcional)
-     * @return nombre de la vista principal del módulo issuer
+     * @param msgOk mensaje de éxito (flash attribute)
+     * @param msgErr mensaje de error (flash attribute)
+     * @return vista principal del módulo issuer
      */
     @GetMapping("")
-    public String home(@RequestParam(value = "issuerId", required = false) Long issuerId,
-                       @RequestParam(value = "personId", required = false) Long personId,
+    public String home(@RequestParam(value = "personId", required = false) Long personId,
                        Model model,
                        @ModelAttribute("msgOk") String msgOk,
                        @ModelAttribute("msgErr") String msgErr) {
 
-        model.addAttribute("issuers", issuingEntityService.listApprovedEmitters()); // ajusta al nombre real
-        model.addAttribute("idTypes", IdType.values());
+        Long issuerId = currentIssuerId();
+        IssuingEntity issuer = issuingEntityService.getById(issuerId);
 
-        IssuerSearchForm searchForm = new IssuerSearchForm();
-        searchForm.setIssuerId(issuerId);
-        model.addAttribute("searchForm", searchForm);
+        model.addAttribute("issuer", issuer);
+        model.addAttribute("idTypes", IdType.values());
+        model.addAttribute("searchForm", new IssuerSearchForm());
 
         IssuerUploadForm uploadForm = new IssuerUploadForm();
-        uploadForm.setIssuerId(issuerId);
         uploadForm.setPersonId(personId);
         model.addAttribute("uploadForm", uploadForm);
 
-        if (issuerId != null && personId != null) {
+        if (personId != null) {
             Person person = personService.findById(personId).orElse(null);
             model.addAttribute("person", person);
             model.addAttribute("personDocs", personDocumentService.listByPerson(personId));
@@ -118,52 +114,50 @@ public class IssuerController {
             model.addAttribute("allowedDocs", Collections.emptyList());
         }
 
+        model.addAttribute("msgOk", msgOk);
+        model.addAttribute("msgErr", msgErr);
+
         return "issuer/index";
     }
 
     /**
-     * Busca una persona a partir del emisor seleccionado y los datos de identificación ingresados.
+     * Busca una persona por tipo y número de identificación.
      *
-     * @param form formulario de búsqueda con emisor seleccionado y datos de identificación
-     * @return redirección a la página principal con los parámetros necesarios
+     * @param form formulario de búsqueda
+     * @param ra atributos flash para mensajes de UI
+     * @return redirección a la página principal con {@code personId} si la persona existe
      */
     @PostMapping("/search")
     public String search(@ModelAttribute("searchForm") IssuerSearchForm form,
                          RedirectAttributes ra) {
 
-        if (form.getIssuerId() == null) {
-            ra.addFlashAttribute("msgErr", "Selecciona un emisor.");
-            return "redirect:/issuer";
-        }
-
         var opt = personService.findByIdTypeAndNumber(form.getIdType(), form.getIdNumber());
         if (opt.isEmpty()) {
             ra.addFlashAttribute("msgErr", "Persona no encontrada.");
-            return "redirect:/issuer?issuerId=" + form.getIssuerId();
+            return "redirect:/issuer";
         }
 
-        return "redirect:/issuer?issuerId=" + form.getIssuerId() + "&personId=" + opt.get().getId();
+        return "redirect:/issuer?personId=" + opt.get().getId();
     }
 
     /**
-     * Carga un documento desde un emisor para una persona específica.
+     * Carga un documento para una persona desde el módulo del emisor.
      *
-     * <p>Este endpoint recibe el formulario {@link IssuerUploadForm} con los metadatos del documento
-     * y el archivo como {@link MultipartFile}. La carga y persistencia se delegan a
-     * {@link PersonDocumentService#uploadFromIssuer}</p>
-     *
-     * @param form formulario de carga con emisor, persona, documento, estado y fechas
-     * @param file archivo a cargar desde la UI
-     * @param ra redirect attributes para mensajes flash
+     * @param form formulario con metadatos del documento
+     * @param file archivo recibido desde la UI
+     * @param ra atributos flash para mensajes de UI
+     * @return redirección a la página principal del emisor con el contexto de la persona
      */
     @PostMapping("/upload")
     public String upload(@ModelAttribute("uploadForm") IssuerUploadForm form,
                          @RequestParam("file") MultipartFile file,
                          RedirectAttributes ra) {
 
+        Long issuerId = currentIssuerId();
+
         try {
             personDocumentService.uploadFromIssuer(
-                    form.getIssuerId(),
+                    issuerId,
                     form.getPersonId(),
                     form.getDocumentId(),
                     form.getStatus(),
@@ -171,12 +165,11 @@ public class IssuerController {
                     form.getExpiryDate(),
                     file
             );
-
-            ra.addFlashAttribute("msgOk", "Documento cargado y enviado a revisión (PENDING).");
+            ra.addFlashAttribute("msgOk", "Documento cargado y enviado a revisión.");
         } catch (Exception ex) {
-            ra.addFlashAttribute("msgErr", "Error subiendo documento: " + ex.getMessage());
+            ra.addFlashAttribute("msgErr", "Error al cargar el documento: " + ex.getMessage());
         }
 
-        return "redirect:/issuer?issuerId=" + form.getIssuerId() + "&personId=" + form.getPersonId();
+        return "redirect:/issuer?personId=" + form.getPersonId();
     }
 }

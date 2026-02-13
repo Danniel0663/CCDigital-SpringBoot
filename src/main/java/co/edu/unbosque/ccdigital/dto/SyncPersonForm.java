@@ -3,14 +3,12 @@ package co.edu.unbosque.ccdigital.dto;
 import co.edu.unbosque.ccdigital.entity.IdType;
 
 /**
- * DTO utilizado para capturar los datos del formulario de sincronización
- * de una persona en la interfaz web del módulo administrativo.
+ * DTO para capturar los datos del formulario de sincronización por persona en el módulo administrativo.
  *
- * <p>Este formulario se usa típicamente para ejecutar una sincronización hacia herramientas externas
- * como Hyperledger Fabric de manera puntual para una persona específica</p>
- *
- * <p>Mapea con {@code @ModelAttribute("personForm")} en endpoints como
- * {@code POST /admin/sync/fabric/person}.</p>
+ * <p>
+ * Se utiliza para ejecutar procesos puntuales (por ejemplo, sincronización hacia Fabric) con base en
+ * tipo y número de identificación.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -18,14 +16,7 @@ import co.edu.unbosque.ccdigital.entity.IdType;
  */
 public class SyncPersonForm {
 
-    /**
-     * Tipo de identificación de la persona (por ejemplo: CC, TI, CE, PAS, etc.).
-     */
     private IdType idType;
-
-    /**
-     * Número de identificación de la persona.
-     */
     private String idNumber;
 
     /**

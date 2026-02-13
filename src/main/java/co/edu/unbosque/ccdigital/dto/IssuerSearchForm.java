@@ -3,24 +3,14 @@ package co.edu.unbosque.ccdigital.dto;
 import co.edu.unbosque.ccdigital.entity.IdType;
 
 /**
- * DTO utilizado para capturar los datos del formulario de búsqueda en el módulo de Emisores (Issuer).
+ * DTO para capturar los criterios de búsqueda de una persona desde la vista del emisor (Issuer).
  *
- * <p>Normalmente se usa en el endpoint {@code POST /issuer/search} para redirigir a la vista principal
- * con el {@code issuerId} y el {@code personId} encontrados.</p>
- *
- * @author Danniel
- * @author Yeison
- * @since 1.0
+ * @since 3.0
  */
 public class IssuerSearchForm {
 
     /**
-     * Identificador del emisor seleccionado en la interfaz.
-     */
-    private Long issuerId;
-
-    /**
-     * Tipo de identificación de la persona (por ejemplo: CC, TI, CE, PAS, etc.).
+     * Tipo de identificación de la persona.
      */
     private IdType idType;
 
@@ -30,25 +20,7 @@ public class IssuerSearchForm {
     private String idNumber;
 
     /**
-     * Retorna el id del emisor seleccionado.
-     *
-     * @return id del emisor
-     */
-    public Long getIssuerId() {
-        return issuerId;
-    }
-
-    /**
-     * Establece el id del emisor seleccionado.
-     *
-     * @param issuerId id del emisor
-     */
-    public void setIssuerId(Long issuerId) {
-        this.issuerId = issuerId;
-    }
-
-    /**
-     * Retorna el tipo de identificación de la persona.
+     * Retorna el tipo de identificación.
      *
      * @return tipo de identificación
      */
@@ -57,7 +29,7 @@ public class IssuerSearchForm {
     }
 
     /**
-     * Establece el tipo de identificación de la persona.
+     * Establece el tipo de identificación.
      *
      * @param idType tipo de identificación
      */
@@ -66,7 +38,7 @@ public class IssuerSearchForm {
     }
 
     /**
-     * Retorna el número de identificación de la persona.
+     * Retorna el número de identificación.
      *
      * @return número de identificación
      */
@@ -75,7 +47,7 @@ public class IssuerSearchForm {
     }
 
     /**
-     * Establece el número de identificación de la persona.
+     * Establece el número de identificación.
      *
      * @param idNumber número de identificación
      */
