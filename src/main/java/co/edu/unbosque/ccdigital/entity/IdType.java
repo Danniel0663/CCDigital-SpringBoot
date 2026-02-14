@@ -1,10 +1,12 @@
 package co.edu.unbosque.ccdigital.entity;
 
 /**
- * Enum que representa los tipos de identificación soportados por el sistema.
+ * Tipos de identificación soportados por el sistema.
  *
- * <p>Se utiliza para clasificar el documento de identidad de una persona (por ejemplo en {@code Person})
- * y para búsquedas/formularios donde se requiere el tipo junto con el número.</p>
+ * <p>
+ * Se utiliza para clasificar el documento de identidad de una persona y para operaciones que requieren
+ * el tipo y el número de identificación.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -12,38 +14,24 @@ package co.edu.unbosque.ccdigital.entity;
  */
 public enum IdType {
 
-    /**
-     * Cédula de Ciudadanía.
-     */
+    /** Cédula de ciudadanía. */
     CC,
 
-    /**
-     * Cédula de Extranjería.
-     */
+    /** Cédula de extranjería. */
     CE,
 
-    /**
-     * Pasaporte.
-     */
+    /** Pasaporte. */
     PA,
 
-    /**
-     * Número de Identificación Tributaria (empresas/personas jurídicas).
-     */
+    /** Número de identificación tributaria. */
     NIT,
 
-    /**
-     * Tarjeta de Identidad.
-     */
+    /** Tarjeta de identidad. */
     TI,
 
-    /**
-     * Permiso Especial de Permanencia.
-     */
+    /** Permiso especial de permanencia. */
     PEP,
 
-    /**
-     * Otro tipo de identificación.
-     */
+    /** Otro tipo de identificación. */
     OTRO
 }

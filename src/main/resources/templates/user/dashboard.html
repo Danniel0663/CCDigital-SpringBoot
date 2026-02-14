@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Dashboard Usuario · CCDigital</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1000px; margin: 30px auto; padding: 0 16px; }
+    .top { display:flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
+    th { background: #f6f6f6; }
+    .pill { display:inline-block; padding: 4px 10px; border-radius: 999px; background:#eee; }
+    form { margin: 0; }
+    button { padding: 8px 12px; cursor: pointer; }
+    .muted { color:#666; font-size: 12px; }
+    a.btnlink { display:inline-block; padding: 7px 10px; border:1px solid #333; border-radius:6px; text-decoration:none; }
+  </style>
+</head>
+<body>
+
+  <div class="top">
+    <div>
+      <h2 th:text="${displayName}">Usuario</h2>
+      <div>
+        <span class="pill" th:text="${idType}">CC</span>
+        <span class="pill" th:text="${idNumber}">000</span>
+        <span class="pill" th:text="${email}">email</span>
+      </div>
+    </div>
+
+    <form th:action="@{/user/logout}" method="post">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <button type="submit">Cerrar sesión</button>
+    </form>
+  </div>
+
+  <h3>Documentos en Fabric</h3>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Título</th>
+        <th>Entidad</th>
+        <th>Estado</th>
+        <th>Creado</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr th:if="${#lists.isEmpty(docs)}">
+        <td colspan="5">No hay documentos registrados.</td>
+      </tr>
+
+      <tr th:each="d : ${docs}">
+        <td>
+          <div th:text="${d.title()}">Título</div>
+          <div class="muted" th:text="${d.sizeHuman()}">Tamaño</div>
+        </td>
+
+        <td th:text="${d.issuingEntity()}">Fabric</td>
+
+        <td>
+          <span class="pill" th:text="${d.status()}">Registrado</span>
+        </td>
+
+        <td th:text="${d.createdAtHuman()}">Fecha</td>
+
+        <td>
+          <a class="btnlink"
+             th:href="@{/user/docs/view/{docId}(docId=${d.docId()})}"
+             target="_blank"
+             rel="noopener">
+            Ver
+          </a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+</body>
+</html>

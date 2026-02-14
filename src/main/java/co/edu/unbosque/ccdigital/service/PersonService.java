@@ -12,8 +12,13 @@ import java.util.Optional;
 /**
  * Servicio de negocio para la gestión de personas ({@link Person}).
  *
- * <p>Esta clase encapsula el acceso a datos de {@link PersonRepository} y la lógica complementaria
- * relacionada con el ciclo de vida de una persona en el sistema.</p>
+ * <p>Responsabilidades:</p>
+ * <ul>
+ *   <li>Listar personas.</li>
+ *   <li>Consultar personas por id.</li>
+ *   <li>Consultar personas por tipo y número de identificación.</li>
+ *   <li>Crear una persona y asegurar la creación de su carpeta en el sistema de archivos.</li>
+ * </ul>
  *
  * @author Danniel
  * @author Yeison
@@ -65,8 +70,8 @@ public class PersonService {
     /**
      * Busca una persona por tipo y número de identificación.
      *
-     * <p>Este método es útil para flujos donde el usuario ingresa su identificación en un formulario
-     * (por ejemplo, módulo issuer o sincronización).</p>
+     * <p>Este método se usa típicamente cuando el usuario ingresa su identificación en un formulario
+     * (por ejemplo, módulo issuer o validaciones previas a carga/sincronización).</p>
      *
      * @param idType tipo de identificación (ej: {@link IdType#CC})
      * @param idNumber número de identificación
@@ -80,7 +85,7 @@ public class PersonService {
      * Crea una persona y asegura la creación de su carpeta en el sistema de archivos.
      *
      * <p>Se ejecuta dentro de una transacción para asegurar consistencia en la creación de la persona.
-     * Ten en cuenta que la creación de la carpeta en disco no participa de la transacción de BD.</p>
+     * La creación de la carpeta en disco no participa de la transacción de BD.</p>
      *
      * @param person entidad {@link Person} a crear
      * @return persona persistida (con id asignado)
@@ -88,9 +93,7 @@ public class PersonService {
     @Transactional
     public Person createPersonAndFolder(Person person) {
         Person saved = personRepository.save(person);
-
         fileStorageService.ensurePersonFolder(saved);
-
         return saved;
     }
 }

@@ -7,10 +7,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 /**
- * Repositorio JPA para la entidad {@link Person}.
+ * Repositorio JPA para {@link Person}.
  *
- * <p>Extiende {@link JpaRepository} para proveer operaciones CRUD sobre la tabla {@code persons}
- * (personas registradas en el sistema).</p>
+ * <p>
+ * Provee operaciones CRUD sobre la tabla {@code persons}. Incluye una consulta derivada para
+ * ubicar una persona por su tipo y número de identificación.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -21,8 +23,9 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
     /**
      * Busca una persona por tipo de identificación y número.
      *
-     * <p>Este método se implementa automáticamente por Spring Data JPA a partir del nombre
-     * del método, generando la consulta correspondiente.</p>
+     * <p>
+     * Este método se implementa automáticamente por Spring Data JPA a partir del nombre del método.
+     * </p>
      *
      * @param idType tipo de identificación ({@link IdType})
      * @param idNumber número de identificación

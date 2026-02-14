@@ -9,6 +9,11 @@ import java.io.InputStreamReader;
 /**
  * Servicio de integración que ejecuta comandos del sistema operativo para invocar herramientas externas.
  *
+ * <p>Este servicio ejecuta comandos hardcoded (rutas fijas). Se usa como alternativa simple
+ * cuando no se requiere configuración por properties o como soporte temporal.</p>
+ *
+ * <p>Si se necesita parametrizar workdir, binarios o scripts por ambiente, usar {@link ExternalToolsService}.</p>
+ *
  * @author Danniel
  * @author Yeison
  * @since 3.0
@@ -22,7 +27,7 @@ public class IntegrationCommandService {
      * <p>La salida incluye todas las líneas generadas por el proceso y al final agrega el
      * código de salida (exit code).</p>
      *
-     * <p><b>Implementación:</b> combina stdout+stderr en un mismo stream
+     * <p>Implementación: combina stdout+stderr en un mismo stream
      * ({@code pb.redirectErrorStream(true)}).</p>
      *
      * @param command comando completo a ejecutar en bash
@@ -47,7 +52,6 @@ public class IntegrationCommandService {
             output.append("\nExit code: ").append(exitCode);
             return output.toString();
         } catch (IOException | InterruptedException e) {
-            
             Thread.currentThread().interrupt();
             return "Error ejecutando comando: " + e.getMessage();
         }
@@ -56,9 +60,10 @@ public class IntegrationCommandService {
     /**
      * Ejecuta la sincronización completa hacia Hyperledger Fabric.
      *
-     * <p>Comando ejecutado (hardcoded):</p>
+     * <p>Comando ejecutado:</p>
      * <pre>
      * {@code cd /home/ccdigital/fabric/fabric-samples/test-network/client && node sync-db-to-ledger.js --all}
+     * cd /home/ccdigital/fabric/fabric-samples/test-network/client &amp;&amp; node sync-db-to-ledger.js --all
      * </pre>
      *
      * @return salida del comando y código de salida
@@ -70,6 +75,11 @@ public class IntegrationCommandService {
 
     /**
      * Ejecuta la sincronización hacia Hyperledger Fabric para una persona específica.
+     *
+     * <p>Comando ejecutado:</p>
+     * <pre>
+     * cd /home/ccdigital/fabric/fabric-samples/test-network/client &amp;&amp; node sync-db-to-ledger.js --person &lt;idType&gt; &lt;idNumber&gt;
+     * </pre>
      *
      * @param idType tipo de identificación (ej. {@code CC}, {@code TI})
      * @param idNumber número de identificación
@@ -83,6 +93,11 @@ public class IntegrationCommandService {
 
     /**
      * Ejecuta la emisión de credenciales Indy desde base de datos.
+     *
+     * <p>Comando ejecutado:</p>
+     * <pre>
+     * cd /home/ccdigital/cdigital-indy-python &amp;&amp; source venv/bin/activate &amp;&amp; python3 issue_credentials_from_db.py
+     * </pre>
      *
      * @return salida del comando y código de salida
      */

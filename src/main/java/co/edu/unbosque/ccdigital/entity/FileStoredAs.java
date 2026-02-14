@@ -1,10 +1,12 @@
 package co.edu.unbosque.ccdigital.entity;
 
 /**
- * Enum que representa la estrategia/medio en el que un archivo es almacenado.
+ * Estrategia de almacenamiento del contenido de un archivo.
  *
- * <p>Se utiliza junto con entidades como {@code FileRecord} para indicar dónde se encuentra
- * físicamente el contenido del archivo</p>
+ * <p>
+ * Se utiliza en {@link FileRecord} para indicar dónde se encuentra el contenido: en base de datos
+ * (BLOB), en el sistema de archivos (PATH) o en almacenamiento externo (S3).
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -12,18 +14,12 @@ package co.edu.unbosque.ccdigital.entity;
  */
 public enum FileStoredAs {
 
-    /**
-     * El archivo se guarda en base de datos como contenido binario (BLOB).
-     */
+    /** Almacenamiento en base de datos como contenido binario (BLOB). */
     BLOB,
 
-    /**
-     * El archivo se guarda en el sistema de archivos, referenciado por una ruta.
-     */
+    /** Almacenamiento en sistema de archivos, referenciado por una ruta. */
     PATH,
 
-    /**
-     * El archivo se guarda en almacenamiento externo compatible con S3.
-     */
+    /** Almacenamiento externo compatible con S3. */
     S3
 }

@@ -5,35 +5,29 @@ import co.edu.unbosque.ccdigital.entity.PersonDocumentStatus;
 import java.time.LocalDate;
 
 /**
- * DTO utilizado para capturar los datos del formulario de carga de documentos en el módulo de Emisores (Issuer).
+ * DTO para capturar los metadatos del formulario de carga de documentos desde el módulo del emisor (Issuer).
  *
- * <p><b>Valor por defecto:</b> {@link #status} se inicializa como {@link PersonDocumentStatus#VIGENTE}.</p>
+ * <p>
+ * Este DTO contiene el contexto de la persona y los metadatos del documento. El archivo físico se recibe
+ * como {@code MultipartFile} y se procesa en el servicio correspondiente.
+ * </p>
  *
- * @author Danniel
- * @author Yeison
  * @since 3.0
  */
 public class IssuerUploadForm {
 
     /**
-     * Identificador del emisor (issuer) que realiza la carga del documento.
-     */
-    private Long issuerId;
-
-    /**
-     * Identificador de la persona a la cual se asociará el documento cargado.
+     * Identificador interno de la persona a la cual se asociará el documento.
      */
     private Long personId;
 
     /**
-     * Identificador de la definición de documento seleccionada (catálogo).
+     * Identificador de la definición del documento seleccionada.
      */
     private Long documentId;
 
     /**
      * Estado funcional del documento.
-     *
-     * <p>Por defecto se asigna {@link PersonDocumentStatus#VIGENTE}.</p>
      */
     private PersonDocumentStatus status = PersonDocumentStatus.VIGENTE;
 
@@ -48,25 +42,7 @@ public class IssuerUploadForm {
     private LocalDate expiryDate;
 
     /**
-     * Retorna el id del emisor que realiza la carga.
-     *
-     * @return id del emisor
-     */
-    public Long getIssuerId() {
-        return issuerId;
-    }
-
-    /**
-     * Establece el id del emisor que realiza la carga.
-     *
-     * @param issuerId id del emisor
-     */
-    public void setIssuerId(Long issuerId) {
-        this.issuerId = issuerId;
-    }
-
-    /**
-     * Retorna el id de la persona asociada a la carga.
+     * Retorna el identificador de la persona.
      *
      * @return id de la persona
      */
@@ -75,7 +51,7 @@ public class IssuerUploadForm {
     }
 
     /**
-     * Establece el id de la persona asociada a la carga.
+     * Establece el identificador de la persona.
      *
      * @param personId id de la persona
      */
@@ -84,18 +60,18 @@ public class IssuerUploadForm {
     }
 
     /**
-     * Retorna el id de la definición de documento seleccionada.
+     * Retorna el identificador de la definición del documento.
      *
-     * @return id de la definición de documento
+     * @return id de la definición del documento
      */
     public Long getDocumentId() {
         return documentId;
     }
 
     /**
-     * Establece el id de la definición de documento seleccionada.
+     * Establece el identificador de la definición del documento.
      *
-     * @param documentId id de la definición de documento
+     * @param documentId id de la definición del documento
      */
     public void setDocumentId(Long documentId) {
         this.documentId = documentId;
@@ -120,7 +96,7 @@ public class IssuerUploadForm {
     }
 
     /**
-     * Retorna la fecha de expedición del documento.
+     * Retorna la fecha de expedición.
      *
      * @return fecha de expedición
      */
@@ -129,7 +105,7 @@ public class IssuerUploadForm {
     }
 
     /**
-     * Establece la fecha de expedición del documento.
+     * Establece la fecha de expedición.
      *
      * @param issueDate fecha de expedición
      */
@@ -138,7 +114,7 @@ public class IssuerUploadForm {
     }
 
     /**
-     * Retorna la fecha de vencimiento del documento.
+     * Retorna la fecha de vencimiento.
      *
      * @return fecha de vencimiento
      */
@@ -147,7 +123,7 @@ public class IssuerUploadForm {
     }
 
     /**
-     * Establece la fecha de vencimiento del documento.
+     * Establece la fecha de vencimiento.
      *
      * @param expiryDate fecha de vencimiento
      */

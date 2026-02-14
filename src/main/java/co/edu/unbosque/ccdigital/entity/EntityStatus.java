@@ -1,10 +1,12 @@
 package co.edu.unbosque.ccdigital.entity;
 
 /**
- * Enum que representa el estado de una entidad dentro del flujo de aprobación del sistema.
+ * Estado del flujo de aprobación de una entidad dentro del sistema.
  *
- * <p>Se utiliza para modelar el ciclo de vida de aprobación típico, por ejemplo para
- * entidades emisoras y registros pendientes de validación</p>
+ * <p>
+ * Se utiliza para modelar el ciclo de vida de aprobación, por ejemplo, en entidades emisoras
+ * y registros que requieren validación administrativa.
+ * </p>
  *
  * @author Danniel
  * @author Yeison
@@ -12,18 +14,12 @@ package co.edu.unbosque.ccdigital.entity;
  */
 public enum EntityStatus {
 
-    /**
-     * La entidad fue aprobada y está habilitada para su uso.
-     */
+    /** La entidad fue aprobada y está habilitada para su uso. */
     APROBADA,
 
-    /**
-     * La entidad se encuentra pendiente de revisión o aprobación.
-     */
+    /** La entidad se encuentra pendiente de revisión o aprobación. */
     PENDIENTE,
 
-    /**
-     * La entidad fue rechazada y no está habilitada para su uso.
-     */
+    /** La entidad fue rechazada y no está habilitada para su uso. */
     RECHAZADA
 }

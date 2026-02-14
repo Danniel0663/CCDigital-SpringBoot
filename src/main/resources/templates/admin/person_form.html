@@ -38,6 +38,8 @@
         </div>
 
         <form th:action="@{/admin/persons}" th:object="${form}" method="post" class="row g-3">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
           <div class="col-md-2">
             <label class="form-label">Tipo ID</label>
             <select class="form-select" th:field="*{idType}" required>

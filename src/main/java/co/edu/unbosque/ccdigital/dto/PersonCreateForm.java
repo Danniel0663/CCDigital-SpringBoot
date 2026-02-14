@@ -5,8 +5,7 @@ import co.edu.unbosque.ccdigital.entity.IdType;
 import java.time.LocalDate;
 
 /**
- * DTO utilizado para capturar los datos del formulario de creación
- * de una persona en la interfaz web (módulo administrativo).
+ * DTO para capturar los datos del formulario de creación de una persona en el módulo administrativo.
  *
  * @author Danniel
  * @author Yeison
@@ -14,39 +13,12 @@ import java.time.LocalDate;
  */
 public class PersonCreateForm {
 
-    /**
-     * Tipo de identificación de la persona (por ejemplo: CC, TI, CE, PAS, etc.).
-     */
     private IdType idType;
-
-    /**
-     * Número de identificación de la persona.
-     */
     private String idNumber;
-
-    /**
-     * Nombres de la persona.
-     */
     private String firstName;
-
-    /**
-     * Apellidos de la persona.
-     */
     private String lastName;
-
-    /**
-     * Correo electrónico de contacto.
-     */
     private String email;
-
-    /**
-     * Teléfono de contacto.
-     */
     private String phone;
-
-    /**
-     * Fecha de nacimiento de la persona.
-     */
     private LocalDate birthdate;
 
     /**
@@ -86,7 +58,7 @@ public class PersonCreateForm {
     }
 
     /**
-     * Retorna los nombres de la persona.
+     * Retorna los nombres.
      *
      * @return nombres
      */
@@ -95,7 +67,7 @@ public class PersonCreateForm {
     }
 
     /**
-     * Establece los nombres de la persona.
+     * Establece los nombres.
      *
      * @param firstName nombres
      */
@@ -104,7 +76,7 @@ public class PersonCreateForm {
     }
 
     /**
-     * Retorna los apellidos de la persona.
+     * Retorna los apellidos.
      *
      * @return apellidos
      */
@@ -113,7 +85,7 @@ public class PersonCreateForm {
     }
 
     /**
-     * Establece los apellidos de la persona.
+     * Establece los apellidos.
      *
      * @param lastName apellidos
      */
@@ -122,7 +94,7 @@ public class PersonCreateForm {
     }
 
     /**
-     * Retorna el correo electrónico de la persona.
+     * Retorna el correo electrónico.
      *
      * @return correo electrónico
      */
@@ -131,7 +103,7 @@ public class PersonCreateForm {
     }
 
     /**
-     * Establece el correo electrónico de la persona.
+     * Establece el correo electrónico.
      *
      * @param email correo electrónico
      */
@@ -140,7 +112,7 @@ public class PersonCreateForm {
     }
 
     /**
-     * Retorna el teléfono de la persona.
+     * Retorna el teléfono.
      *
      * @return teléfono
      */
@@ -149,7 +121,7 @@ public class PersonCreateForm {
     }
 
     /**
-     * Establece el teléfono de la persona.
+     * Establece el teléfono.
      *
      * @param phone teléfono
      */

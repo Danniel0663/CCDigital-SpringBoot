@@ -1,218 +1,115 @@
 package co.edu.unbosque.ccdigital.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
- * Representa las propiedades de configuración para la ejecución de herramientas externas
- * utilizadas por CCDigital ntegraciones con Hyperledger Fabric e Indy.
+ * Propiedades de configuración para la ejecución de herramientas externas.
  *
- * <p>Estas propiedades se cargan automáticamente desde el archivo de configuración de
- * Spring {@code application.properties} o {@code application.yml})
- * usando el prefijo {@code ccdigital.tools}.</p>
+ * <p>
+ * Mapea la configuración bajo el prefijo {@code external-tools}. Su objetivo es centralizar rutas,
+ * ejecutables y scripts requeridos para interactuar con componentes externos (por ejemplo, CLI de Fabric).
+ * </p>
  *
- * <p>Se recomienda validar que las rutas existan y que el usuario del proceso de la aplicación
- * tenga permisos de lectura y ejecución sobre los scripts.</p>
+ * <h2>Notas</h2>
+ * <ul>
+ *   <li>Esta clase se registra vía {@code @ConfigurationPropertiesScan} (no requiere {@code @Component}).</li>
+ *   <li>La sub-sección {@code external-tools.fabric} agrupa los parámetros de Fabric.</li>
+ * </ul>
  *
- * @author Danniel
- * @author Yeison
  * @since 1.0
  */
-@Component
-@ConfigurationProperties(prefix = "ccdigital.tools")
+@ConfigurationProperties(prefix = "external-tools")
 public class ExternalToolsProperties {
 
-    /**
-     * Configuración del bloque de herramientas relacionadas con Hyperledger Fabric.
-     */
-    private Fabric fabric = new Fabric();
+    private final Fabric fabric = new Fabric();
 
     /**
-     * Configuración del bloque de herramientas relacionadas con Hyperledger Indy.
-     */
-    private Indy indy = new Indy();
-
-    /**
-     * Retorna la configuración de herramientas para Fabric.
+     * Retorna la configuración asociada a Fabric.
      *
-     * @return configuración de Fabric (rutas y script)
+     * @return configuración de Fabric
      */
     public Fabric getFabric() {
         return fabric;
     }
 
     /**
-     * Establece la configuración de herramientas para Fabric.
+     * Configuración específica para ejecución de scripts/CLI asociados a Fabric.
      *
-     * @param fabric configuración de Fabric
-     */
-    public void setFabric(Fabric fabric) {
-        this.fabric = fabric;
-    }
-
-    /**
-     * Retorna la configuración de herramientas para Indy.
+     * <p>
+     * Permite definir el directorio de trabajo, el ejecutable de Node y rutas de scripts.
+     * </p>
      *
-     * @return configuración de Indy (rutas, comando de venv y script)
-     */
-    public Indy getIndy() {
-        return indy;
-    }
-
-    /**
-     * Establece la configuración de herramientas para Indy.
-     *
-     * @param indy configuración de Indy
-     */
-    public void setIndy(Indy indy) {
-        this.indy = indy;
-    }
-
-    /**
-     * Agrupa las propiedades necesarias para ejecutar procesos asociados a Hyperledger Fabric.
-     *
-     * <p>Normalmente se utiliza para ejecutar el script que sincroniza la base de datos con el ledger,
-     * por ejemplo {@code sync-db-to-ledger.js}.</p>
+     * @since 1.0
      */
     public static class Fabric {
 
         /**
-         * Directorio de trabajo donde se encuentra el script (work directory).
+         * Directorio base para ejecutar comandos.
          *
-         * <p>Ejemplo:
-         * {@code /home/ccdigital/fabric/fabric-samples/test-network/client}</p>
+         * <p>Por defecto se toma {@code user.dir}.</p>
          */
-        private String workdir;
+        private String workdir = System.getProperty("user.dir");
 
         /**
-         * Nombre del script a ejecutar dentro de {@link #workdir}.
-         *
-         * <p>Ejemplo: {@code sync-db-to-ledger.js}</p>
+         * Script genérico asociado a la integración (si aplica).
          */
-        private String script;
+        private String script = "fabric-cli.js";
 
         /**
-         * Retorna el directorio de trabajo donde se encuentra el script.
-         *
-         * @return ruta del directorio de trabajo
+         * Ejecutable de Node.js utilizado para lanzar scripts.
          */
+        private String nodeBin = "node";
+
+        /**
+         * Script específico para listar documentos.
+         *
+         * <p>Puede ser una ruta relativa al {@link #workdir} o una ruta absoluta.</p>
+         */
+        private String listDocsScript =
+                "/home/ccdigital/fabric/fabric-samples/test-network/client/list-docs.js";
+
         public String getWorkdir() {
             return workdir;
         }
 
-        /**
-         * Establece el directorio de trabajo donde se encuentra el script.
-         *
-         * @param workdir ruta del directorio de trabajo
-         */
         public void setWorkdir(String workdir) {
             this.workdir = workdir;
         }
 
-        /**
-         * Retorna el nombre del script a ejecutar.
-         *
-         * @return nombre del script
-         */
         public String getScript() {
             return script;
         }
 
-        /**
-         * Establece el nombre del script a ejecutar.
-         *
-         * @param script nombre del script
-         */
         public void setScript(String script) {
             this.script = script;
         }
-    }
 
-    /**
-     * Agrupa las propiedades necesarias para ejecutar procesos asociados a Hyperledger Indy.
-     *
-     * <p>Normalmente se utiliza para lanzar un script Python que emite credenciales a partir
-     * de información almacenada en base de datos.</p>
-     */
-    public static class Indy {
+        public String getNodeBin() {
+            return nodeBin;
+        }
 
-        /**
-         * Directorio de trabajo del proyecto Python relacionado con Indy.
-         *
-         * <p>Ejemplo: {@code /home/ccdigital/cdigital-indy-python}</p>
-         */
-        private String workdir;
+        public void setNodeBin(String nodeBin) {
+            this.nodeBin = nodeBin;
+        }
 
-        /**
-         * Comando utilizado para activar el entorno virtual (venv) antes de ejecutar el script.
-         *
-         * <p>Ejemplo: {@code source venv/bin/activate}</p>
-         *
-         * <p><b>Nota:</b> en muchos casos este comando se ejecuta dentro de un shell,
-         * por lo que la implementación que consuma esta propiedad debe considerar el
-         * intérprete (bash/sh) utilizado.</p>
-         */
-        private String venvActivate;
+        public String getListDocsScript() {
+            return listDocsScript;
+        }
 
-        /**
-         * Nombre del script Python a ejecutar dentro de {@link #workdir}.
-         *
-         * <p>Ejemplo: {@code issue_credentials_from_db.py}</p>
-         */
-        private String script;
-
-        /**
-         * Retorna el directorio de trabajo del proyecto Python.
-         *
-         * @return ruta del directorio de trabajo
-         */
-        public String getWorkdir() {
-            return workdir;
+        public void setListDocsScript(String listDocsScript) {
+            this.listDocsScript = listDocsScript;
         }
 
         /**
-         * Establece el directorio de trabajo del proyecto Python.
+         * Retorna el {@link Path} normalizado del directorio de trabajo configurado.
          *
-         * @param workdir ruta del directorio de trabajo
+         * @return ruta absoluta y normalizada del {@code workdir}
          */
-        public void setWorkdir(String workdir) {
-            this.workdir = workdir;
-        }
-
-        /**
-         * Retorna el comando de activación del entorno virtual (venv).
-         *
-         * @return comando para activar venv
-         */
-        public String getVenvActivate() {
-            return venvActivate;
-        }
-
-        /**
-         * Establece el comando de activación del entorno virtual (venv).
-         *
-         * @param venvActivate comando para activar venv
-         */
-        public void setVenvActivate(String venvActivate) {
-            this.venvActivate = venvActivate;
-        }
-
-        /**
-         * Retorna el nombre del script Python a ejecutar.
-         *
-         * @return nombre del script
-         */
-        public String getScript() {
-            return script;
-        }
-
-        /**
-         * Establece el nombre del script Python a ejecutar.
-         *
-         * @param script nombre del script
-         */
-        public void setScript(String script) {
-            this.script = script;
+        public Path workdirPath() {
+            return Paths.get(workdir).toAbsolutePath().normalize();
         }
     }
 }

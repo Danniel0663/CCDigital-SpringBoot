@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ingreso de Usuario - CCDigital</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f6f7fb; }
+    .card { max-width: 520px; margin: 7vh auto; background: #fff; padding: 24px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+    .btn { padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; background: #2f6fed; color: #fff; }
+    .status { margin-top: 14px; font-size: 14px; }
+    input { width: 100%; padding: 10px; border: 1px solid #d9d9d9; border-radius: 6px; }
+    label { font-size: 14px; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>Ingreso de Usuario</h2>
+  <p>El acceso se valida con una prueba de tu credencial (Indy).</p>
+
+  <div style="margin: 12px 0;">
+    <label for="idNumber" style="display:block; margin-bottom:6px;">Número de identificación</label>
+    <input id="idNumber" type="text" inputmode="numeric" autocomplete="off" placeholder="Ej: 1019983896" />
+  </div>
+
+  <button id="btnStart" class="btn">Validar con credencial</button>
+
+  <div id="status" class="status"></div>
+</div>
+
+<script>
+  // ✅ Redirección automática si ya hay sesión válida (cookie/JSESSIONID)
+  (async function redirectIfAlreadyLoggedIn() {
+    try {
+      // Este endpoint debe existir y devolver { authenticated: boolean, redirectUrl?: string }
+      const res = await fetch('/user/auth/session', { method: 'GET' });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.authenticated) {
+          window.location.replace(data.redirectUrl || '/user/dashboard');
+        }
+      }
+    } catch (e) {
+      // Silencioso: si falla, dejamos que el usuario haga login normal
+    }
+  })();
+
+  async function postJson(url, data) {
+	  const res = await fetch(url, {
+	    method: 'POST',
+	    credentials: 'same-origin',
+	    headers: { 'Content-Type': 'application/json' },
+	    body: JSON.stringify(data)
+	  });
+	  if (!res.ok) {
+	    const txt = await res.text();
+	    throw new Error('HTTP ' + res.status + ' - ' + txt);
+	  }
+	  return res.json();
+	}
+
+  async function getJson(url) {
+	  const res = await fetch(url, { credentials: 'same-origin' });
+	  if (!res.ok) throw new Error('HTTP ' + res.status);
+	  return res.json();
+	}
+
+  const btn = document.getElementById('btnStart');
+  const statusEl = document.getElementById('status');
+  const idNumberEl = document.getElementById('idNumber');
+
+  function setStatus(msg) {
+    statusEl.textContent = msg;
+  }
+
+  btn.addEventListener('click', async () => {
+    try {
+      const idNumber = (idNumberEl.value || '').trim();
+      if (!idNumber) {
+        setStatus('Ingresa tu número de identificación.');
+        return;
+      }
+
+      setStatus('Enviando solicitud de prueba al Holder...');
+      const startRes = await postJson('/user/auth/start', { idNumber });
+
+      const presExId = startRes.presExId;
+      setStatus('Solicitud enviada. Esperando verificación...');
+
+      let tries = 0;
+      const maxTries = 30;
+
+      const timer = setInterval(async () => {
+        tries++;
+        try {
+          const pollRes = await getJson('/user/auth/poll?presExId=' + encodeURIComponent(presExId));
+          if (pollRes.authenticated) {
+            clearInterval(timer);
+            setStatus('Verificado. Redirigiendo...');
+            window.location.href = pollRes.redirectUrl || '/user/dashboard';
+            return;
+          }
+
+          if (tries >= maxTries) {
+            clearInterval(timer);
+            setStatus('Tiempo de espera agotado. Intenta de nuevo.');
+            return;
+          }
+
+          setStatus('Aún no verificado. Estado: ' + (pollRes.state || '...'));
+        } catch (e) {
+          clearInterval(timer);
+          setStatus('Error consultando estado: ' + e.message);
+        }
+      }, 700);
+
+    } catch (e) {
+      setStatus('Error: ' + e.message);
+    }
+  });
+</script>
+</body>
+</html>

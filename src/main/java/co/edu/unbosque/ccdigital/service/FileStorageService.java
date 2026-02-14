@@ -20,8 +20,20 @@ import java.text.Normalizer;
  * Servicio encargado del almacenamiento y recuperación de archivos en el sistema de archivos local.
  *
  * <p>Este servicio utiliza la propiedad {@code ccdigital.fs.basePath} (inyectada vía
- * {@link FileStorageProperties}) como directorio raíz para guardar archivos. Los archivos se almacenan
- * dentro de una carpeta por persona, y adicionalmente se calculan metadatos como:</p>
+ * {@link FileStorageProperties}) como directorio raíz para guardar archivos.</p>
+ *
+ * <p>Comportamiento principal:</p>
+ * <ul>
+ *   <li>Guarda archivos dentro de una carpeta por persona (nombre derivado de apellidos+nombres).</li>
+ *   <li>Calcula metadatos del archivo almacenado:
+ *     <ul>
+ *       <li>Tamaño en bytes.</li>
+ *       <li>Hash SHA-256.</li>
+ *       <li>Ruta relativa desde el {@code basePath} (normalizada con {@code /}).</li>
+ *     </ul>
+ *   </li>
+ *   <li>Resuelve rutas absolutas a partir de rutas relativas persistidas en {@link FileRecord}.</li>
+ * </ul>
  *
  * @author Danniel
  * @author Yeison
@@ -58,7 +70,7 @@ public class FileStorageService {
     /**
      * Crea (si no existe) la carpeta de la persona dentro del {@code basePath}.
      *
-     * <p>El nombre de la carpeta se genera por {@link #buildPersonFolderName(Person)}.</p>
+     * <p>El nombre de la carpeta se genera con {@link #buildPersonFolderName(Person)}.</p>
      *
      * @param person persona para la cual se asegura el directorio
      * @return ruta de la carpeta de la persona
@@ -76,8 +88,16 @@ public class FileStorageService {
     }
 
     /**
-     * Construye el nombre de carpeta para una persona usando Apellidos + Nombres,
+     * Construye el nombre de carpeta para una persona usando apellidos + nombres,
      * removiendo espacios y caracteres no permitidos.
+     *
+     * <p>Reglas aplicadas:</p>
+     * <ul>
+     *   <li>Concatena apellido y nombre.</li>
+     *   <li>Elimina espacios.</li>
+     *   <li>Normaliza y elimina tildes/diacríticos (ASCII).</li>
+     *   <li>Deja únicamente caracteres alfanuméricos.</li>
+     * </ul>
      *
      * @param person persona fuente
      * @return nombre de carpeta seguro (ASCII alfanumérico)
@@ -99,8 +119,8 @@ public class FileStorageService {
      *
      * <p>Ejemplo de salida: {@code ApellidoNombre/documento.pdf}</p>
      *
-     * <p>La ruta se normaliza a separador {@code /} para que sea consistente al persistirse
-     * en base de datos independientemente del sistema operativo.</p>
+     * <p>La ruta se normaliza a separador {@code /} para ser consistente al persistirse,
+     * independientemente del sistema operativo.</p>
      *
      * @param person persona propietaria
      * @param filename nombre del archivo
@@ -116,6 +136,14 @@ public class FileStorageService {
 
     /**
      * Almacena un archivo en disco dentro de la carpeta de la persona, calculando metadatos.
+     *
+     * <p>Comportamiento:</p>
+     * <ul>
+     *   <li>Si {@code file.getOriginalFilename()} es vacío, genera un nombre {@code upload-&lt;timestamp&gt;}.</li>
+     *   <li>Escribe el archivo con {@link StandardCopyOption#REPLACE_EXISTING}.</li>
+     *   <li>Calcula tamaño y hash SHA-256 del archivo ya almacenado.</li>
+     *   <li>Retorna metadatos en {@link StoredFileInfo}.</li>
+     * </ul>
      *
      * @param person persona propietaria del archivo
      * @param file archivo recibido (multipart)
@@ -179,7 +207,7 @@ public class FileStorageService {
      * Resuelve la ruta absoluta del archivo a partir del {@link FileRecord#getStoragePath()}.
      *
      * <p>El {@code storagePath} se espera como ruta relativa a {@code basePath}. Para evitar problemas
-     * por rutas guardadas con separadores de Windows ({@code \}), se normaliza a {@code /} antes de resolver.</p>
+     * por rutas guardadas con separadores de Windows ({@code \\}), se normaliza a {@code /} antes de resolver.</p>
      *
      * @param fileRecord registro de archivo con ruta relativa persistida
      * @return ruta absoluta y normalizada del archivo en disco

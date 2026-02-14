@@ -2,7 +2,11 @@ cat > .gitignore <<EOF
 .classpath
 .project
 .settings/
+
 # OS
+/target/
+*.log
+
 .DS_Store
 Thumbs.db
 
