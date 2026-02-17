@@ -62,7 +62,6 @@ public class IntegrationCommandService {
      *
      * <p>Comando ejecutado:</p>
      * <pre>
-     * {@code cd /home/ccdigital/fabric/fabric-samples/test-network/client && node sync-db-to-ledger.js --all}
      * cd /home/ccdigital/fabric/fabric-samples/test-network/client &amp;&amp; node sync-db-to-ledger.js --all
      * </pre>
      *

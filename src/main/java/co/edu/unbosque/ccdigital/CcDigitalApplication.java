@@ -1,9 +1,8 @@
 package co.edu.unbosque.ccdigital;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
-
-import co.edu.unbosque.ccdigital.config.FileStorageProperties;
 
 /**
  * Clase de arranque de la aplicación <strong>CCDigital</strong>.
@@ -30,12 +29,6 @@ public class CcDigitalApplication {
 
     /**
      * Punto de entrada principal de la aplicación.
-     * Método principal (entry point) que ejecuta el arranque de la aplicación.
-     * <p>
-     * Este método delega en {@link SpringApplication} de run para
-     * inicializar el contenedor de Spring, cargar los beans, aplicar la configuración
-     * y dejar la aplicación lista para atender solicitudes.
-     * </p>
      *
      * <p>
      * Delega el arranque en {@link SpringApplication#run(Class, String...)} para levantar el

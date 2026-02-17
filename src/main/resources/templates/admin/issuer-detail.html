@@ -1,14 +1,14 @@
-<div class="bg-white border rounded-4 shadow-sm p-4 mb-3">
+<div class="cc-card-soft p-4 mb-3">
   <h2 class="h6 text-uppercase text-muted mb-3">Credenciales del emisor (Login)</h2>
 
-  <div th:if="${credOk != null}" class="alert alert-success mb-2">
+  <div th:if="${credOk != null}" class="alert alert-success py-2 mb-2">
     Credenciales guardadas correctamente.
   </div>
-  <div th:if="${credErr != null}" class="alert alert-danger mb-2" th:text="${credErr}">
+  <div th:if="${credErr != null}" class="alert alert-danger py-2 mb-2" th:text="${credErr}">
     Error
   </div>
 
-  <form th:action="@{/admin/issuers/{id}/credentials(id=${issuer.id})}" method="post" class="row g-2">
+  <form th:action="@{/admin/issuers/{id}/credentials(id=${issuer.id})}" method="post" class="row g-3">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
     <div class="col-12 col-lg-6">
@@ -24,8 +24,10 @@
       <div class="form-text">Se guarda en BD como hash (bcrypt).</div>
     </div>
 
-    <div class="col-12 mt-2">
-      <button class="btn btn-dark" type="submit">Guardar credenciales</button>
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">
+        <i class="bi bi-save me-2"></i>Guardar credenciales
+      </button>
     </div>
   </form>
 </div>
