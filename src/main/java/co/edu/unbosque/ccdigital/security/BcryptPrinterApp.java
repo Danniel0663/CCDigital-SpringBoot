@@ -11,7 +11,7 @@ public class BcryptPrinterApp {
 
         // 2) Alternativa: system property (opcional)
         if (raw == null || raw.isBlank()) {
-            raw = System.getProperty("app.print-bcrypt", "policia123*");
+            raw = System.getProperty("app.print-bcrypt", "Danniel06*");
         }
 
         // 3) Alternativa: variable de entorno (opcional)
