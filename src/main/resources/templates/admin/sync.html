@@ -5,16 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Sync · CCDigital</title>
 
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
 </head>
 
-<body class="bg-light">
-<nav class="navbar bg-white border-bottom">
-  <div class="container">
-    <a class="navbar-brand fw-semibold text-decoration-none" th:href="@{/admin/dashboard}">
+<body class="bg-body-tertiary">
+<nav class="navbar cc-navbar">
+  <div class="container d-flex justify-content-between align-items-center">
+    <a class="navbar-brand fw-semibold text-decoration-none cc-brand" th:href="@{/admin/dashboard}">
       <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
     </a>
     <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}">
@@ -32,7 +31,7 @@
   <div class="row g-3">
     <!-- Fabric ALL -->
     <div class="col-12 col-lg-4">
-      <div class="bg-white border rounded-4 shadow-sm p-4 h-100">
+      <div class="cc-card p-4 h-100">
         <h2 class="h6 text-uppercase text-muted mb-2">Fabric</h2>
         <div class="fw-semibold mb-3">Sync ALL</div>
         <p class="text-muted small mb-3">Ejecuta: <code>node sync-db-to-ledger.js --all</code></p>
@@ -46,7 +45,7 @@
 
     <!-- Fabric Persona -->
     <div class="col-12 col-lg-4">
-      <div class="bg-white border rounded-4 shadow-sm p-4 h-100">
+      <div class="cc-card p-4 h-100">
         <h2 class="h6 text-uppercase text-muted mb-2">Fabric</h2>
         <div class="fw-semibold mb-3">Sync Persona</div>
 
@@ -74,7 +73,7 @@
 
     <!-- Indy -->
     <div class="col-12 col-lg-4">
-      <div class="bg-white border rounded-4 shadow-sm p-4 h-100">
+      <div class="cc-card p-4 h-100">
         <h2 class="h6 text-uppercase text-muted mb-2">Indy</h2>
         <div class="fw-semibold mb-3">Emitir credenciales</div>
         <p class="text-muted small mb-3">Ejecuta el script Python desde DB.</p>
@@ -89,7 +88,7 @@
   </div>
 
   <!-- Resultado -->
-  <div class="bg-white border rounded-4 shadow-sm p-4 mt-3">
+  <div class="cc-card p-4 mt-3">
     <div class="d-flex align-items-center justify-content-between mb-2">
       <h2 class="h6 text-uppercase text-muted mb-0">Resultado</h2>
       <span th:if="${result != null}"
@@ -109,12 +108,12 @@
       <div class="row g-3">
         <div class="col-12 col-lg-6">
           <h3 class="h6 mb-2">STDOUT</h3>
-          <pre class="border rounded-3 p-3 bg-light mb-0"><code th:text="${result.stdout}"></code></pre>
+          <pre class="border p-3 bg-light mb-0"><code th:text="${result.stdout}"></code></pre>
         </div>
 
         <div class="col-12 col-lg-6">
           <h3 class="h6 mb-2">STDERR</h3>
-          <pre class="border rounded-3 p-3 bg-light mb-0"><code th:text="${result.stderr}"></code></pre>
+          <pre class="border p-3 bg-light mb-0"><code th:text="${result.stderr}"></code></pre>
         </div>
       </div>
     </div>

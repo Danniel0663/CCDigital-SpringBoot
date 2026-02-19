@@ -1,1 +1,1 @@
-tagSearchIndex = [{"l":"Propiedades tipadas habilitadas","h":"class co.edu.unbosque.ccdigital.CcDigitalApplication","d":"Section","u":"co/edu/unbosque/ccdigital/CcDigitalApplication.html#propiedades-tipadas-habilitadas-heading"},{"l":"Serialized Form","h":"","u":"serialized-form.html"}];updateSearchResults();
+tagSearchIndex = [];updateSearchResults();
