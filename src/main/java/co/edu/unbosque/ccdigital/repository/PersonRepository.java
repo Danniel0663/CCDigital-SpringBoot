@@ -21,6 +21,19 @@ import java.util.Optional;
 public interface PersonRepository extends JpaRepository<Person, Long> {
 
     /**
+     * Busca una persona por número de identificación.
+     *
+     * <p>
+     * Se utiliza en el flujo de registro de usuarios finales para enlazar la cuenta
+     * de acceso con una persona previamente cargada en {@code persons}.
+     * </p>
+     *
+     * @param idNumber número de identificación
+     * @return {@link Optional} con la persona si existe; vacío si no existe
+     */
+    Optional<Person> findByIdNumber(String idNumber);
+
+    /**
      * Busca una persona por tipo de identificación y número.
      *
      * <p>

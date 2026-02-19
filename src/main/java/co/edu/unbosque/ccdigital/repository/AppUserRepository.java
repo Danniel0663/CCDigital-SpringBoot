@@ -20,6 +20,14 @@ import java.util.Optional;
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     /**
+     * Busca un usuario por correo electrónico ignorando mayúsculas/minúsculas.
+     *
+     * @param email correo electrónico a comparar
+     * @return {@link Optional} con el usuario encontrado, o vacío si no existe
+     */
+    Optional<AppUser> findByEmailIgnoreCase(String email);
+
+    /**
      * Busca el primer usuario que coincida por correo electrónico o por nombre completo,
      * ignorando mayúsculas/minúsculas.
      *
