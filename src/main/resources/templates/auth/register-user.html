@@ -25,7 +25,7 @@
       <div class="cc-card p-4 p-md-5">
         <h1 class="h4 mb-2">Crear cuenta de usuario</h1>
         <p class="cc-help-text small mb-3">
-          Completa todos los datos para crear la cuenta en <code>users</code> y actualizar la información de la persona.
+          Completa todos los datos para crear la cuenta.
         </p>
 
         <div class="cc-hero mb-3">
@@ -33,9 +33,7 @@
             <i class="bi bi-lightbulb me-1"></i>Antes de iniciar
           </div>
           <ul class="cc-help-list small">
-            <li>Usa el mismo número de identificación con el que ya estás registrado como persona.</li>
             <li>El correo que ingreses será tu usuario de acceso.</li>
-            <li>La contraseña se guarda cifrada (BCrypt) en la base de datos.</li>
           </ul>
         </div>
 
@@ -84,12 +82,12 @@
               <div class="col-12">
                 <label for="firstName" class="form-label">Nombres</label>
                 <input id="firstName" class="form-control" type="text"
-                       th:field="*{firstName}" placeholder="Ej: Johan Nicolas" required />
+                       th:field="*{firstName}" required />
               </div>
               <div class="col-12">
                 <label for="lastName" class="form-label">Apellidos</label>
                 <input id="lastName" class="form-control" type="text"
-                       th:field="*{lastName}" placeholder="Ej: Parra Chavarro" required />
+                       th:field="*{lastName}" required />
               </div>
               <div class="col-12">
                 <label for="birthdate" class="form-label">Fecha de nacimiento</label>
@@ -113,7 +111,7 @@
               <div class="col-12">
                 <label for="phone" class="form-label">Teléfono</label>
                 <input id="phone" class="form-control" type="text" inputmode="tel"
-                       th:field="*{phone}" placeholder="Ej: 3001234567" required />
+                       th:field="*{phone}" required />
               </div>
             </div>
           </div>
