@@ -104,8 +104,8 @@ public class FabricLedgerCliService {
      *   <li>{@code createdAt}</li>
      * </ul>
      *
-     * <p>Los campos {@code issuingEntity} y {@code status} se dejan como {@code null} para que la vista
-     * o el DTO aplique valores por defecto.</p>
+     * <p>El campo {@code status} se deja como {@code null} para que la vista o el DTO aplique
+     * valores por defecto. {@code issuingEntity} se toma de la respuesta de Fabric si está disponible.</p>
      *
      * @param idType tipo de identificación
      * @param idNumber número de identificación
@@ -124,6 +124,7 @@ public class FabricLedgerCliService {
             return items.stream().map(m -> {
                 String docId = asString(m.get("docId"));
                 String title = asString(m.get("title"));
+                String issuingEntity = asString(m.get("issuingEntity"));
                 String filePath = asString(m.get("filePath"));
                 Long sizeBytes = asLong(m.get("sizeBytes"));
                 String createdAt = asString(m.get("createdAt"));
@@ -131,7 +132,7 @@ public class FabricLedgerCliService {
                 return new FabricDocView(
                         docId,
                         title,
-                        null,
+                        issuingEntity,
                         null,
                         createdAt,
                         sizeBytes,
