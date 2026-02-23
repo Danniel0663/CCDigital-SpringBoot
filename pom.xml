@@ -76,6 +76,12 @@
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
 
+    <!-- Mail (recuperación de contraseña por código) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.thymeleaf.extras</groupId>
       <artifactId>thymeleaf-extras-springsecurity6</artifactId>
@@ -118,5 +124,4 @@
     </plugins>
   </build>
 
-</project>
 </project>
