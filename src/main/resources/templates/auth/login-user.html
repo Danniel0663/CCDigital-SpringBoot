@@ -23,12 +23,16 @@
   <div class="row justify-content-center">
     <div class="col-12 col-md-8 col-lg-6">
       <div class="cc-card p-4 p-md-5">
-        <h1 class="h4 mb-1">Ingreso de Usuario</h1>
+        <h1 class="h4 mb-2">Ingreso de Usuario</h1>
+        <p class="cc-help-text small mb-3">
+          Ingresa con tu correo y contraseña. Luego se validará tu credencial digital automáticamente.
+        </p>
 
         <div class="mb-3">
           <label for="email" class="form-label">Correo</label>
           <input id="email" class="form-control" type="email" autocomplete="username"
                  placeholder="correo@ejemplo.com" />
+          <div class="form-text">Usa el correo con el que registraste tu cuenta.</div>
         </div>
 
         <div class="mb-3">
@@ -38,10 +42,12 @@
         </div>
 
         <button id="btnStart" class="btn btn-primary w-100">
-          <i class="bi bi-shield-check me-2"></i>Validar con credencial
+          <i class="bi bi-shield-check me-2"></i>Ingresar y validar credencial
         </button>
 
-        <div id="status" class="mt-3 small text-muted"></div>
+        <div id="statusBox" class="cc-status-box alert py-2 mt-3 mb-0" role="status" aria-live="polite">
+          <span id="statusText">Estado</span>
+        </div>
 
         <div class="mt-3 text-center">
           <a href="/register/user" class="small text-decoration-none">
@@ -58,6 +64,22 @@
 </main>
 
 <script>
+  let pollTimer = null;
+
+  function extractErrorMessage(status, text) {
+    if (!text) return 'Ocurrió un error inesperado.';
+    try {
+      const data = JSON.parse(text);
+      if (data && typeof data.error === 'string' && data.error.trim()) {
+        return data.error.trim();
+      }
+      if (data && typeof data.message === 'string' && data.message.trim()) {
+        return data.message.trim();
+      }
+    } catch (_) {}
+    return text.replace(/\s+/g, ' ').trim() || ('Error HTTP ' + status);
+  }
+
   async function postJson(url, data) {
     const res = await fetch(url, {
       method: 'POST',
@@ -66,74 +88,119 @@
     });
     if (!res.ok) {
       const txt = await res.text();
-      throw new Error('HTTP ' + res.status + ' - ' + txt);
+      throw new Error(extractErrorMessage(res.status, txt));
     }
     return res.json();
   }
 
   async function getJson(url) {
     const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(extractErrorMessage(res.status, txt));
+    }
     return res.json();
   }
 
   const btn = document.getElementById('btnStart');
-  const statusEl = document.getElementById('status');
+  const statusBoxEl = document.getElementById('statusBox');
+  const statusTextEl = document.getElementById('statusText');
   const emailEl = document.getElementById('email');
   const passwordEl = document.getElementById('password');
 
-  function setStatus(msg) {
-    statusEl.textContent = msg;
+  function setStatus(msg, tone = 'info') {
+    statusTextEl.textContent = msg;
+    statusBoxEl.className = 'cc-status-box is-visible alert py-2 mt-3 mb-0';
+    if (tone === 'success') statusBoxEl.classList.add('alert-success');
+    else if (tone === 'warning') statusBoxEl.classList.add('alert-warning');
+    else if (tone === 'danger') statusBoxEl.classList.add('alert-danger');
+    else statusBoxEl.classList.add('alert-info');
   }
+
+  function setBusy(isBusy, label) {
+    btn.disabled = isBusy;
+    if (isBusy) {
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + (label || 'Procesando...');
+    } else {
+      btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Ingresar y validar credencial';
+    }
+  }
+
+  (function showUrlMessages() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('logout')) {
+      setStatus('Sesión cerrada correctamente.', 'success');
+      return;
+    }
+    if (params.has('expired')) {
+      setStatus('Tu sesión expiró. Ingresa nuevamente.', 'warning');
+      return;
+    }
+    if (params.has('denied')) {
+      setStatus('No tienes permisos para acceder a esa página.', 'warning');
+      return;
+    }
+  })();
 
   btn.addEventListener('click', async () => {
     try {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
       const email = (emailEl.value || '').trim();
       const password = passwordEl.value || '';
       if (!email) {
-        setStatus('Ingresa tu correo.');
+        setStatus('Ingresa tu correo.', 'warning');
         return;
       }
       if (!password.trim()) {
-        setStatus('Ingresa tu clave.');
+        setStatus('Ingresa tu clave.', 'warning');
         return;
       }
 
-      setStatus('Validando correo y clave...');
+      setBusy(true, 'Validando...');
+      setStatus('Validando correo y clave...', 'info');
       const startRes = await postJson('/user/auth/start', { email, password });
 
       const presExId = startRes.presExId;
-      setStatus('Solicitud enviada. Esperando verificación...');
+      setStatus('Solicitud enviada. Esperando verificación de credencial...', 'info');
 
       let tries = 0;
       const maxTries = 30;
 
-      const timer = setInterval(async () => {
+      pollTimer = setInterval(async () => {
         tries++;
         try {
           const pollRes = await getJson('/user/auth/poll?presExId=' + encodeURIComponent(presExId));
           if (pollRes.authenticated) {
-            clearInterval(timer);
-            setStatus('Verificado. Redirigiendo...');
+            clearInterval(pollTimer);
+            pollTimer = null;
+            setStatus('Verificación completa. Redirigiendo...', 'success');
             window.location.href = pollRes.redirectUrl || '/user/dashboard';
             return;
           }
 
           if (tries >= maxTries) {
-            clearInterval(timer);
-            setStatus('Tiempo de espera agotado. Intenta de nuevo.');
+            clearInterval(pollTimer);
+            pollTimer = null;
+            setBusy(false);
+            setStatus('Se agotó el tiempo de espera. Intenta nuevamente.', 'warning');
             return;
           }
 
-          setStatus('Aún no verificado. Estado: ' + (pollRes.state || '...'));
+          setStatus('Estamos verificando tu credencial. Estado: ' + (pollRes.state || '...'), 'info');
         } catch (e) {
-          clearInterval(timer);
-          setStatus('Error consultando estado: ' + e.message);
+          clearInterval(pollTimer);
+          pollTimer = null;
+          setBusy(false);
+          setStatus(e.message || 'No pudimos consultar el estado de verificación.', 'danger');
         }
       }, 700);
 
     } catch (e) {
-      setStatus('Error: ' + e.message);
+      setBusy(false);
+      setStatus(e.message || 'No fue posible iniciar la validación.', 'danger');
     }
   });
 </script>

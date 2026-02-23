@@ -29,14 +29,28 @@
       <div class="cc-card p-4 p-md-5">
 
         <h1 class="h4 mb-2">Recuperar contraseña</h1>
-        <p class="text-muted small mb-3">
-          Verifica tu identidad (correo y documento) y luego define una nueva contraseña.
+        <p class="cc-help-text small mb-3">
+          Valida tus datos y recibe un código temporal en tu correo para restablecer la contraseña.
         </p>
+
+        <div class="cc-hero mb-3">
+          <div class="fw-semibold small mb-2">
+            <i class="bi bi-list-check me-1"></i>Pasos
+          </div>
+          <ol class="cc-help-list small">
+            <li>Ingresa tu correo y datos del documento.</li>
+            <li>Recibe un código temporal en tu correo.</li>
+            <li>Ingresa el código y crea una nueva contraseña.</li>
+          </ol>
+        </div>
 
         <div id="alertBox" class="alert d-none py-2 mb-3"></div>
 
-        <!-- Paso 1: Verificación -->
-        <div id="step1">
+        <!-- Paso 1: Solicitar código -->
+        <div id="step1" class="cc-form-section">
+          <div class="cc-section-title">
+            <i class="bi bi-envelope-check"></i>Paso 1: Solicitar código de seguridad
+          </div>
           <div class="mb-3">
             <label for="email" class="form-label">Correo</label>
             <input id="email" class="form-control" type="email" autocomplete="email"
@@ -50,7 +64,9 @@
               <option value="CC">CC</option>
               <option value="CE">CE</option>
               <option value="TI">TI</option>
-              <option value="PAS">PAS</option>
+              <option value="PA">PA</option>
+              <option value="NIT">NIT</option>
+              <option value="PEP">PEP</option>
               <option value="OTRO">OTRO</option>
             </select>
           </div>
@@ -62,21 +78,33 @@
           </div>
 
           <button id="btnVerify" type="button" class="btn btn-primary w-100">
-            <i class="bi bi-shield-check me-2"></i>Verificar identidad
+            <i class="bi bi-envelope me-2"></i>Enviar código al correo
           </button>
         </div>
 
-        <!-- Paso 2: Reset -->
-        <div id="step2" class="d-none">
-          <div class="alert alert-success py-2 mb-3">
-            <i class="bi bi-check-circle me-1"></i>
-            Identidad verificada. Define tu nueva contraseña.
+        <!-- Paso 2: Código + nueva contraseña -->
+        <div id="step2" class="d-none cc-form-section">
+          <div class="cc-section-title">
+            <i class="bi bi-key"></i>Paso 2: Ingresa el código y crea nueva contraseña
+          </div>
+          <div class="alert alert-info py-2 mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            Revisa tu correo (incluida la carpeta de spam) e ingresa el código temporal recibido.
+          </div>
+
+          <div class="mb-3">
+            <label for="resetCode" class="form-label">Código de seguridad</label>
+            <input id="resetCode" class="form-control" type="text" inputmode="numeric"
+                   maxlength="8" autocomplete="one-time-code"
+                   placeholder="Ingresa el código recibido por correo" required />
+            <div class="form-text">El código vence en pocos minutos y solo sirve una vez.</div>
           </div>
 
           <div class="mb-3">
             <label for="newPassword" class="form-label">Nueva contraseña</label>
             <input id="newPassword" class="form-control" type="password" autocomplete="new-password"
                    placeholder="Ingresa tu nueva contraseña" required />
+            <div class="form-text">Mínimo 8 caracteres, con letras y números.</div>
           </div>
 
           <div class="mb-3">
@@ -104,7 +132,10 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-  // Helpers
+  // Helpers de frontend para el flujo de recuperación por código:
+  // - leen CSRF para llamadas fetch
+  // - muestran mensajes amigables
+  // - hacen POST JSON a endpoints /user/auth/forgot/*
   function csrf() {
     const token = document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || '';
     const header = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
@@ -143,8 +174,9 @@
     return res.json();
   }
 
-  // State
-  let verifiedPayload = null;
+  // Estado del flujo:
+  // Se conserva la identidad validada (correo + documento) entre el paso 1 y el paso 2.
+  let requestPayload = null;
 
   // Elements
   const step1 = document.getElementById('step1');
@@ -156,10 +188,12 @@
 
   const newPasswordEl = document.getElementById('newPassword');
   const confirmPasswordEl = document.getElementById('confirmPassword');
+  const resetCodeEl = document.getElementById('resetCode');
 
   const btnVerify = document.getElementById('btnVerify');
   const btnReset = document.getElementById('btnReset');
 
+  // Paso 1: solicita envío de código temporal al correo.
   btnVerify.addEventListener('click', async () => {
     try {
       hideAlert();
@@ -173,56 +207,64 @@
       if (!idNumber) { showAlert('warning', 'Ingresa el número de identificación.'); return; }
 
       btnVerify.disabled = true;
-      btnVerify.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
+      btnVerify.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando código...';
 
       const r = await postJson('/user/auth/forgot/verify', { email, idType, idNumber });
 
-      if (!r.verified) {
-        showAlert('danger', 'No fue posible verificar. Revisa correo y documento.');
+      if (!r.accepted) {
+        showAlert('danger', r.message || 'No fue posible enviar el código de recuperación.');
         return;
       }
 
-      verifiedPayload = { email, idType, idNumber };
+      requestPayload = { email, idType, idNumber };
       step1.classList.add('d-none');
       step2.classList.remove('d-none');
-      newPasswordEl.focus();
+      showAlert('info', r.message || 'Si los datos coinciden, enviamos un código temporal al correo.');
+      resetCodeEl.focus();
 
     } catch (e) {
       showAlert('danger', 'Error: ' + e.message);
     } finally {
       btnVerify.disabled = false;
-      btnVerify.innerHTML = '<i class="bi bi-shield-check me-2"></i>Verificar identidad';
+      btnVerify.innerHTML = '<i class="bi bi-envelope me-2"></i>Enviar código al correo';
     }
   });
 
+  // Paso 2: valida código temporal + nueva contraseña y ejecuta el restablecimiento.
   btnReset.addEventListener('click', async () => {
     try {
       hideAlert();
 
-      if (!verifiedPayload) {
-        showAlert('warning', 'Primero verifica tu identidad.');
+      if (!requestPayload) {
+        showAlert('warning', 'Primero solicita el código de seguridad.');
         return;
       }
 
+      const code = (resetCodeEl.value || '').trim();
       const p1 = newPasswordEl.value || '';
       const p2 = confirmPasswordEl.value || '';
 
+      if (!code) { showAlert('warning', 'Ingresa el código de seguridad enviado al correo.'); return; }
       if (!p1.trim()) { showAlert('warning', 'Ingresa la nueva contraseña.'); return; }
-      if (p1.length < 6) { showAlert('warning', 'La contraseña debe tener mínimo 6 caracteres.'); return; }
+      if (p1.length < 8) { showAlert('warning', 'La contraseña debe tener mínimo 8 caracteres.'); return; }
+      if (!/[A-Za-z]/.test(p1) || !/[0-9]/.test(p1)) {
+        showAlert('warning', 'La contraseña debe incluir letras y números.');
+        return;
+      }
       if (p1 !== p2) { showAlert('warning', 'Las contraseñas no coinciden.'); return; }
 
       btnReset.disabled = true;
       btnReset.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
 
-      const r = await postJson('/user/auth/forgot/reset', { ...verifiedPayload, newPassword: p1 });
+      const r = await postJson('/user/auth/forgot/reset', { ...requestPayload, resetCode: code, newPassword: p1 });
 
       if (!r.ok) {
-        showAlert('danger', 'No fue posible actualizar la contraseña.');
+        showAlert('danger', r.message || 'No fue posible actualizar la contraseña.');
         return;
       }
 
-      // Redirigir directo al login
-      window.location.href = '/login/user';
+      showAlert('success', r.message || 'Contraseña actualizada correctamente. Redirigiendo...');
+      setTimeout(() => { window.location.href = '/login/user'; }, 1000);
 
     } catch (e) {
       showAlert('danger', 'Error: ' + e.message);

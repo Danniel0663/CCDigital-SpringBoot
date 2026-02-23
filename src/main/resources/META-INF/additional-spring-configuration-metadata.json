@@ -1,0 +1,99 @@
+{
+  "properties": [
+    {
+      "name": "acapy.verifier.admin",
+      "type": "java.lang.String",
+      "description": "URL base del Admin API de ACA-Py usado por el verificador."
+    },
+    {
+      "name": "acapy.holder.admin",
+      "type": "java.lang.String",
+      "description": "URL base del Admin API de ACA-Py del holder."
+    },
+    {
+      "name": "acapy.cred-def-id",
+      "type": "java.lang.String",
+      "description": "Credential Definition ID usado para emisión/verificación en Indy/ACA-Py."
+    },
+    {
+      "name": "acapy.proof.poll-interval-ms",
+      "type": "java.lang.Long",
+      "description": "Intervalo de polling del proof en milisegundos."
+    },
+    {
+      "name": "acapy.proof.poll-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Timeout total del polling del proof en milisegundos."
+    },
+    {
+      "name": "external-tools.fabric.workdir",
+      "type": "java.lang.String",
+      "description": "Directorio de trabajo para scripts de Fabric."
+    },
+    {
+      "name": "external-tools.fabric.node-bin",
+      "type": "java.lang.String",
+      "description": "Binario de Node.js usado para scripts de Fabric."
+    },
+    {
+      "name": "external-tools.fabric.list-docs-script",
+      "type": "java.lang.String",
+      "description": "Script CLI para listar documentos desde Fabric."
+    },
+    {
+      "name": "external-tools.fabric.sync-all-script",
+      "type": "java.lang.String",
+      "description": "Script CLI para sincronización total DB -> Fabric."
+    },
+    {
+      "name": "external-tools.fabric.sync-person-script",
+      "type": "java.lang.String",
+      "description": "Script CLI para sincronización por persona DB -> Fabric."
+    },
+    {
+      "name": "external-tools.indy.workdir",
+      "type": "java.lang.String",
+      "description": "Directorio de trabajo para scripts de Indy."
+    },
+    {
+      "name": "external-tools.indy.venv-activate",
+      "type": "java.lang.String",
+      "description": "Comando para activar el entorno virtual de Python antes de ejecutar scripts Indy."
+    },
+    {
+      "name": "external-tools.indy.script",
+      "type": "java.lang.String",
+      "description": "Script de emisión/operación Indy ejecutado vía herramientas externas."
+    },
+    {
+      "name": "external-tools.default-timeout-seconds",
+      "type": "java.lang.Long",
+      "description": "Timeout por defecto (segundos) para ejecución de herramientas externas."
+    },
+    {
+      "name": "app.security.forgot-password.code-length",
+      "type": "java.lang.Integer",
+      "description": "Longitud del código temporal (OTP) de recuperación de contraseña."
+    },
+    {
+      "name": "app.security.forgot-password.code-ttl-minutes",
+      "type": "java.lang.Long",
+      "description": "Vigencia del código temporal de recuperación (minutos)."
+    },
+    {
+      "name": "app.security.forgot-password.max-attempts",
+      "type": "java.lang.Integer",
+      "description": "Número máximo de intentos fallidos permitidos por código de recuperación."
+    },
+    {
+      "name": "app.security.forgot-password.resend-cooldown-seconds",
+      "type": "java.lang.Long",
+      "description": "Tiempo mínimo entre envíos de códigos de recuperación al mismo correo (segundos)."
+    },
+    {
+      "name": "app.security.forgot-password.mail.from",
+      "type": "java.lang.String",
+      "description": "Remitente usado para correos de recuperación de contraseña."
+    }
+  ]
+}

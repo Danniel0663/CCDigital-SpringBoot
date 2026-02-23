@@ -36,13 +36,30 @@
 
   <div class="cc-card p-4 mb-3">
     <h1 class="h4 mb-1">Solicitudes de acceso</h1>
-    <p class="text-muted mb-0">
-      Aquí puede aprobar o rechazar solicitudes para que una entidad consulte sus documentos.
+    <p class="cc-help-text mb-0">
+      Aquí puedes aprobar o rechazar solicitudes para que una entidad consulte tus documentos.
     </p>
 
     <div th:if="${error}" class="alert alert-danger py-2 mt-3 mb-0">
       <i class="bi bi-exclamation-triangle me-2"></i>
       <span th:text="${error}">Error</span>
+    </div>
+  </div>
+
+  <div class="cc-tip mb-3">
+    <div class="fw-semibold small mb-2">
+      <i class="bi bi-info-circle me-1"></i>Cómo usar esta pantalla
+    </div>
+    <ul class="cc-help-list small">
+      <li>Revisa la entidad, el motivo y los documentos solicitados.</li>
+      <li>Aprueba si estás de acuerdo con el acceso.</li>
+      <li>Rechaza si no reconoces la solicitud o no deseas compartir información.</li>
+    </ul>
+    <div class="cc-legend mt-2">
+      <span class="badge text-bg-warning">PENDIENTE</span>
+      <span class="badge text-bg-success">APROBADA</span>
+      <span class="badge text-bg-danger">RECHAZADA</span>
+      <span class="badge text-bg-secondary">EXPIRADA</span>
     </div>
   </div>
 
@@ -57,14 +74,21 @@
             <th>Documentos solicitados</th>
             <th style="width: 140px;">Estado</th>
             <th style="width: 170px;">Solicitada</th>
+            <th style="width: 170px;">Decidida</th>
             <th class="text-end" style="width: 260px;">Acciones</th>
           </tr>
         </thead>
 
         <tbody>
           <tr th:if="${#lists.isEmpty(requests)}">
-            <td colspan="7" class="text-center text-muted py-4">
-              No hay solicitudes registradas.
+            <td colspan="8" class="py-4">
+              <div class="cc-empty">
+                <i class="bi bi-inbox"></i>
+                <div class="mt-2 fw-semibold">No tienes solicitudes registradas</div>
+                <div class="small text-muted mt-1">
+                  Cuando una entidad solicite acceso a tus documentos, aparecerá aquí.
+                </div>
+              </div>
             </td>
           </tr>
 
@@ -77,7 +101,7 @@
 
             <td>
               <div th:text="${r.purpose}">Motivo</div>
-              <div class="text-muted small" th:if="${r.decisionNote != null}">
+              <div class="text-muted small" th:if="${r.decisionNote != null and !#strings.isEmpty(r.decisionNote)}">
                 Nota: <span th:text="${r.decisionNote}">—</span>
               </div>
             </td>
@@ -104,6 +128,9 @@
             <td class="text-muted"
                 th:text="${r.requestedAt != null ? #temporals.format(r.requestedAt, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
 
+            <td class="text-muted"
+                th:text="${r.decidedAt != null ? #temporals.format(r.decidedAt, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+
             <td class="text-end">
               <div th:if="${r.status.name() == 'PENDIENTE'}" class="d-flex flex-column gap-2 align-items-end">
 
@@ -111,7 +138,7 @@
                   <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                   <input class="form-control form-control-sm mb-2" type="text"
                          name="decisionNote" maxlength="300"
-                         placeholder="Nota (opcional)">
+                         placeholder="Comentario opcional">
                   <button type="submit" class="btn btn-sm btn-success w-100">
                     <i class="bi bi-check2-circle me-1"></i>Aprobar
                   </button>

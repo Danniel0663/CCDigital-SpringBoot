@@ -33,24 +33,33 @@
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
       <div>
         <h1 class="h4 mb-1" th:text="${displayName}">Usuario</h1>
-
-        <div class="d-flex flex-wrap gap-2">
-          <span class="badge text-bg-secondary" th:text="${idType}">CC</span>
-          <span class="badge text-bg-light border" th:text="${idNumber}">000</span>
-          <span class="badge text-bg-light border" th:text="${email}">email</span>
-        </div>
-
-        <p class="text-muted small mt-3 mb-0">
-          Datos del Usuario.
+        <p class="cc-help-text small mb-3">
+          Bienvenido. Desde aquí puedes ver tus documentos y revisar solicitudes de acceso.
         </p>
 
-        <!-- CAMBIO 5: Botón a solicitudes -->
+        <div class="cc-kv-grid">
+          <div class="cc-kv-item">
+            <div class="cc-kv-label">Tipo de identificación</div>
+            <div class="cc-kv-value" th:text="${idType}">CC</div>
+          </div>
+          <div class="cc-kv-item">
+            <div class="cc-kv-label">Número de identificación</div>
+            <div class="cc-kv-value" th:text="${idNumber}">000</div>
+          </div>
+          <div class="cc-kv-item">
+            <div class="cc-kv-label">Correo registrado</div>
+            <div class="cc-kv-value" th:text="${email != null and !#strings.isEmpty(email) ? email : 'No registrado'}">email</div>
+          </div>
+        </div>
+
         <div class="d-flex flex-wrap gap-2 mt-3">
           <a class="btn btn-sm btn-outline-primary" th:href="@{/user/requests}">
             <i class="bi bi-inbox me-1"></i>Solicitudes de acceso
           </a>
+          <a class="btn btn-sm btn-outline-secondary" href="#mis-documentos">
+            <i class="bi bi-file-earmark-text me-1"></i>Ver documentos
+          </a>
         </div>
-        <!-- FIN CAMBIO 5 -->
 
       </div>
 
@@ -62,26 +71,43 @@
     </div>
   </div>
 
+  <div class="cc-tip mb-3">
+    <div class="fw-semibold small mb-1">
+      <i class="bi bi-compass me-1"></i>Guía rápida
+    </div>
+    <div class="small text-muted">
+      Usa <strong>Solicitudes de acceso</strong> para aprobar o rechazar permisos de entidades.
+      En la tabla de abajo puedes abrir tus documentos disponibles.
+    </div>
+  </div>
+
   <!-- Documentos -->
-  <div class="cc-card p-4">
+  <div id="mis-documentos" class="cc-card p-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h2 class="h6 text-uppercase text-muted mb-0">Documentos en Fabric</h2>
+      <div>
+        <h2 class="h6 text-uppercase text-muted mb-1">Mis documentos</h2>
+        <div class="small text-muted">Documentos disponibles para consulta en la plataforma.</div>
+      </div>
       <span class="badge text-bg-light border" th:text="${#lists.size(docs)} + ' registros'">0 registros</span>
     </div>
 
-    <div th:if="${#lists.isEmpty(docs)}" class="text-center text-muted py-4">
-      No hay documentos registrados.
+    <div th:if="${#lists.isEmpty(docs)}" class="cc-empty">
+      <i class="bi bi-folder2-open"></i>
+      <div class="mt-2 fw-semibold">Aún no tienes documentos visibles</div>
+      <div class="small text-muted mt-1">
+        Cuando una entidad cargue documentos aprobados, aparecerán aquí.
+      </div>
     </div>
 
     <div class="table-responsive" th:if="${!#lists.isEmpty(docs)}">
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Título</th>
+            <th>Documento</th>
             <th>Entidad</th>
             <th>Estado</th>
-            <th>Creado</th>
-            <th class="text-end">Acción</th>
+            <th>Fecha</th>
+            <th class="text-end">Abrir</th>
           </tr>
         </thead>
 

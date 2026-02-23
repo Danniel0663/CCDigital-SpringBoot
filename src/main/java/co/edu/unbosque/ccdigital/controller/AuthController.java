@@ -48,6 +48,31 @@ public class AuthController {
     }
 
     /**
+     * Redirección amigable para accesos GET a la URL de logout de Admin.
+     *
+     * <p>
+     * El cierre de sesión real se realiza por POST vía Spring Security. Este endpoint evita
+     * que un acceso manual por URL termine en 404/405 y redirige a la pantalla de login.
+     * </p>
+     *
+     * @return redirección a login de Admin
+     */
+    @GetMapping("/admin/logout")
+    public String adminLogoutGet() {
+        return "redirect:/login/admin?logout=true";
+    }
+
+    /**
+     * Redirección amigable para accesos GET a la URL de logout de Issuer.
+     *
+     * @return redirección a login de Issuer
+     */
+    @GetMapping("/issuer/logout")
+    public String issuerLogoutGet() {
+        return "redirect:/login/issuer?logout=true";
+    }
+
+    /**
      * Vista de autenticación para usuario final.
      *
      * <p>
@@ -69,5 +94,15 @@ public class AuthController {
         }
 
         return "auth/login-user";
+    }
+
+    /**
+     * Redirección amigable para accesos GET a la URL de logout de usuario final.
+     *
+     * @return redirección a login de usuario
+     */
+    @GetMapping("/user/logout")
+    public String userLogoutGet() {
+        return "redirect:/login/user?logout=true";
     }
 }

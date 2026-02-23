@@ -7,6 +7,12 @@
   --cc-bg: #f6f7fb;
   --cc-border: rgba(16, 24, 40, .10);
   --cc-shadow: 0 10px 28px rgba(16, 24, 40, .08);
+  --cc-shadow-soft: 0 6px 18px rgba(16, 24, 40, .06);
+  --cc-text-soft: #475467;
+  --cc-info-soft: #eef4ff;
+  --cc-success-soft: #ecfdf3;
+  --cc-warning-soft: #fffaeb;
+  --cc-danger-soft: #fef3f2;
 
   --cc-radius: 1rem;
 }
@@ -15,6 +21,7 @@ html, body { height: 100%; }
 
 body{
   background: var(--cc-bg);
+  color: #101828;
 }
 
 .cc-navbar{
@@ -37,7 +44,7 @@ body{
   background: #fff;
   border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius);
-  box-shadow: 0 6px 18px rgba(16,24,40,.06);
+  box-shadow: var(--cc-shadow-soft);
 }
 
 .btn, .form-control, .form-select, .alert, .badge, .accordion-item, .table{
@@ -54,4 +61,112 @@ body{
 
 pre{
   border-radius: .85rem;
+}
+
+.form-control:focus, .form-select:focus{
+  box-shadow: 0 0 0 .2rem rgba(var(--bs-primary-rgb), .14);
+}
+
+.cc-hero{
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  border: 1px solid var(--cc-border);
+  border-radius: 1rem;
+  padding: .9rem 1rem;
+}
+
+.cc-hero p,
+.cc-help-text{
+  color: var(--cc-text-soft);
+}
+
+.cc-help-list{
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--cc-text-soft);
+}
+
+.cc-help-list li + li{
+  margin-top: .35rem;
+}
+
+.cc-status-box{
+  display: none;
+}
+
+.cc-status-box.is-visible{
+  display: block;
+}
+
+.cc-form-section{
+  border: 1px solid var(--cc-border);
+  background: #fff;
+  border-radius: .95rem;
+  padding: .9rem;
+}
+
+.cc-form-section + .cc-form-section{
+  margin-top: .9rem;
+}
+
+.cc-section-title{
+  font-size: .92rem;
+  font-weight: 700;
+  margin-bottom: .75rem;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.cc-tip{
+  border: 1px dashed var(--cc-border);
+  border-radius: .9rem;
+  background: #fff;
+  padding: .75rem .9rem;
+}
+
+.cc-kv-grid{
+  display: grid;
+  gap: .65rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.cc-kv-item{
+  border: 1px solid var(--cc-border);
+  background: #fff;
+  border-radius: .9rem;
+  padding: .75rem .85rem;
+}
+
+.cc-kv-label{
+  font-size: .78rem;
+  color: var(--cc-text-soft);
+  margin-bottom: .15rem;
+}
+
+.cc-kv-value{
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.cc-empty{
+  border: 1px dashed var(--cc-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  text-align: center;
+  background: #fff;
+}
+
+.cc-empty .bi{
+  font-size: 1.4rem;
+  opacity: .7;
+}
+
+.cc-legend{
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.cc-legend .badge{
+  font-weight: 500;
 }
