@@ -6,6 +6,7 @@ import co.edu.unbosque.ccdigital.repository.AppUserRepository;
 import co.edu.unbosque.ccdigital.repository.PersonRepository;
 import co.edu.unbosque.ccdigital.security.IndyUserPrincipal;
 import co.edu.unbosque.ccdigital.service.IndyProofLoginService;
+import co.edu.unbosque.ccdigital.service.UserLoginOtpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.CacheControl;
@@ -36,11 +37,14 @@ import java.util.Map;
 public class UserAuthController {
 
     private static final String SESSION_EXPECTED_ID_NUMBERS = "user.auth.expectedIdNumbersByPresExId";
+    private static final String SESSION_EXPECTED_EMAILS = "user.auth.expectedEmailsByPresExId";
+    private static final String SESSION_PENDING_OTP_CONTEXTS = "user.auth.pendingOtpContextsByPresExId";
 
     private final IndyProofLoginService proofLoginService;
     private final AppUserRepository appUserRepository;
     private final PersonRepository personRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserLoginOtpService userLoginOtpService;
 
     /**
      * Constructor del controlador.
@@ -49,15 +53,18 @@ public class UserAuthController {
      * @param appUserRepository repositorio de usuarios de aplicación
      * @param personRepository repositorio de personas
      * @param passwordEncoder comparador de hash de contraseñas (BCrypt)
+     * @param userLoginOtpService servicio de envío/validación de OTP por correo para login
      */
     public UserAuthController(IndyProofLoginService proofLoginService,
                               AppUserRepository appUserRepository,
                               PersonRepository personRepository,
-                              PasswordEncoder passwordEncoder) {
+                              PasswordEncoder passwordEncoder,
+                              UserLoginOtpService userLoginOtpService) {
         this.proofLoginService = proofLoginService;
         this.appUserRepository = appUserRepository;
         this.personRepository = personRepository;
         this.passwordEncoder = passwordEncoder;
+        this.userLoginOtpService = userLoginOtpService;
     }
 
     /**
@@ -106,6 +113,55 @@ public class UserAuthController {
             this.password = password;
         }
 
+    }
+
+    /**
+     * Request para validar el segundo factor por correo durante el login.
+     */
+    public static class OtpVerifyRequest {
+        private String presExId;
+        private String code;
+
+        public String getPresExId() {
+            return presExId;
+        }
+
+        public void setPresExId(String presExId) {
+            this.presExId = presExId;
+        }
+
+        public String getCode() {
+            return code;
+        }
+
+        public void setCode(String code) {
+            this.code = code;
+        }
+    }
+
+    /**
+     * Contexto temporal pendiente de autenticación final mientras se valida OTP.
+     */
+    public static class PendingOtpContext {
+        private String idType;
+        private String idNumber;
+        private String firstName;
+        private String lastName;
+        private String profileEmail;
+        private String loginEmail;
+
+        public String getIdType() { return idType; }
+        public void setIdType(String idType) { this.idType = idType; }
+        public String getIdNumber() { return idNumber; }
+        public void setIdNumber(String idNumber) { this.idNumber = idNumber; }
+        public String getFirstName() { return firstName; }
+        public void setFirstName(String firstName) { this.firstName = firstName; }
+        public String getLastName() { return lastName; }
+        public void setLastName(String lastName) { this.lastName = lastName; }
+        public String getProfileEmail() { return profileEmail; }
+        public void setProfileEmail(String profileEmail) { this.profileEmail = profileEmail; }
+        public String getLoginEmail() { return loginEmail; }
+        public void setLoginEmail(String loginEmail) { this.loginEmail = loginEmail; }
     }
 
     /**
@@ -160,6 +216,9 @@ public class UserAuthController {
         }
 
         saveExpectedIdNumber(request, presExIdValue, idNumberFromDb);
+        saveExpectedEmail(request, presExIdValue, emailNorm);
+        removePendingOtpContext(request, presExIdValue);
+        userLoginOtpService.invalidate(presExIdValue);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("presExId", presExIdValue);
@@ -215,40 +274,104 @@ public class UserAuthController {
                         ));
             }
 
-            IndyUserPrincipal principal = new IndyUserPrincipal(
-                    attrs.getOrDefault("id_type", ""),
-                    attrs.getOrDefault("id_number", ""),
-                    attrs.getOrDefault("first_name", ""),
-                    attrs.getOrDefault("last_name", ""),
-                    attrs.getOrDefault("email", "")
-            );
+            PendingOtpContext pending = getPendingOtpContext(request, presExIdNorm);
+            if (pending == null) {
+                String loginEmail = getExpectedEmail(request, presExIdNorm);
+                if (loginEmail == null || loginEmail.isBlank()) {
+                    removeExpectedIdNumber(request, presExIdNorm);
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .cacheControl(CacheControl.noStore())
+                            .body(Map.of("error", "La sesión de autenticación expiró. Intenta de nuevo."));
+                }
 
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+                pending = buildPendingOtpContext(attrs, loginEmail);
+                boolean sent = userLoginOtpService.issueCode(
+                        presExIdNorm,
+                        loginEmail,
+                        displayNameFromPending(pending)
+                );
+                if (!sent) {
+                    return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                            .cacheControl(CacheControl.noStore())
+                            .body(Map.of("error", "No fue posible enviar el código de verificación al correo."));
+                }
+                savePendingOtpContext(request, presExIdNorm, pending);
+            }
 
-            SecurityContext context = SecurityContextHolder.createEmptyContext();
-            context.setAuthentication(auth);
-            SecurityContextHolder.setContext(context);
-
-            request.getSession(true).setAttribute(
-                    HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                    context
-            );
-
-            out.put("authenticated", true);
-            out.put("redirectUrl", "/user/dashboard");
-            out.put("displayName", principal.getDisplayName());
-            removeExpectedIdNumber(request, presExIdNorm);
+            out.put("authenticated", false);
+            out.put("otpRequired", true);
+            out.put("maskedEmail", maskEmail(pending.getLoginEmail()));
+            out.put("message", "Se envió un código de verificación a tu correo.");
         } else {
             out.put("authenticated", false);
             if (done) {
                 removeExpectedIdNumber(request, presExIdNorm);
+                removeExpectedEmail(request, presExIdNorm);
+                removePendingOtpContext(request, presExIdNorm);
+                userLoginOtpService.invalidate(presExIdNorm);
             }
         }
 
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(out);
+    }
+
+    /**
+     * Valida el OTP enviado por correo y completa la autenticación de la sesión.
+     *
+     * @param req request con presExId y código OTP
+     * @param request request HTTP para acceso a sesión
+     * @return respuesta con estado de autenticación y redirección
+     */
+    @PostMapping("/otp/verify")
+    public ResponseEntity<Map<String, Object>> verifyOtp(@RequestBody OtpVerifyRequest req,
+                                                         HttpServletRequest request) {
+        String presExId = req == null ? null : normalize(req.getPresExId());
+        String code = req == null ? null : normalize(req.getCode());
+
+        if (presExId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "presExId es requerido"));
+        }
+        if (code.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "code es requerido"));
+        }
+
+        PendingOtpContext pending = getPendingOtpContext(request, presExId);
+        if (pending == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .cacheControl(CacheControl.noStore())
+                    .body(Map.of("error", "La sesión de validación expiró. Intenta iniciar sesión nuevamente."));
+        }
+
+        boolean ok = userLoginOtpService.verifyCode(presExId, code);
+        if (!ok) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .cacheControl(CacheControl.noStore())
+                    .body(Map.of("error", "Código inválido o expirado."));
+        }
+
+        IndyUserPrincipal principal = new IndyUserPrincipal(
+                pending.getIdType(),
+                pending.getIdNumber(),
+                pending.getFirstName(),
+                pending.getLastName(),
+                pending.getProfileEmail()
+        );
+        authenticateInSession(request, principal);
+
+        removeExpectedIdNumber(request, presExId);
+        removeExpectedEmail(request, presExId);
+        removePendingOtpContext(request, presExId);
+        userLoginOtpService.invalidate(presExId);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(Map.of(
+                        "authenticated", true,
+                        "redirectUrl", "/user/dashboard",
+                        "displayName", principal.getDisplayName()
+                ));
     }
 
     private boolean hasUserRole(AppUser appUser) {
@@ -316,6 +439,107 @@ public class UserAuthController {
             return;
         }
         expected.remove(presExId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, String> expectedEmails(HttpServletRequest request, boolean createIfMissing) {
+        var session = request.getSession(createIfMissing);
+        if (session == null) return null;
+        Object raw = session.getAttribute(SESSION_EXPECTED_EMAILS);
+        if (raw instanceof Map<?, ?> rawMap) {
+            return (Map<String, String>) rawMap;
+        }
+        if (!createIfMissing) return null;
+        Map<String, String> created = new LinkedHashMap<>();
+        session.setAttribute(SESSION_EXPECTED_EMAILS, created);
+        return created;
+    }
+
+    private void saveExpectedEmail(HttpServletRequest request, String presExId, String email) {
+        Map<String, String> expected = expectedEmails(request, true);
+        if (expected != null) expected.put(presExId, normalize(email));
+    }
+
+    private String getExpectedEmail(HttpServletRequest request, String presExId) {
+        Map<String, String> expected = expectedEmails(request, false);
+        return expected == null ? null : normalize(expected.get(presExId));
+    }
+
+    private void removeExpectedEmail(HttpServletRequest request, String presExId) {
+        Map<String, String> expected = expectedEmails(request, false);
+        if (expected != null) expected.remove(presExId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, PendingOtpContext> pendingOtpContexts(HttpServletRequest request, boolean createIfMissing) {
+        var session = request.getSession(createIfMissing);
+        if (session == null) return null;
+        Object raw = session.getAttribute(SESSION_PENDING_OTP_CONTEXTS);
+        if (raw instanceof Map<?, ?> rawMap) {
+            return (Map<String, PendingOtpContext>) rawMap;
+        }
+        if (!createIfMissing) return null;
+        Map<String, PendingOtpContext> created = new LinkedHashMap<>();
+        session.setAttribute(SESSION_PENDING_OTP_CONTEXTS, created);
+        return created;
+    }
+
+    private void savePendingOtpContext(HttpServletRequest request, String presExId, PendingOtpContext ctx) {
+        Map<String, PendingOtpContext> map = pendingOtpContexts(request, true);
+        if (map != null) map.put(presExId, ctx);
+    }
+
+    private PendingOtpContext getPendingOtpContext(HttpServletRequest request, String presExId) {
+        Map<String, PendingOtpContext> map = pendingOtpContexts(request, false);
+        return map == null ? null : map.get(presExId);
+    }
+
+    private void removePendingOtpContext(HttpServletRequest request, String presExId) {
+        Map<String, PendingOtpContext> map = pendingOtpContexts(request, false);
+        if (map != null) map.remove(presExId);
+    }
+
+    private PendingOtpContext buildPendingOtpContext(Map<String, String> attrs, String loginEmail) {
+        PendingOtpContext ctx = new PendingOtpContext();
+        ctx.setIdType(attrs.getOrDefault("id_type", ""));
+        ctx.setIdNumber(attrs.getOrDefault("id_number", ""));
+        ctx.setFirstName(attrs.getOrDefault("first_name", ""));
+        ctx.setLastName(attrs.getOrDefault("last_name", ""));
+        ctx.setProfileEmail(attrs.getOrDefault("email", ""));
+        ctx.setLoginEmail(loginEmail);
+        return ctx;
+    }
+
+    private void authenticateInSession(HttpServletRequest request, IndyUserPrincipal principal) {
+        UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(auth);
+        SecurityContextHolder.setContext(context);
+
+        request.getSession(true).setAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+                context
+        );
+    }
+
+    private static String displayNameFromPending(PendingOtpContext ctx) {
+        if (ctx == null) return "";
+        String fn = normalize(ctx.getFirstName());
+        String ln = normalize(ctx.getLastName());
+        String out = (fn + " " + ln).trim();
+        return out.isBlank() ? normalize(ctx.getLoginEmail()) : out;
+    }
+
+    private static String maskEmail(String email) {
+        String value = normalize(email);
+        int at = value.indexOf('@');
+        if (at <= 1) return value;
+        String local = value.substring(0, at);
+        String domain = value.substring(at);
+        if (local.length() <= 2) return local.charAt(0) + "*" + domain;
+        return local.substring(0, 2) + "*".repeat(Math.max(1, local.length() - 2)) + domain;
     }
 
     private static String normalize(String value) {

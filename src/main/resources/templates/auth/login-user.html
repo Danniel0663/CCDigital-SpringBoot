@@ -41,6 +41,21 @@
                  placeholder="Tu clave" />
         </div>
 
+        <div id="otpSection" class="cc-form-section d-none mb-3">
+          <div class="cc-section-title">
+            <i class="bi bi-envelope-check"></i>Verificación por correo
+          </div>
+          <p id="otpHelp" class="small text-muted mb-2">
+            Ingresa el código que enviamos a tu correo.
+          </p>
+          <label for="otpCode" class="form-label">Código de verificación</label>
+          <input id="otpCode" class="form-control" type="text" inputmode="numeric" maxlength="8"
+                 autocomplete="one-time-code" placeholder="Código de 6 dígitos" />
+          <button id="btnOtpVerify" type="button" class="btn btn-outline-primary w-100 mt-2">
+            <i class="bi bi-check2-circle me-2"></i>Validar código
+          </button>
+        </div>
+
         <button id="btnStart" class="btn btn-primary w-100">
           <i class="bi bi-shield-check me-2"></i>Ingresar y validar credencial
         </button>
@@ -65,6 +80,7 @@
 
 <script>
   let pollTimer = null;
+  let currentPresExId = null;
 
   function extractErrorMessage(status, text) {
     if (!text) return 'Ocurrió un error inesperado.';
@@ -107,6 +123,10 @@
   const statusTextEl = document.getElementById('statusText');
   const emailEl = document.getElementById('email');
   const passwordEl = document.getElementById('password');
+  const otpSectionEl = document.getElementById('otpSection');
+  const otpHelpEl = document.getElementById('otpHelp');
+  const otpCodeEl = document.getElementById('otpCode');
+  const btnOtpVerify = document.getElementById('btnOtpVerify');
 
   function setStatus(msg, tone = 'info') {
     statusTextEl.textContent = msg;
@@ -124,6 +144,30 @@
     } else {
       btn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Ingresar y validar credencial';
     }
+  }
+
+  function setOtpBusy(isBusy) {
+    btnOtpVerify.disabled = isBusy;
+    if (isBusy) {
+      btnOtpVerify.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Validando código...';
+    } else {
+      btnOtpVerify.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Validar código';
+    }
+  }
+
+  function showOtpSection(maskedEmail) {
+    otpSectionEl.classList.remove('d-none');
+    btn.classList.add('d-none');
+    otpHelpEl.textContent = maskedEmail
+      ? ('Ingresa el código que enviamos a ' + maskedEmail + '.')
+      : 'Ingresa el código que enviamos a tu correo.';
+    otpCodeEl.focus();
+  }
+
+  function resetOtpSection() {
+    otpSectionEl.classList.add('d-none');
+    btn.classList.remove('d-none');
+    otpCodeEl.value = '';
   }
 
   (function showUrlMessages() {
@@ -160,10 +204,13 @@
       }
 
       setBusy(true, 'Validando...');
+      resetOtpSection();
+      currentPresExId = null;
       setStatus('Validando correo y clave...', 'info');
       const startRes = await postJson('/user/auth/start', { email, password });
 
       const presExId = startRes.presExId;
+      currentPresExId = presExId;
       setStatus('Solicitud enviada. Esperando verificación de credencial...', 'info');
 
       let tries = 0;
@@ -173,6 +220,15 @@
         tries++;
         try {
           const pollRes = await getJson('/user/auth/poll?presExId=' + encodeURIComponent(presExId));
+          if (pollRes.otpRequired) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            setBusy(false);
+            showOtpSection(pollRes.maskedEmail || '');
+            setStatus(pollRes.message || 'Se envió un código de verificación al correo.', 'info');
+            return;
+          }
+
           if (pollRes.authenticated) {
             clearInterval(pollTimer);
             pollTimer = null;
@@ -201,6 +257,41 @@
     } catch (e) {
       setBusy(false);
       setStatus(e.message || 'No fue posible iniciar la validación.', 'danger');
+    }
+  });
+
+  btnOtpVerify.addEventListener('click', async () => {
+    try {
+      const code = (otpCodeEl.value || '').trim();
+      if (!currentPresExId) {
+        resetOtpSection();
+        setStatus('La sesión de validación expiró. Inicia nuevamente.', 'warning');
+        return;
+      }
+      if (!code) {
+        setStatus('Ingresa el código de verificación enviado al correo.', 'warning');
+        return;
+      }
+
+      setOtpBusy(true);
+      setStatus('Validando código de verificación...', 'info');
+      const res = await postJson('/user/auth/otp/verify', { presExId: currentPresExId, code });
+
+      if (res.authenticated) {
+        setStatus('Verificación completa. Redirigiendo...', 'success');
+        window.location.href = res.redirectUrl || '/user/dashboard';
+        return;
+      }
+
+      setStatus('No fue posible validar el código.', 'danger');
+    } catch (e) {
+      if ((e.message || '').toLowerCase().includes('expir')) {
+        resetOtpSection();
+        currentPresExId = null;
+      }
+      setStatus(e.message || 'No fue posible validar el código.', 'danger');
+    } finally {
+      setOtpBusy(false);
     }
   });
 </script>
