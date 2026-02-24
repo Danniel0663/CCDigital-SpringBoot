@@ -18,6 +18,11 @@ import java.time.LocalDate;
  * El campo {@code idNumber} se usa como llave de enlace con la persona ya registrada.
  * </p>
  *
+ * <p>
+ * Incluye además una bandera opcional ({@code enableTotpNow}) para indicar si el ciudadano desea
+ * configurar el autenticador de celular inmediatamente después de crear la cuenta.
+ * </p>
+ *
  * @since 3.0
  */
 public class UserRegisterForm {
@@ -31,6 +36,7 @@ public class UserRegisterForm {
     private LocalDate birthdate;
     private String password;
     private String confirmPassword;
+    private Boolean enableTotpNow;
 
     /**
      * Retorna el tipo de identificación.
@@ -192,5 +198,23 @@ public class UserRegisterForm {
      */
     public void setConfirmPassword(String confirmPassword) {
         this.confirmPassword = confirmPassword;
+    }
+
+    /**
+     * Indica si el usuario desea configurar la app autenticadora inmediatamente después del registro.
+     *
+     * @return {@code true} si desea activar TOTP ahora; {@code false} en caso contrario
+     */
+    public Boolean getEnableTotpNow() {
+        return enableTotpNow;
+    }
+
+    /**
+     * Establece la preferencia de configuración inmediata de TOTP.
+     *
+     * @param enableTotpNow indicador de activación TOTP al finalizar el registro
+     */
+    public void setEnableTotpNow(Boolean enableTotpNow) {
+        this.enableTotpNow = enableTotpNow;
     }
 }
