@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.time.LocalDateTime;
+
 /**
  * Entidad JPA que representa un usuario administrativo del sistema.
  *
@@ -72,6 +74,38 @@ public class AppUser {
      */
     @Column(name = "role", nullable = false, length = 60)
     private String role;
+
+    /**
+     * Secreto TOTP en Base32 para MFA con app autenticadora.
+     *
+     * <p>Columna: {@code totp_secret_base32}. Puede ser null si MFA no está configurado.</p>
+     */
+    @Column(name = "totp_secret_base32", length = 128)
+    private String totpSecretBase32;
+
+    /**
+     * Indicador de si el MFA TOTP está activo para el usuario.
+     *
+     * <p>Columna: {@code totp_enabled}.</p>
+     */
+    @Column(name = "totp_enabled")
+    private Boolean totpEnabled = Boolean.FALSE;
+
+    /**
+     * Fecha/hora de confirmación/activación del TOTP.
+     *
+     * <p>Columna: {@code totp_confirmed_at}.</p>
+     */
+    @Column(name = "totp_confirmed_at")
+    private LocalDateTime totpConfirmedAt;
+
+    /**
+     * Último time-step TOTP aceptado (anti reuso del mismo código).
+     *
+     * <p>Columna: {@code totp_last_time_step}.</p>
+     */
+    @Column(name = "totp_last_time_step")
+    private Long totpLastTimeStep;
 
     /**
      * Retorna el identificador del usuario (person_id).
@@ -179,5 +213,61 @@ public class AppUser {
      */
     public void setRole(String role) {
         this.role = role;
+    }
+
+    /**
+     * @return secreto TOTP Base32 (puede ser null)
+     */
+    public String getTotpSecretBase32() {
+        return totpSecretBase32;
+    }
+
+    /**
+     * @param totpSecretBase32 secreto TOTP Base32
+     */
+    public void setTotpSecretBase32(String totpSecretBase32) {
+        this.totpSecretBase32 = totpSecretBase32;
+    }
+
+    /**
+     * @return {@code true} si TOTP está activo; {@code false} en caso contrario
+     */
+    public Boolean getTotpEnabled() {
+        return totpEnabled;
+    }
+
+    /**
+     * @param totpEnabled indicador de activación TOTP
+     */
+    public void setTotpEnabled(Boolean totpEnabled) {
+        this.totpEnabled = totpEnabled;
+    }
+
+    /**
+     * @return fecha/hora de activación TOTP
+     */
+    public LocalDateTime getTotpConfirmedAt() {
+        return totpConfirmedAt;
+    }
+
+    /**
+     * @param totpConfirmedAt fecha/hora de activación TOTP
+     */
+    public void setTotpConfirmedAt(LocalDateTime totpConfirmedAt) {
+        this.totpConfirmedAt = totpConfirmedAt;
+    }
+
+    /**
+     * @return último time-step TOTP aceptado (anti replay)
+     */
+    public Long getTotpLastTimeStep() {
+        return totpLastTimeStep;
+    }
+
+    /**
+     * @param totpLastTimeStep último time-step TOTP aceptado (anti replay)
+     */
+    public void setTotpLastTimeStep(Long totpLastTimeStep) {
+        this.totpLastTimeStep = totpLastTimeStep;
     }
 }

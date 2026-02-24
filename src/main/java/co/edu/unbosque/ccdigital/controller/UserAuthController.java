@@ -7,6 +7,7 @@ import co.edu.unbosque.ccdigital.repository.PersonRepository;
 import co.edu.unbosque.ccdigital.security.IndyUserPrincipal;
 import co.edu.unbosque.ccdigital.service.IndyProofLoginService;
 import co.edu.unbosque.ccdigital.service.UserLoginOtpService;
+import co.edu.unbosque.ccdigital.service.UserTotpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.CacheControl;
@@ -45,6 +46,7 @@ public class UserAuthController {
     private final PersonRepository personRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserLoginOtpService userLoginOtpService;
+    private final UserTotpService userTotpService;
 
     /**
      * Constructor del controlador.
@@ -54,17 +56,20 @@ public class UserAuthController {
      * @param personRepository repositorio de personas
      * @param passwordEncoder comparador de hash de contraseñas (BCrypt)
      * @param userLoginOtpService servicio de envío/validación de OTP por correo para login
+     * @param userTotpService servicio TOTP para MFA mediante app autenticadora
      */
     public UserAuthController(IndyProofLoginService proofLoginService,
                               AppUserRepository appUserRepository,
                               PersonRepository personRepository,
                               PasswordEncoder passwordEncoder,
-                              UserLoginOtpService userLoginOtpService) {
+                              UserLoginOtpService userLoginOtpService,
+                              UserTotpService userTotpService) {
         this.proofLoginService = proofLoginService;
         this.appUserRepository = appUserRepository;
         this.personRepository = personRepository;
         this.passwordEncoder = passwordEncoder;
         this.userLoginOtpService = userLoginOtpService;
+        this.userTotpService = userTotpService;
     }
 
     /**
@@ -143,13 +148,17 @@ public class UserAuthController {
      * Contexto temporal pendiente de autenticación final mientras se valida OTP.
      */
     public static class PendingOtpContext {
+        private Long personId;
         private String idType;
         private String idNumber;
         private String firstName;
         private String lastName;
         private String profileEmail;
         private String loginEmail;
+        private String secondFactorMethod;
 
+        public Long getPersonId() { return personId; }
+        public void setPersonId(Long personId) { this.personId = personId; }
         public String getIdType() { return idType; }
         public void setIdType(String idType) { this.idType = idType; }
         public String getIdNumber() { return idNumber; }
@@ -162,6 +171,8 @@ public class UserAuthController {
         public void setProfileEmail(String profileEmail) { this.profileEmail = profileEmail; }
         public String getLoginEmail() { return loginEmail; }
         public void setLoginEmail(String loginEmail) { this.loginEmail = loginEmail; }
+        public String getSecondFactorMethod() { return secondFactorMethod; }
+        public void setSecondFactorMethod(String secondFactorMethod) { this.secondFactorMethod = secondFactorMethod; }
     }
 
     /**
@@ -285,23 +296,39 @@ public class UserAuthController {
                 }
 
                 pending = buildPendingOtpContext(attrs, loginEmail);
-                boolean sent = userLoginOtpService.issueCode(
-                        presExIdNorm,
-                        loginEmail,
-                        displayNameFromPending(pending)
-                );
-                if (!sent) {
-                    return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                            .cacheControl(CacheControl.noStore())
-                            .body(Map.of("error", "No fue posible enviar el código de verificación al correo."));
+                AppUser loginUser = findActiveUserByEmail(loginEmail);
+                if (loginUser != null) {
+                    pending.setPersonId(loginUser.getPersonId());
+                }
+
+                if (loginUser != null && userTotpService.isTotpEnabled(loginUser)) {
+                    pending.setSecondFactorMethod("totp");
+                } else {
+                    pending.setSecondFactorMethod("email");
+                    boolean sent = userLoginOtpService.issueCode(
+                            presExIdNorm,
+                            loginEmail,
+                            displayNameFromPending(pending)
+                    );
+                    if (!sent) {
+                        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                                .cacheControl(CacheControl.noStore())
+                                .body(Map.of("error", "No fue posible enviar el código de verificación al correo."));
+                    }
                 }
                 savePendingOtpContext(request, presExIdNorm, pending);
             }
 
             out.put("authenticated", false);
             out.put("otpRequired", true);
-            out.put("maskedEmail", maskEmail(pending.getLoginEmail()));
-            out.put("message", "Se envió un código de verificación a tu correo.");
+            if (isTotpFactor(pending)) {
+                out.put("otpMethod", "totp");
+                out.put("message", "Ingresa el código de tu app de autenticación.");
+            } else {
+                out.put("otpMethod", "email");
+                out.put("maskedEmail", maskEmail(pending.getLoginEmail()));
+                out.put("message", "Se envió un código de verificación a tu correo.");
+            }
         } else {
             out.put("authenticated", false);
             if (done) {
@@ -344,11 +371,21 @@ public class UserAuthController {
                     .body(Map.of("error", "La sesión de validación expiró. Intenta iniciar sesión nuevamente."));
         }
 
-        boolean ok = userLoginOtpService.verifyCode(presExId, code);
+        boolean ok;
+        if (isTotpFactor(pending)) {
+            AppUser loginUser = pending.getPersonId() != null
+                    ? findActiveUserByPersonId(pending.getPersonId())
+                    : findActiveUserByEmail(pending.getLoginEmail());
+            ok = userTotpService.verifyLoginCodeAndMark(loginUser, code);
+        } else {
+            ok = userLoginOtpService.verifyCode(presExId, code);
+        }
         if (!ok) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .cacheControl(CacheControl.noStore())
-                    .body(Map.of("error", "Código inválido o expirado."));
+                    .body(Map.of("error", isTotpFactor(pending)
+                            ? "Código de la app inválido o expirado."
+                            : "Código inválido o expirado."));
         }
 
         IndyUserPrincipal principal = new IndyUserPrincipal(
@@ -380,6 +417,26 @@ public class UserAuthController {
             role = role.substring("ROLE_".length());
         }
         return "USER".equalsIgnoreCase(role) || "USUARIO".equalsIgnoreCase(role);
+    }
+
+    private AppUser findActiveUserByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        return appUserRepository.findByEmailIgnoreCase(email.trim())
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
+                .filter(this::hasUserRole)
+                .orElse(null);
+    }
+
+    private AppUser findActiveUserByPersonId(Long personId) {
+        if (personId == null) {
+            return null;
+        }
+        return appUserRepository.findById(personId)
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
+                .filter(this::hasUserRole)
+                .orElse(null);
     }
 
     private String findIdNumberByUser(AppUser appUser) {
@@ -508,6 +565,10 @@ public class UserAuthController {
         ctx.setProfileEmail(attrs.getOrDefault("email", ""));
         ctx.setLoginEmail(loginEmail);
         return ctx;
+    }
+
+    private boolean isTotpFactor(PendingOtpContext ctx) {
+        return "totp".equalsIgnoreCase(normalize(ctx == null ? null : ctx.getSecondFactorMethod()));
     }
 
     private void authenticateInSession(HttpServletRequest request, IndyUserPrincipal principal) {

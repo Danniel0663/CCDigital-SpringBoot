@@ -94,6 +94,51 @@
       "name": "app.security.forgot-password.mail.from",
       "type": "java.lang.String",
       "description": "Remitente usado para correos de recuperación de contraseña."
+    },
+    {
+      "name": "app.security.login-otp.code-length",
+      "type": "java.lang.Integer",
+      "description": "Longitud del código OTP por correo usado en el segundo factor del login."
+    },
+    {
+      "name": "app.security.login-otp.code-ttl-minutes",
+      "type": "java.lang.Long",
+      "description": "Vigencia del código OTP por correo para login (minutos)."
+    },
+    {
+      "name": "app.security.login-otp.max-attempts",
+      "type": "java.lang.Integer",
+      "description": "Intentos máximos permitidos para OTP por correo en login."
+    },
+    {
+      "name": "app.security.login-otp.mail.from",
+      "type": "java.lang.String",
+      "description": "Remitente usado para correos OTP del login."
+    },
+    {
+      "name": "app.security.totp.issuer",
+      "type": "java.lang.String",
+      "description": "Nombre del emisor mostrado en la app autenticadora (TOTP)."
+    },
+    {
+      "name": "app.security.totp.secret-bytes",
+      "type": "java.lang.Integer",
+      "description": "Tamaño (bytes) del secreto aleatorio TOTP antes de codificarlo en Base32."
+    },
+    {
+      "name": "app.security.totp.code-digits",
+      "type": "java.lang.Integer",
+      "description": "Cantidad de dígitos del código TOTP (normalmente 6)."
+    },
+    {
+      "name": "app.security.totp.period-seconds",
+      "type": "java.lang.Long",
+      "description": "Duración en segundos de cada ventana TOTP."
+    },
+    {
+      "name": "app.security.totp.window-steps",
+      "type": "java.lang.Integer",
+      "description": "Ventana de tolerancia TOTP en pasos (ej. 1 permite +/- 1 intervalo)."
     }
   ]
 }

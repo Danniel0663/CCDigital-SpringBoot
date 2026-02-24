@@ -43,10 +43,10 @@
 
         <div id="otpSection" class="cc-form-section d-none mb-3">
           <div class="cc-section-title">
-            <i class="bi bi-envelope-check"></i>Verificación por correo
+            <i class="bi bi-shield-lock"></i>Verificación adicional
           </div>
           <p id="otpHelp" class="small text-muted mb-2">
-            Ingresa el código que enviamos a tu correo.
+            Ingresa el código de verificación.
           </p>
           <label for="otpCode" class="form-label">Código de verificación</label>
           <input id="otpCode" class="form-control" type="text" inputmode="numeric" maxlength="8"
@@ -155,12 +155,16 @@
     }
   }
 
-  function showOtpSection(maskedEmail) {
+  function showOtpSection(options) {
+    const method = (options && options.method) ? String(options.method).toLowerCase() : 'email';
+    const maskedEmail = options && options.maskedEmail ? options.maskedEmail : '';
     otpSectionEl.classList.remove('d-none');
     btn.classList.add('d-none');
-    otpHelpEl.textContent = maskedEmail
-      ? ('Ingresa el código que enviamos a ' + maskedEmail + '.')
-      : 'Ingresa el código que enviamos a tu correo.';
+    otpHelpEl.textContent = method === 'totp'
+      ? 'Ingresa el código generado en tu app de autenticación (Aegis, Google Authenticator o Microsoft Authenticator).'
+      : (maskedEmail
+          ? ('Ingresa el código que enviamos a ' + maskedEmail + '.')
+          : 'Ingresa el código que enviamos a tu correo.');
     otpCodeEl.focus();
   }
 
@@ -224,7 +228,7 @@
             clearInterval(pollTimer);
             pollTimer = null;
             setBusy(false);
-            showOtpSection(pollRes.maskedEmail || '');
+            showOtpSection({ method: pollRes.otpMethod || 'email', maskedEmail: pollRes.maskedEmail || '' });
             setStatus(pollRes.message || 'Se envió un código de verificación al correo.', 'info');
             return;
           }
@@ -269,7 +273,7 @@
         return;
       }
       if (!code) {
-        setStatus('Ingresa el código de verificación enviado al correo.', 'warning');
+        setStatus('Ingresa el código de verificación.', 'warning');
         return;
       }
 
