@@ -59,6 +59,11 @@ public class UserRegisterEmailOtpService {
     @Value("${spring.mail.username:}")
     private String smtpUsername;
 
+    /**
+     * Constructor del servicio.
+     *
+     * @param mailSenderProvider proveedor lazy de {@link JavaMailSender}
+     */
     public UserRegisterEmailOtpService(ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.mailSenderProvider = mailSenderProvider;
     }
@@ -138,6 +143,11 @@ public class UserRegisterEmailOtpService {
         }
     }
 
+    /**
+     * Elimina un desafío expirado del mapa en memoria si corresponde.
+     *
+     * @param flowId identificador del flujo de verificación de correo
+     */
     private void prune(String flowId) {
         Challenge c = challenges.get(flowId);
         if (c != null && Instant.now().isAfter(c.expiresAt)) {
@@ -145,6 +155,14 @@ public class UserRegisterEmailOtpService {
         }
     }
 
+    /**
+     * Envía el correo con el código OTP de verificación de registro.
+     *
+     * @param to correo destino
+     * @param displayName nombre visible del ciudadano (opcional)
+     * @param code código OTP generado
+     * @return {@code true} si el envío fue exitoso
+     */
     private boolean sendEmail(String to, String displayName, String code) {
         JavaMailSender sender = mailSenderProvider.getIfAvailable();
         if (sender == null) {
@@ -168,6 +186,13 @@ public class UserRegisterEmailOtpService {
         }
     }
 
+    /**
+     * Construye el cuerpo del correo de verificación de registro.
+     *
+     * @param displayName nombre visible del ciudadano
+     * @param code código OTP
+     * @return contenido de texto plano del correo
+     */
     private String buildBody(String displayName, String code) {
         String name = isBlank(displayName) ? "usuario" : displayName.trim();
         long ttl = Math.max(1, codeTtlMinutes);
@@ -177,6 +202,12 @@ public class UserRegisterEmailOtpService {
                 + "Si no solicitaste este registro, ignora este correo.\n";
     }
 
+    /**
+     * Genera un código numérico aleatorio para OTP.
+     *
+     * @param length longitud deseada
+     * @return código OTP solo numérico
+     */
     private String generateNumericCode(int length) {
         StringBuilder sb = new StringBuilder(length);
         for (int i = 0; i < length; i++) {
@@ -185,10 +216,21 @@ public class UserRegisterEmailOtpService {
         return sb.toString();
     }
 
+    /**
+     * Normaliza la longitud del OTP a un rango seguro soportado por la UI.
+     *
+     * @return longitud efectiva del código
+     */
     private int safeCodeLength() {
         return Math.max(4, Math.min(8, codeLength));
     }
 
+    /**
+     * Calcula hash SHA-256 (Base64) del código para no almacenarlo en texto plano.
+     *
+     * @param value valor a resumir
+     * @return hash Base64
+     */
     private String sha256Base64(String value) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -199,6 +241,12 @@ public class UserRegisterEmailOtpService {
         }
     }
 
+    /**
+     * Verifica si una cadena está vacía o contiene solo espacios.
+     *
+     * @param s valor a evaluar
+     * @return {@code true} si es nula/blanca
+     */
     private boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }

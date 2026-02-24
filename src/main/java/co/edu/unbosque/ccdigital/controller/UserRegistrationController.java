@@ -34,6 +34,11 @@ import java.util.UUID;
  * </p>
  *
  * <p>
+ * Antes de crear la cuenta, verifica el correo ingresado mediante un código OTP enviado por email.
+ * Solo tras validar ese código se crea el usuario en {@code users}.
+ * </p>
+ *
+ * <p>
  * Además, soporta un flujo opcional de activación TOTP inmediatamente después del registro:
  * genera un secreto temporal, muestra la configuración (clave/QR) en la misma vista y confirma
  * la activación mediante un endpoint AJAX antes de que el usuario inicie sesión por primera vez.
@@ -238,6 +243,13 @@ public class UserRegistrationController {
 
     /**
      * Inicia la verificación de correo previa a la creación del usuario y deja el formulario pendiente en sesión.
+     *
+     * <p>No crea todavía el usuario en base de datos. Solo envía el código OTP al correo,
+     * guarda el formulario en sesión y renderiza la vista del paso de confirmación.</p>
+     *
+     * @param form formulario capturado
+     * @param model modelo de la vista
+     * @param request request HTTP para acceso a sesión
      */
     private void handleRegistrationStart(UserRegisterForm form, Model model, HttpServletRequest request) {
         String email = normalize(form == null ? null : form.getEmail());
@@ -265,6 +277,13 @@ public class UserRegistrationController {
 
     /**
      * Completa el registro después de validar el código enviado al correo.
+     *
+     * <p>Recupera el formulario pendiente desde sesión, valida el OTP del correo y solo después
+     * delega la creación del usuario al servicio de negocio.</p>
+     *
+     * @param form formulario del paso de confirmación (token + código)
+     * @param model modelo de la vista
+     * @param request request HTTP para acceso a sesión
      */
     private void handleEmailVerificationConfirmation(UserRegisterForm form, Model model, HttpServletRequest request) {
         String emailToken = normalize(form == null ? null : form.getRegistrationEmailToken());
@@ -317,6 +336,9 @@ public class UserRegistrationController {
 
     /**
      * Determina si el POST actual corresponde al paso de confirmación del código de correo.
+     *
+     * @param form formulario recibido
+     * @return {@code true} si contiene token/código del paso de verificación
      */
     private boolean isEmailVerificationConfirmationStep(UserRegisterForm form) {
         return !normalize(form == null ? null : form.getRegistrationEmailToken()).isBlank()
@@ -325,6 +347,11 @@ public class UserRegistrationController {
 
     /**
      * Prepara los atributos de modelo para mostrar el paso de validación de correo.
+     *
+     * @param model modelo de Spring MVC
+     * @param emailToken token temporal del flujo de verificación
+     * @param email correo capturado (se mostrará enmascarado)
+     * @param totpWillBeOfferedAfterRegister indicador de si el usuario marcó activación TOTP opcional
      */
     private void showEmailVerificationStep(Model model,
                                            String emailToken,
@@ -336,6 +363,15 @@ public class UserRegistrationController {
         model.addAttribute("registerEmailVerificationNextStepTotp", totpWillBeOfferedAfterRegister);
     }
 
+    /**
+     * Obtiene (o crea) el mapa de formularios pendientes del registro en sesión.
+     *
+     * <p>La llave es el token temporal enviado al usuario para verificar el correo.</p>
+     *
+     * @param request request HTTP
+     * @param createIfMissing si es {@code true}, crea el mapa cuando no exista
+     * @return mapa de formularios pendientes por token o {@code null}
+     */
     @SuppressWarnings("unchecked")
     private Map<String, UserRegisterForm> pendingRegisterForms(HttpServletRequest request, boolean createIfMissing) {
         var session = request.getSession(createIfMissing);
@@ -352,24 +388,53 @@ public class UserRegistrationController {
         return created;
     }
 
+    /**
+     * Guarda en sesión el formulario completo pendiente de validación de correo.
+     *
+     * @param request request HTTP
+     * @param emailToken token temporal del flujo
+     * @param form copia del formulario de registro
+     */
     private void savePendingRegisterForm(HttpServletRequest request, String emailToken, UserRegisterForm form) {
         if (emailToken == null || emailToken.isBlank() || form == null) return;
         Map<String, UserRegisterForm> map = pendingRegisterForms(request, true);
         if (map != null) map.put(emailToken, form);
     }
 
+    /**
+     * Recupera el formulario de registro pendiente asociado a un token de verificación de correo.
+     *
+     * @param request request HTTP
+     * @param emailToken token temporal del flujo
+     * @return formulario pendiente o {@code null}
+     */
     private UserRegisterForm getPendingRegisterForm(HttpServletRequest request, String emailToken) {
         if (emailToken == null || emailToken.isBlank()) return null;
         Map<String, UserRegisterForm> map = pendingRegisterForms(request, false);
         return map == null ? null : map.get(emailToken);
     }
 
+    /**
+     * Elimina de sesión un formulario pendiente del flujo de verificación de correo.
+     *
+     * @param request request HTTP
+     * @param emailToken token temporal del flujo
+     */
     private void removePendingRegisterForm(HttpServletRequest request, String emailToken) {
         if (emailToken == null || emailToken.isBlank()) return;
         Map<String, UserRegisterForm> map = pendingRegisterForms(request, false);
         if (map != null) map.remove(emailToken);
     }
 
+    /**
+     * Crea una copia del formulario para persistirla temporalmente en sesión.
+     *
+     * <p>Se evita reutilizar directamente el mismo objeto del binding web para no mezclar estados
+     * entre pasos del flujo de registro.</p>
+     *
+     * @param src formulario original
+     * @return copia con los datos requeridos para completar el registro tras validar el correo
+     */
     private UserRegisterForm copyFormForSession(UserRegisterForm src) {
         UserRegisterForm copy = new UserRegisterForm();
         if (src == null) return copy;
@@ -386,12 +451,24 @@ public class UserRegistrationController {
         return copy;
     }
 
+    /**
+     * Construye un nombre de visualización para el correo OTP de registro.
+     *
+     * @param form formulario de registro
+     * @return nombre/apellidos si existen; de lo contrario el correo
+     */
     private String displayName(UserRegisterForm form) {
         String out = (normalize(form == null ? null : form.getFirstName()) + " "
                 + normalize(form == null ? null : form.getLastName())).trim();
         return out.isBlank() ? normalize(form == null ? null : form.getEmail()) : out;
     }
 
+    /**
+     * Enmascara el correo para mostrarlo en UI durante el paso de verificación.
+     *
+     * @param email correo capturado
+     * @return correo parcialmente enmascarado
+     */
     private String maskEmail(String email) {
         String value = normalize(email);
         int at = value.indexOf('@');
