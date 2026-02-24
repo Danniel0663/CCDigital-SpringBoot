@@ -23,6 +23,11 @@ import java.time.LocalDate;
  * configurar el autenticador de celular inmediatamente después de crear la cuenta.
  * </p>
  *
+ * <p>
+ * Durante el flujo de verificación de correo previo al registro también transporta el token temporal
+ * del proceso y el código OTP ingresado por el usuario.
+ * </p>
+ *
  * @since 3.0
  */
 public class UserRegisterForm {
@@ -37,6 +42,8 @@ public class UserRegisterForm {
     private String password;
     private String confirmPassword;
     private Boolean enableTotpNow;
+    private String registrationEmailToken;
+    private String registrationEmailCode;
 
     /**
      * Retorna el tipo de identificación.
@@ -216,5 +223,33 @@ public class UserRegisterForm {
      */
     public void setEnableTotpNow(Boolean enableTotpNow) {
         this.enableTotpNow = enableTotpNow;
+    }
+
+    /**
+     * @return token temporal del flujo de verificación de correo del registro
+     */
+    public String getRegistrationEmailToken() {
+        return registrationEmailToken;
+    }
+
+    /**
+     * @param registrationEmailToken token temporal del flujo de verificación de correo del registro
+     */
+    public void setRegistrationEmailToken(String registrationEmailToken) {
+        this.registrationEmailToken = registrationEmailToken;
+    }
+
+    /**
+     * @return código OTP ingresado para verificar el correo durante el registro
+     */
+    public String getRegistrationEmailCode() {
+        return registrationEmailCode;
+    }
+
+    /**
+     * @param registrationEmailCode código OTP ingresado para verificar el correo durante el registro
+     */
+    public void setRegistrationEmailCode(String registrationEmailCode) {
+        this.registrationEmailCode = registrationEmailCode;
     }
 }

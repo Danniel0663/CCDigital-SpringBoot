@@ -5,6 +5,7 @@ import co.edu.unbosque.ccdigital.entity.AppUser;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.repository.AppUserRepository;
 import co.edu.unbosque.ccdigital.service.UserAccountService;
+import co.edu.unbosque.ccdigital.service.UserRegisterEmailOtpService;
 import co.edu.unbosque.ccdigital.service.UserTotpService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.CacheControl;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Controlador web para registro de cuentas de usuario final.
@@ -44,8 +46,10 @@ import java.util.Map;
 public class UserRegistrationController {
 
     private static final String SESSION_REGISTER_PENDING_TOTP_SECRETS = "register.user.pendingTotpSecretsByPersonId";
+    private static final String SESSION_REGISTER_PENDING_FORMS = "register.user.pendingFormsByEmailToken";
 
     private final UserAccountService userAccountService;
+    private final UserRegisterEmailOtpService userRegisterEmailOtpService;
     private final UserTotpService userTotpService;
     private final AppUserRepository appUserRepository;
 
@@ -53,13 +57,16 @@ public class UserRegistrationController {
      * Constructor del controlador.
      *
      * @param userAccountService servicio de registro de usuarios
+     * @param userRegisterEmailOtpService servicio OTP para verificación de correo antes del registro
      * @param userTotpService servicio de generación/validación TOTP para activación opcional
      * @param appUserRepository repositorio de usuarios para confirmar activación post-registro
      */
     public UserRegistrationController(UserAccountService userAccountService,
+                                      UserRegisterEmailOtpService userRegisterEmailOtpService,
                                       UserTotpService userTotpService,
                                       AppUserRepository appUserRepository) {
         this.userAccountService = userAccountService;
+        this.userRegisterEmailOtpService = userRegisterEmailOtpService;
         this.userTotpService = userTotpService;
         this.appUserRepository = appUserRepository;
     }
@@ -138,19 +145,12 @@ public class UserRegistrationController {
                            Model model,
                            HttpServletRequest request) {
         model.addAttribute("idTypes", IdType.values());
-        try {
-            AppUser createdUser = userAccountService.registerFromExistingPerson(form);
-
-            model.addAttribute("success", "Usuario creado correctamente.");
-            model.addAttribute("createdEmail", createdUser.getEmail());
-            prepareOptionalTotpSetupIfRequested(form, createdUser, request, model);
-            model.addAttribute("form", new UserRegisterForm());
-        } catch (IllegalArgumentException ex) {
-            form.setPassword(null);
-            form.setConfirmPassword(null);
-            model.addAttribute("form", form);
-            model.addAttribute("error", ex.getMessage());
+        if (isEmailVerificationConfirmationStep(form)) {
+            handleEmailVerificationConfirmation(form, model, request);
+            return "auth/register-user";
         }
+
+        handleRegistrationStart(form, model, request);
 
         return "auth/register-user";
     }
@@ -234,6 +234,172 @@ public class UserRegistrationController {
         model.addAttribute("registerTotpPersonId", createdUser.getPersonId());
         model.addAttribute("registerTotpSecret", secret);
         model.addAttribute("registerTotpOtpAuthUri", userTotpService.buildOtpAuthUri(createdUser.getEmail(), secret));
+    }
+
+    /**
+     * Inicia la verificación de correo previa a la creación del usuario y deja el formulario pendiente en sesión.
+     */
+    private void handleRegistrationStart(UserRegisterForm form, Model model, HttpServletRequest request) {
+        String email = normalize(form == null ? null : form.getEmail());
+        if (email.isBlank()) {
+            model.addAttribute("form", form);
+            model.addAttribute("error", "Correo requerido.");
+            return;
+        }
+
+        String emailToken = UUID.randomUUID().toString();
+        boolean sent = userRegisterEmailOtpService.issueCode(emailToken, email, displayName(form));
+        if (!sent) {
+            form.setPassword(null);
+            form.setConfirmPassword(null);
+            model.addAttribute("form", form);
+            model.addAttribute("error", "No fue posible enviar el código de verificación al correo.");
+            return;
+        }
+
+        savePendingRegisterForm(request, emailToken, copyFormForSession(form));
+        userRegisterEmailOtpService.invalidate(normalize(form.getRegistrationEmailToken()));
+        showEmailVerificationStep(model, emailToken, email, Boolean.TRUE.equals(form.getEnableTotpNow()));
+        model.addAttribute("form", new UserRegisterForm());
+    }
+
+    /**
+     * Completa el registro después de validar el código enviado al correo.
+     */
+    private void handleEmailVerificationConfirmation(UserRegisterForm form, Model model, HttpServletRequest request) {
+        String emailToken = normalize(form == null ? null : form.getRegistrationEmailToken());
+        String code = normalize(form == null ? null : form.getRegistrationEmailCode());
+
+        if (emailToken.isBlank()) {
+            model.addAttribute("error", "La verificación de correo expiró. Completa el formulario nuevamente.");
+            model.addAttribute("form", new UserRegisterForm());
+            return;
+        }
+
+        UserRegisterForm pendingForm = getPendingRegisterForm(request, emailToken);
+        if (pendingForm == null) {
+            model.addAttribute("error", "La verificación de correo expiró. Completa el formulario nuevamente.");
+            model.addAttribute("form", new UserRegisterForm());
+            return;
+        }
+
+        if (code.isBlank()) {
+            showEmailVerificationStep(model, emailToken, pendingForm.getEmail(), Boolean.TRUE.equals(pendingForm.getEnableTotpNow()));
+            model.addAttribute("verifyEmailError", "Ingresa el código enviado al correo.");
+            model.addAttribute("form", new UserRegisterForm());
+            return;
+        }
+
+        boolean ok = userRegisterEmailOtpService.verifyCode(emailToken, code);
+        if (!ok) {
+            showEmailVerificationStep(model, emailToken, pendingForm.getEmail(), Boolean.TRUE.equals(pendingForm.getEnableTotpNow()));
+            model.addAttribute("verifyEmailError", "Código inválido o expirado.");
+            model.addAttribute("form", new UserRegisterForm());
+            return;
+        }
+
+        try {
+            AppUser createdUser = userAccountService.registerFromExistingPerson(pendingForm);
+            removePendingRegisterForm(request, emailToken);
+            userRegisterEmailOtpService.invalidate(emailToken);
+
+            model.addAttribute("success", "Usuario creado correctamente y correo verificado.");
+            model.addAttribute("createdEmail", createdUser.getEmail());
+            prepareOptionalTotpSetupIfRequested(pendingForm, createdUser, request, model);
+            model.addAttribute("form", new UserRegisterForm());
+        } catch (IllegalArgumentException ex) {
+            removePendingRegisterForm(request, emailToken);
+            userRegisterEmailOtpService.invalidate(emailToken);
+            model.addAttribute("error", ex.getMessage());
+            model.addAttribute("form", new UserRegisterForm());
+        }
+    }
+
+    /**
+     * Determina si el POST actual corresponde al paso de confirmación del código de correo.
+     */
+    private boolean isEmailVerificationConfirmationStep(UserRegisterForm form) {
+        return !normalize(form == null ? null : form.getRegistrationEmailToken()).isBlank()
+                || !normalize(form == null ? null : form.getRegistrationEmailCode()).isBlank();
+    }
+
+    /**
+     * Prepara los atributos de modelo para mostrar el paso de validación de correo.
+     */
+    private void showEmailVerificationStep(Model model,
+                                           String emailToken,
+                                           String email,
+                                           boolean totpWillBeOfferedAfterRegister) {
+        model.addAttribute("awaitingRegisterEmailVerification", true);
+        model.addAttribute("registerEmailVerificationToken", emailToken);
+        model.addAttribute("registerEmailVerificationMaskedEmail", maskEmail(email));
+        model.addAttribute("registerEmailVerificationNextStepTotp", totpWillBeOfferedAfterRegister);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, UserRegisterForm> pendingRegisterForms(HttpServletRequest request, boolean createIfMissing) {
+        var session = request.getSession(createIfMissing);
+        if (session == null) return null;
+
+        Object raw = session.getAttribute(SESSION_REGISTER_PENDING_FORMS);
+        if (raw instanceof Map<?, ?> rawMap) {
+            return (Map<String, UserRegisterForm>) rawMap;
+        }
+
+        if (!createIfMissing) return null;
+        Map<String, UserRegisterForm> created = new LinkedHashMap<>();
+        session.setAttribute(SESSION_REGISTER_PENDING_FORMS, created);
+        return created;
+    }
+
+    private void savePendingRegisterForm(HttpServletRequest request, String emailToken, UserRegisterForm form) {
+        if (emailToken == null || emailToken.isBlank() || form == null) return;
+        Map<String, UserRegisterForm> map = pendingRegisterForms(request, true);
+        if (map != null) map.put(emailToken, form);
+    }
+
+    private UserRegisterForm getPendingRegisterForm(HttpServletRequest request, String emailToken) {
+        if (emailToken == null || emailToken.isBlank()) return null;
+        Map<String, UserRegisterForm> map = pendingRegisterForms(request, false);
+        return map == null ? null : map.get(emailToken);
+    }
+
+    private void removePendingRegisterForm(HttpServletRequest request, String emailToken) {
+        if (emailToken == null || emailToken.isBlank()) return;
+        Map<String, UserRegisterForm> map = pendingRegisterForms(request, false);
+        if (map != null) map.remove(emailToken);
+    }
+
+    private UserRegisterForm copyFormForSession(UserRegisterForm src) {
+        UserRegisterForm copy = new UserRegisterForm();
+        if (src == null) return copy;
+        copy.setIdType(src.getIdType());
+        copy.setIdNumber(src.getIdNumber());
+        copy.setFirstName(src.getFirstName());
+        copy.setLastName(src.getLastName());
+        copy.setEmail(src.getEmail());
+        copy.setPhone(src.getPhone());
+        copy.setBirthdate(src.getBirthdate());
+        copy.setPassword(src.getPassword());
+        copy.setConfirmPassword(src.getConfirmPassword());
+        copy.setEnableTotpNow(src.getEnableTotpNow());
+        return copy;
+    }
+
+    private String displayName(UserRegisterForm form) {
+        String out = (normalize(form == null ? null : form.getFirstName()) + " "
+                + normalize(form == null ? null : form.getLastName())).trim();
+        return out.isBlank() ? normalize(form == null ? null : form.getEmail()) : out;
+    }
+
+    private String maskEmail(String email) {
+        String value = normalize(email);
+        int at = value.indexOf('@');
+        if (at <= 1) return value;
+        String local = value.substring(0, at);
+        String domain = value.substring(at);
+        if (local.length() <= 2) return local.charAt(0) + "*" + domain;
+        return local.substring(0, 2) + "*".repeat(Math.max(1, local.length() - 2)) + domain;
     }
 
     /**

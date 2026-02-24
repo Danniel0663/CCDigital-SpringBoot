@@ -116,6 +116,26 @@
       "description": "Remitente usado para correos OTP del login."
     },
     {
+      "name": "app.security.register-email-otp.code-length",
+      "type": "java.lang.Integer",
+      "description": "Longitud del código OTP para verificación de correo durante el registro."
+    },
+    {
+      "name": "app.security.register-email-otp.code-ttl-minutes",
+      "type": "java.lang.Long",
+      "description": "Vigencia del código OTP de verificación de correo del registro (minutos)."
+    },
+    {
+      "name": "app.security.register-email-otp.max-attempts",
+      "type": "java.lang.Integer",
+      "description": "Intentos máximos para validar el código OTP de verificación de correo del registro."
+    },
+    {
+      "name": "app.security.register-email-otp.mail.from",
+      "type": "java.lang.String",
+      "description": "Remitente usado para correos de verificación de registro."
+    },
+    {
       "name": "app.security.totp.issuer",
       "type": "java.lang.String",
       "description": "Nombre del emisor mostrado en la app autenticadora (TOTP)."
