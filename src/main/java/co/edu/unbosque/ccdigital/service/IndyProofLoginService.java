@@ -3,6 +3,7 @@ package co.edu.unbosque.ccdigital.service;
 import co.edu.unbosque.ccdigital.config.IndyProperties;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.LinkedHashMap;
@@ -71,10 +72,14 @@ public class IndyProofLoginService {
         String url = verifierAdmin + "/present-proof-2.0/send-request";
 
         HttpEntity<Map<String, Object>> req = new HttpEntity<>(payload, buildAdminHeaders());
-        ResponseEntity<Map> resp = rest.exchange(url, HttpMethod.POST, req, Map.class);
+        ResponseEntity<Map<String, Object>> resp = rest.exchange(
+                url,
+                HttpMethod.POST,
+                req,
+                new ParameterizedTypeReference<>() {}
+        );
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) resp.getBody();
+        Map<String, Object> body = resp.getBody();
         if (body == null) body = new LinkedHashMap<>();
 
         Object id = body.get("pres_ex_id");
@@ -243,10 +248,14 @@ public class IndyProofLoginService {
         String url = verifierAdmin + "/present-proof-2.0/records/" + presExId;
 
         HttpEntity<Void> req = new HttpEntity<>(buildAdminHeaders());
-        ResponseEntity<Map> resp = rest.exchange(url, HttpMethod.GET, req, Map.class);
+        ResponseEntity<Map<String, Object>> resp = rest.exchange(
+                url,
+                HttpMethod.GET,
+                req,
+                new ParameterizedTypeReference<>() {}
+        );
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) resp.getBody();
+        Map<String, Object> body = resp.getBody();
         if (body == null) body = new LinkedHashMap<>();
         return body;
     }
@@ -263,7 +272,6 @@ public class IndyProofLoginService {
      * @param record record completo del proof exchange
      * @return mapa con claves de atributos y su valor {@code raw}
      */
-    @SuppressWarnings("unchecked")
     private Map<String, Object> extractRevealedAttrsRaw(Map<String, Object> record) {
         Map<String, Object> byFormat = asMap(record.get("by_format"));
         Map<String, Object> pres = asMap(byFormat.get("pres"));
@@ -319,7 +327,12 @@ public class IndyProofLoginService {
 
         String url = issuerAdmin + "/connections?state=active";
         HttpEntity<Void> req = new HttpEntity<>(buildAdminHeaders());
-        ResponseEntity<Map> resp = rest.exchange(url, HttpMethod.GET, req, Map.class);
+        ResponseEntity<Map<String, Object>> resp = rest.exchange(
+                url,
+                HttpMethod.GET,
+                req,
+                new ParameterizedTypeReference<>() {}
+        );
 
         Map<String, Object> body = castMap(resp.getBody());
         List<Object> results = castList(body.get("results"));

@@ -56,6 +56,7 @@
             <th>Motivo</th>
             <th style="width: 140px;">Estado</th>
             <th style="width: 170px;">Solicitada</th>
+            <th style="width: 170px;">Decisión</th>
             <th style="width: 170px;">Vence</th>
             <th>Documentos</th>
             <th class="text-end" style="width: 220px;">Acciones</th>
@@ -64,7 +65,7 @@
 
         <tbody>
           <tr th:if="${#lists.isEmpty(requests)}">
-            <td colspan="8" class="text-center text-muted py-4">
+            <td colspan="9" class="text-center text-muted py-4">
               No hay solicitudes registradas.
             </td>
           </tr>
@@ -100,6 +101,9 @@
 
             <td class="text-muted"
                 th:text="${r.requestedAt != null ? #temporals.format(r.requestedAt, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+
+            <td class="text-muted"
+                th:text="${r.decidedAt != null ? #temporals.format(r.decidedAt, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
 
             <td class="text-muted"
                 th:text="${r.expiresAt != null ? #temporals.format(r.expiresAt, 'yyyy-MM-dd HH:mm') : '-'}">-</td>

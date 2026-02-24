@@ -4,6 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Dashboard Usuario · CCDigital</title>
+  <meta name="_csrf" th:content="${_csrf.token}">
+  <meta name="_csrf_header" th:content="${_csrf.headerName}">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -33,24 +35,33 @@
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
       <div>
         <h1 class="h4 mb-1" th:text="${displayName}">Usuario</h1>
-
-        <div class="d-flex flex-wrap gap-2">
-          <span class="badge text-bg-secondary" th:text="${idType}">CC</span>
-          <span class="badge text-bg-light border" th:text="${idNumber}">000</span>
-          <span class="badge text-bg-light border" th:text="${email}">email</span>
-        </div>
-
-        <p class="text-muted small mt-3 mb-0">
-          Datos del Usuario.
+        <p class="cc-help-text small mb-3">
+          Bienvenido. Desde aquí puedes ver tus documentos y revisar solicitudes de acceso.
         </p>
 
-        <!-- CAMBIO 5: Botón a solicitudes -->
+        <div class="cc-kv-grid">
+          <div class="cc-kv-item">
+            <div class="cc-kv-label">Tipo de identificación</div>
+            <div class="cc-kv-value" th:text="${idType}">CC</div>
+          </div>
+          <div class="cc-kv-item">
+            <div class="cc-kv-label">Número de identificación</div>
+            <div class="cc-kv-value" th:text="${idNumber}">000</div>
+          </div>
+          <div class="cc-kv-item">
+            <div class="cc-kv-label">Correo registrado</div>
+            <div class="cc-kv-value" th:text="${email != null and !#strings.isEmpty(email) ? email : 'No registrado'}">email</div>
+          </div>
+        </div>
+
         <div class="d-flex flex-wrap gap-2 mt-3">
           <a class="btn btn-sm btn-outline-primary" th:href="@{/user/requests}">
             <i class="bi bi-inbox me-1"></i>Solicitudes de acceso
           </a>
+          <a class="btn btn-sm btn-outline-secondary" href="#mis-documentos">
+            <i class="bi bi-file-earmark-text me-1"></i>Ver documentos
+          </a>
         </div>
-        <!-- FIN CAMBIO 5 -->
 
       </div>
 
@@ -62,26 +73,123 @@
     </div>
   </div>
 
+  <div class="cc-tip mb-3">
+    <div class="fw-semibold small mb-1">
+      <i class="bi bi-compass me-1"></i>Guía rápida
+    </div>
+    <div class="small text-muted">
+      Usa <strong>Solicitudes de acceso</strong> para aprobar o rechazar permisos de entidades.
+      En la tabla de abajo puedes abrir tus documentos disponibles.
+    </div>
+  </div>
+
+  <!-- Seguridad / MFA -->
+  <div class="cc-card p-4 mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <h2 class="h6 text-uppercase text-muted mb-1">Seguridad de la cuenta</h2>
+        <div class="small text-muted mb-2">
+          Puedes activar una app de autenticación para validar el ingreso con un código de 6 dígitos.
+        </div>
+        <div class="small">
+          App recomendada: <strong>Aegis</strong> (gratis). También funciona con Google Authenticator o Microsoft Authenticator.
+        </div>
+      </div>
+
+      <div class="text-end">
+        <span class="badge"
+              th:classappend="${totpEnabled} ? ' text-bg-success' : ' text-bg-secondary'"
+              th:text="${totpEnabled} ? 'App autenticadora activa' : 'App autenticadora inactiva'">
+          Estado MFA
+        </span>
+        <div class="small text-muted mt-2" th:if="${totpEnabled and totpConfirmedAtHuman != null}">
+          Activado: <span th:text="${totpConfirmedAtHuman}">2026-01-01 10:00</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="totpStatusMsg" class="cc-status-box alert py-2 mt-3 mb-0 d-none" role="status" aria-live="polite">
+      <span id="totpStatusText">Estado</span>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <button id="btnTotpSetupStart" type="button" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-phone me-1"></i>
+        <span th:text="${totpEnabled} ? 'Reconfigurar app' : 'Activar app autenticadora'">Activar app autenticadora</span>
+      </button>
+      <button id="btnTotpDisable" type="button" class="btn btn-outline-danger btn-sm" th:if="${totpEnabled}">
+        <i class="bi bi-x-circle me-1"></i>Desactivar app
+      </button>
+    </div>
+
+    <div id="totpSetupPanel" class="cc-form-section mt-3 d-none">
+      <div class="cc-section-title">
+        <i class="bi bi-shield-lock"></i>Configurar app autenticadora
+      </div>
+      <p class="small text-muted mb-2">
+        Abre tu app (Aegis / Google Authenticator / Microsoft Authenticator), agrega una cuenta TOTP y escribe la clave manual:
+      </p>
+      <div class="cc-kv-grid">
+        <div class="cc-kv-item">
+          <div class="cc-kv-label">Clave manual</div>
+          <div id="totpSecretValue" class="cc-kv-value" style="word-break:break-all;">-</div>
+        </div>
+        <div class="cc-kv-item">
+          <div class="cc-kv-label">Formato</div>
+          <div class="cc-kv-value">TOTP · 6 dígitos · 30 segundos</div>
+        </div>
+      </div>
+      <div class="small text-muted mt-2">
+        También puedes usar esta URI (si tu app permite pegarla): <span id="totpUriValue" style="word-break:break-all;"></span>
+      </div>
+      <div class="mt-3">
+        <div class="small fw-semibold mb-2">Código QR</div>
+        <div id="totpQrBox" class="bg-white p-2 border rounded d-inline-block"></div>
+        <div class="small text-muted mt-2">Escanea este QR con Aegis, Google Authenticator o Microsoft Authenticator.</div>
+      </div>
+
+      <div class="row g-2 mt-2">
+        <div class="col-12 col-md-8">
+          <label for="totpConfirmCode" class="form-label">Código generado por la app</label>
+          <input id="totpConfirmCode" type="text" class="form-control" inputmode="numeric" maxlength="8"
+                 placeholder="Código de 6 dígitos" autocomplete="one-time-code">
+        </div>
+        <div class="col-12 col-md-4 d-flex align-items-end">
+          <button id="btnTotpConfirm" type="button" class="btn btn-primary w-100">
+            <i class="bi bi-check2-circle me-1"></i>Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Documentos -->
-  <div class="cc-card p-4">
+  <div id="mis-documentos" class="cc-card p-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h2 class="h6 text-uppercase text-muted mb-0">Documentos en Fabric</h2>
+      <div>
+        <h2 class="h6 text-uppercase text-muted mb-1">Mis documentos</h2>
+        <div class="small text-muted">Documentos disponibles para consulta en la plataforma.</div>
+      </div>
       <span class="badge text-bg-light border" th:text="${#lists.size(docs)} + ' registros'">0 registros</span>
     </div>
 
-    <div th:if="${#lists.isEmpty(docs)}" class="text-center text-muted py-4">
-      No hay documentos registrados.
+    <div th:if="${#lists.isEmpty(docs)}" class="cc-empty">
+      <i class="bi bi-folder2-open"></i>
+      <div class="mt-2 fw-semibold">Aún no tienes documentos visibles</div>
+      <div class="small text-muted mt-1">
+        Cuando una entidad cargue documentos aprobados, aparecerán aquí.
+      </div>
     </div>
 
     <div class="table-responsive" th:if="${!#lists.isEmpty(docs)}">
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Título</th>
+            <th>Documento</th>
             <th>Entidad</th>
             <th>Estado</th>
-            <th>Creado</th>
-            <th class="text-end">Acción</th>
+            <th>Fecha</th>
+            <th class="text-end">Abrir</th>
           </tr>
         </thead>
 
@@ -116,6 +224,134 @@
   </div>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  (function () {
+    const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || '';
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
+
+    const statusBox = document.getElementById('totpStatusMsg');
+    const statusText = document.getElementById('totpStatusText');
+    const setupPanel = document.getElementById('totpSetupPanel');
+    const btnSetup = document.getElementById('btnTotpSetupStart');
+    const btnDisable = document.getElementById('btnTotpDisable');
+    const btnConfirm = document.getElementById('btnTotpConfirm');
+    const secretValue = document.getElementById('totpSecretValue');
+    const uriValue = document.getElementById('totpUriValue');
+    const qrBox = document.getElementById('totpQrBox');
+    const codeInput = document.getElementById('totpConfirmCode');
+
+    function renderQr(text) {
+      if (!qrBox) return;
+      qrBox.innerHTML = '';
+      if (!text) return;
+      if (!window.QRCode) {
+        setTotpStatus('No se pudo cargar el generador de QR. Puedes usar la clave manual.', 'warning');
+        return;
+      }
+      try {
+        new window.QRCode(qrBox, {
+          text: text,
+          width: 220,
+          height: 220,
+          correctLevel: window.QRCode.CorrectLevel.M
+        });
+      } catch (_) {
+        setTotpStatus('No fue posible generar el QR. Puedes usar la clave manual.', 'warning');
+      }
+    }
+
+    function setTotpStatus(message, tone) {
+      if (!statusBox || !statusText) return;
+      statusText.textContent = message || '';
+      statusBox.className = 'cc-status-box is-visible alert py-2 mt-3 mb-0';
+      if (tone === 'success') statusBox.classList.add('alert-success');
+      else if (tone === 'warning') statusBox.classList.add('alert-warning');
+      else if (tone === 'danger') statusBox.classList.add('alert-danger');
+      else statusBox.classList.add('alert-info');
+    }
+
+    async function requestJson(url, method, payload) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (csrfToken) headers[csrfHeader] = csrfToken;
+      const res = await fetch(url, {
+        method: method || 'GET',
+        headers,
+        body: payload ? JSON.stringify(payload) : undefined
+      });
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (_) {}
+      if (!res.ok) {
+        throw new Error((data && (data.error || data.message)) || 'Error de operación');
+      }
+      return data;
+    }
+
+    if (btnSetup) {
+      btnSetup.addEventListener('click', async function () {
+        try {
+          btnSetup.disabled = true;
+          setTotpStatus('Generando configuración para la app autenticadora...', 'info');
+          const data = await requestJson('/user/mfa/totp/setup', 'POST', {});
+          secretValue.textContent = data.secret || '-';
+          uriValue.textContent = data.otpauthUri || '';
+          renderQr(data.otpauthUri || '');
+          codeInput.value = '';
+          setupPanel.classList.remove('d-none');
+          codeInput.focus();
+          setTotpStatus('Configura la app con la clave y luego confirma con el código generado.', 'info');
+        } catch (e) {
+          setTotpStatus(e.message || 'No fue posible iniciar la configuración.', 'danger');
+        } finally {
+          btnSetup.disabled = false;
+        }
+      });
+    }
+
+    if (btnConfirm) {
+      btnConfirm.addEventListener('click', async function () {
+        try {
+          const code = (codeInput.value || '').trim();
+          if (!code) {
+            setTotpStatus('Ingresa el código generado por la app.', 'warning');
+            return;
+          }
+          btnConfirm.disabled = true;
+          setTotpStatus('Validando código de la app...', 'info');
+          await requestJson('/user/mfa/totp/confirm', 'POST', { code: code });
+          setTotpStatus('App autenticadora activada correctamente. Recarga la página para ver el estado actualizado.', 'success');
+          setupPanel.classList.add('d-none');
+          renderQr('');
+        } catch (e) {
+          setTotpStatus(e.message || 'No fue posible confirmar el código.', 'danger');
+        } finally {
+          btnConfirm.disabled = false;
+        }
+      });
+    }
+
+    if (btnDisable) {
+      btnDisable.addEventListener('click', async function () {
+        try {
+          if (!window.confirm('¿Desactivar la app autenticadora para tu cuenta?')) {
+            return;
+          }
+          btnDisable.disabled = true;
+          setTotpStatus('Desactivando app autenticadora...', 'info');
+          await requestJson('/user/mfa/totp/disable', 'POST', {});
+          setTotpStatus('App autenticadora desactivada. Recarga la página para actualizar el estado.', 'success');
+          setupPanel.classList.add('d-none');
+          renderQr('');
+        } catch (e) {
+          setTotpStatus(e.message || 'No fue posible desactivar TOTP.', 'danger');
+        } finally {
+          btnDisable.disabled = false;
+        }
+      });
+    }
+  })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

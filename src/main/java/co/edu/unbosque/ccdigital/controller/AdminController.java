@@ -6,7 +6,6 @@ import co.edu.unbosque.ccdigital.dto.SyncPersonForm;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
-import co.edu.unbosque.ccdigital.service.DocumentDefinitionService;
 import co.edu.unbosque.ccdigital.service.ExternalToolsService;
 import co.edu.unbosque.ccdigital.service.PersonDocumentService;
 import co.edu.unbosque.ccdigital.service.PersonService;
@@ -39,7 +38,6 @@ public class AdminController {
 
     private final PersonService personService;
     private final PersonDocumentService personDocumentService;
-    private final DocumentDefinitionService documentDefinitionService;
     private final ExternalToolsService externalToolsService;
 
     /**
@@ -47,16 +45,13 @@ public class AdminController {
      *
      * @param personService servicio para operaciones sobre {@link Person}
      * @param personDocumentService servicio para operaciones sobre {@link PersonDocument}
-     * @param documentDefinitionService servicio de definiciones/catálogos de documentos
      * @param externalToolsService servicio de ejecución de herramientas externas
      */
     public AdminController(PersonService personService,
                            PersonDocumentService personDocumentService,
-                           DocumentDefinitionService documentDefinitionService,
                            ExternalToolsService externalToolsService) {
         this.personService = personService;
         this.personDocumentService = personDocumentService;
-        this.documentDefinitionService = documentDefinitionService;
         this.externalToolsService = externalToolsService;
     }
 

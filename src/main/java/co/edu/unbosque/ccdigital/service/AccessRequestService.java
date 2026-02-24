@@ -1,5 +1,6 @@
 package co.edu.unbosque.ccdigital.service;
 
+import co.edu.unbosque.ccdigital.dto.FabricDocView;
 import co.edu.unbosque.ccdigital.entity.*;
 import co.edu.unbosque.ccdigital.repository.AccessRequestRepository;
 import co.edu.unbosque.ccdigital.repository.IssuingEntityRepository;
@@ -34,6 +35,8 @@ public class AccessRequestService {
     private final IssuingEntityRepository issuingEntityRepository;
     private final PersonDocumentRepository personDocumentRepository;
     private final FileStorageService fileStorageService;
+    private final ExternalToolsService externalToolsService;
+    private final FabricLedgerCliService fabricLedgerCliService;
 
     /**
      * Inyección de dependencias del servicio.
@@ -43,19 +46,25 @@ public class AccessRequestService {
      * @param issuingEntityRepository repositorio de entidades emisoras (IssuingEntity)
      * @param personDocumentRepository repositorio de PersonDocument (incluye consultas con archivos)
      * @param fileStorageService servicio para resolver y cargar archivos desde almacenamiento
+     * @param externalToolsService servicio de ejecución de scripts externos (sync a Fabric)
+     * @param fabricLedgerCliService servicio de consulta de metadatos en Hyperledger Fabric
      */
     public AccessRequestService(
             AccessRequestRepository accessRequestRepository,
             PersonRepository personRepository,
             IssuingEntityRepository issuingEntityRepository,
             PersonDocumentRepository personDocumentRepository,
-            FileStorageService fileStorageService
+            FileStorageService fileStorageService,
+            ExternalToolsService externalToolsService,
+            FabricLedgerCliService fabricLedgerCliService
     ) {
         this.accessRequestRepository = accessRequestRepository;
         this.personRepository = personRepository;
         this.issuingEntityRepository = issuingEntityRepository;
         this.personDocumentRepository = personDocumentRepository;
         this.fileStorageService = fileStorageService;
+        this.externalToolsService = externalToolsService;
+        this.fabricLedgerCliService = fabricLedgerCliService;
     }
 
     /**
@@ -188,6 +197,10 @@ public class AccessRequestService {
      * - Actualiza status a APROBADA o RECHAZADA.
      * - Registra decidedAt.
      * - Si decisionNote viene con contenido, la guarda.
+     * - Si la decisión es aprobar:
+     *   1) sincroniza la persona en Hyperledger Fabric
+     *   2) valida que los documentos solicitados queden visibles en Fabric
+     *   3) solo entonces persiste la APROBACIÓN
      *
      * @param requestId ID de la solicitud
      * @param personId ID de la persona que decide
@@ -219,6 +232,13 @@ public class AccessRequestService {
             throw new IllegalArgumentException("La solicitud se encuentra expirada");
         }
 
+        // Si aprueba, primero sincroniza y valida trazabilidad en Fabric.
+        // Si falla, NO se aprueba la solicitud (se mantiene en PENDIENTE).
+        if (approve) {
+            syncApprovedPersonDocumentsToFabric(request);
+            validateApprovedItemsAreInFabric(request);
+        }
+
         // Actualiza estado final y fecha de decisión
         request.setStatus(approve ? AccessRequestStatus.APROBADA : AccessRequestStatus.RECHAZADA);
         request.setDecidedAt(LocalDateTime.now());
@@ -241,6 +261,8 @@ public class AccessRequestService {
      * Importante:
      * - Esta operación NO devuelve información si la solicitud no está aprobada,
      *   evitando que el emisor consulte documentos por fuera del consentimiento.
+     * - Antes de entregar el archivo, se valida trazabilidad en Fabric para asegurar
+     *   que el documento consultado se encuentre registrado on-chain.
      *
      * Selección de archivo:
      * - Si el PersonDocument tiene múltiples archivos (versiones), se elige el de mayor versión.
@@ -294,7 +316,197 @@ public class AccessRequestService {
                 .max(Comparator.comparingInt(fr -> fr.getVersion() != null ? fr.getVersion() : 0))
                 .orElseThrow(() -> new IllegalArgumentException("El documento no tiene archivos válidos"));
 
+        // Seguridad/trazabilidad: antes de entregar el archivo al emisor, se exige
+        // que el documento exista en la consulta on-chain de Fabric para la persona.
+        ensureDocumentPresentInFabric(request.getPerson(), pd, latest);
+
         // Delegación a FileStorageService para resolver la ruta y devolver un Resource
         return fileStorageService.loadAsResource(latest);
+    }
+
+    /**
+     * Sincroniza en Fabric los documentos de la persona asociada a una solicitud aprobada.
+     *
+     * <p>Se invoca únicamente cuando el usuario aprueba una solicitud. Si la sincronización falla
+     * (script no configurado, error de ejecución o timeout), se lanza una excepción de negocio para
+     * evitar que la solicitud quede marcada como aprobada sin trazabilidad en Fabric.</p>
+     *
+     * @param request solicitud que se está aprobando
+     */
+    private void syncApprovedPersonDocumentsToFabric(AccessRequest request) {
+        Person person = request.getPerson();
+        String idType = person.getIdType() != null ? person.getIdType().name() : null;
+        String idNumber = person.getIdNumber();
+
+        ExternalToolsService.ExecResult result = externalToolsService.runFabricSyncPerson(idType, idNumber);
+        if (!result.isOk()) {
+            throw new IllegalArgumentException(
+                    "No se pudo registrar la aprobación en Fabric. Intente nuevamente. Detalle: "
+                            + firstNonBlankLine(result.getStderr(), "Error de sincronización con Fabric")
+            );
+        }
+    }
+
+    /**
+     * Valida que todos los documentos solicitados en una aprobación estén visibles en la consulta de Fabric.
+     *
+     * <p>La validación se hace por coincidencia de ruta de archivo (preferido) y por título como respaldo,
+     * para reducir falsos negativos cuando Fabric expone la ruta absoluta y la BD almacena ruta relativa.</p>
+     *
+     * @param request solicitud aprobada (aún no persistida como APROBADA)
+     */
+    private void validateApprovedItemsAreInFabric(AccessRequest request) {
+        Person person = request.getPerson();
+        List<FabricDocView> fabricDocs = loadFabricDocsForPerson(person);
+
+        for (AccessRequestItem item : request.getItems()) {
+            Long personDocumentId = item.getPersonDocument() != null ? item.getPersonDocument().getId() : null;
+            if (personDocumentId == null) {
+                throw new IllegalArgumentException("La solicitud contiene un documento inválido");
+            }
+
+            PersonDocument pd = personDocumentRepository.findByIdWithFiles(personDocumentId)
+                    .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + personDocumentId));
+
+            FileRecord latest = findLatestFile(pd);
+            if (findMatchingFabricDoc(fabricDocs, pd, latest).isEmpty()) {
+                String title = pd.getDocumentDefinition() != null ? pd.getDocumentDefinition().getTitle() : "Documento";
+                throw new IllegalArgumentException(
+                        "No se pudo validar en Fabric el documento '" + title + "'. Intente nuevamente."
+                );
+            }
+        }
+    }
+
+    /**
+     * Exige que un documento específico exista en Fabric antes de entregarlo al emisor.
+     *
+     * @param person persona propietaria del documento
+     * @param pd documento solicitado
+     * @param latest archivo seleccionado para visualización
+     */
+    private void ensureDocumentPresentInFabric(Person person, PersonDocument pd, FileRecord latest) {
+        List<FabricDocView> fabricDocs = loadFabricDocsForPerson(person);
+        if (findMatchingFabricDoc(fabricDocs, pd, latest).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "El documento no está disponible en Fabric para esta persona. Solicite una nueva aprobación."
+            );
+        }
+    }
+
+    /**
+     * Consulta documentos de una persona en Fabric y traduce errores técnicos a mensajes de negocio.
+     *
+     * @param person persona propietaria
+     * @return lista de documentos visibles en Fabric
+     */
+    private List<FabricDocView> loadFabricDocsForPerson(Person person) {
+        try {
+            String idType = person.getIdType() != null ? person.getIdType().name() : "";
+            String idNumber = person.getIdNumber() != null ? person.getIdNumber() : "";
+            return fabricLedgerCliService.listDocsView(idType, idNumber);
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException(
+                    "No fue posible consultar la trazabilidad en Fabric. Intente nuevamente."
+            );
+        }
+    }
+
+    /**
+     * Selecciona el archivo de mayor versión de un documento.
+     *
+     * @param pd documento de persona con archivos cargados
+     * @return archivo más reciente
+     */
+    private FileRecord findLatestFile(PersonDocument pd) {
+        if (pd.getFiles() == null || pd.getFiles().isEmpty()) {
+            throw new IllegalArgumentException("El documento no tiene archivo asociado");
+        }
+        return pd.getFiles().stream()
+                .filter(Objects::nonNull)
+                .max(Comparator.comparingInt(fr -> fr.getVersion() != null ? fr.getVersion() : 0))
+                .orElseThrow(() -> new IllegalArgumentException("El documento no tiene archivos válidos"));
+    }
+
+    /**
+     * Busca un documento equivalente en la lista retornada por Fabric.
+     *
+     * <p>Orden de coincidencia:</p>
+     * <ol>
+     *   <li>Ruta de archivo (exacta o sufijo cuando Fabric expone ruta absoluta).</li>
+     *   <li>Título del documento (respaldo).</li>
+     * </ol>
+     *
+     * @param fabricDocs documentos visibles en Fabric
+     * @param pd documento solicitado en BD
+     * @param latest archivo local asociado
+     * @return coincidencia opcional
+     */
+    private Optional<FabricDocView> findMatchingFabricDoc(List<FabricDocView> fabricDocs, PersonDocument pd, FileRecord latest) {
+        String dbRelativePath = normalizePath(latest.getStoragePath());
+        String title = pd.getDocumentDefinition() != null ? pd.getDocumentDefinition().getTitle() : null;
+
+        return fabricDocs.stream()
+                .filter(Objects::nonNull)
+                .filter(doc -> matchesFilePath(doc.filePath(), dbRelativePath) || matchesTitle(doc.title(), title))
+                .findFirst();
+    }
+
+    /**
+     * Compara rutas considerando que BD suele guardar rutas relativas y Fabric puede retornar absolutas.
+     *
+     * @param fabricPath ruta reportada por Fabric
+     * @param dbRelativePath ruta relativa persistida en BD
+     * @return {@code true} si coinciden bajo las reglas de normalización/sufijo
+     */
+    private boolean matchesFilePath(String fabricPath, String dbRelativePath) {
+        if (fabricPath == null || fabricPath.isBlank() || dbRelativePath == null || dbRelativePath.isBlank()) {
+            return false;
+        }
+        String fabricNorm = normalizePath(fabricPath);
+        String dbNorm = normalizePath(dbRelativePath);
+        return fabricNorm.equals(dbNorm)
+                || fabricNorm.endsWith("/" + dbNorm)
+                || fabricNorm.endsWith(dbNorm);
+    }
+
+    /**
+     * Compara títulos de forma tolerante para una coincidencia de respaldo.
+     *
+     * @param fabricTitle título reportado por Fabric
+     * @param dbTitle título del documento en BD
+     * @return {@code true} si coinciden ignorando mayúsculas/minúsculas
+     */
+    private boolean matchesTitle(String fabricTitle, String dbTitle) {
+        if (fabricTitle == null || dbTitle == null) return false;
+        String a = fabricTitle.trim();
+        String b = dbTitle.trim();
+        return !a.isEmpty() && !b.isEmpty() && a.equalsIgnoreCase(b);
+    }
+
+    /**
+     * Normaliza una ruta a formato con separador {@code /} para comparaciones.
+     *
+     * @param value ruta original
+     * @return ruta normalizada
+     */
+    private String normalizePath(String value) {
+        return value == null ? "" : value.trim().replace('\\', '/');
+    }
+
+    /**
+     * Extrae la primera línea no vacía de una salida de consola para mostrar un mensaje compacto.
+     *
+     * @param text texto completo (stderr/stdout)
+     * @param fallback valor por defecto si no hay líneas útiles
+     * @return primera línea no vacía
+     */
+    private String firstNonBlankLine(String text, String fallback) {
+        if (text == null || text.isBlank()) return fallback;
+        return Arrays.stream(text.split("\\R"))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .findFirst()
+                .orElse(fallback);
     }
 }

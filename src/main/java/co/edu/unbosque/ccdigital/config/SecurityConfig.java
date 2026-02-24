@@ -189,7 +189,7 @@ public class SecurityConfig {
         http.securityMatcher("/admin/**", "/login/admin", "/admin/logout")
                 .authenticationProvider(adminAuthProvider)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login/admin").permitAll()
+                        .requestMatchers("/login/admin", "/admin/logout").permitAll()
                         .anyRequest().hasRole("GOBIERNO")
                 )
                 .formLogin(form -> form
@@ -204,6 +204,15 @@ public class SecurityConfig {
                         .logoutSuccessUrl("/login/admin?logout=true")
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
+                )
+                .sessionManagement(session -> session
+                        .invalidSessionUrl("/login/admin?expired=true")
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authEx) ->
+                                response.sendRedirect("/login/admin?expired=true"))
+                        .accessDeniedHandler((request, response, accessDeniedEx) ->
+                                response.sendRedirect("/login/admin?denied=true"))
                 );
 
         return http.build();
@@ -227,7 +236,7 @@ public class SecurityConfig {
         http.securityMatcher("/issuer/**", "/login/issuer", "/issuer/logout")
                 .authenticationProvider(issuerAuthProvider)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login/issuer").permitAll()
+                        .requestMatchers("/login/issuer", "/issuer/logout").permitAll()
                         .anyRequest().hasRole("ISSUER")
                 )
                 .formLogin(form -> form
@@ -242,6 +251,15 @@ public class SecurityConfig {
                         .logoutSuccessUrl("/login/issuer?logout=true")
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
+                )
+                .sessionManagement(session -> session
+                        .invalidSessionUrl("/login/issuer?expired=true")
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authEx) ->
+                                response.sendRedirect("/login/issuer?expired=true"))
+                        .accessDeniedHandler((request, response, accessDeniedEx) ->
+                                response.sendRedirect("/login/issuer?denied=true"))
                 );
 
         return http.build();
@@ -265,7 +283,7 @@ public class SecurityConfig {
 
         http.securityMatcher("/user/**", "/login/user", "/user/logout")
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login/user", "/user/auth/**").permitAll()
+                        .requestMatchers("/login/user", "/user/auth/**", "/user/logout").permitAll()
                         .anyRequest().hasRole("USER")
                 )
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/user/auth/**"))
@@ -279,6 +297,15 @@ public class SecurityConfig {
                         .logoutSuccessUrl("/login/user?logout=true")
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
+                )
+                .sessionManagement(session -> session
+                        .invalidSessionUrl("/login/user?expired=true")
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authEx) ->
+                                response.sendRedirect("/login/user?expired=true"))
+                        .accessDeniedHandler((request, response, accessDeniedEx) ->
+                                response.sendRedirect("/login/user?denied=true"))
                 );
 
         return http.build();

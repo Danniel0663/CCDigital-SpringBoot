@@ -24,7 +24,16 @@
     <div class="col-12 col-md-7 col-lg-5">
       <div class="cc-card p-4 p-md-5">
         <h1 class="h4 mb-1">Ingreso Emisor</h1>
-        <p class="text-muted mb-4">Acceso para entidades emisoras.</p>
+        <p class="cc-help-text mb-3">Acceso para entidades emisoras autorizadas.</p>
+
+        <div class="cc-hero mb-3">
+          <div class="fw-semibold small mb-1">
+            <i class="bi bi-info-circle me-1"></i>Recomendación
+          </div>
+          <div class="small text-muted">
+            Usa el correo configurado para tu entidad y verifica que la contraseña esté actualizada.
+          </div>
+        </div>
 
         <div th:if="${param.error}" class="alert alert-danger py-2 mb-3">
           Credenciales inválidas.
@@ -32,8 +41,14 @@
         <div th:if="${param.logout}" class="alert alert-success py-2 mb-3">
           Sesión cerrada correctamente.
         </div>
+        <div th:if="${param.expired}" class="alert alert-warning py-2 mb-3">
+          Tu sesión expiró. Ingresa nuevamente.
+        </div>
+        <div th:if="${param.denied}" class="alert alert-warning py-2 mb-3">
+          No tienes permisos para acceder a esa página.
+        </div>
 
-        <form th:action="@{/login/issuer}" method="post" class="vstack gap-3">
+        <form th:action="@{/login/issuer}" method="post" class="vstack gap-3" novalidate>
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
           <div>

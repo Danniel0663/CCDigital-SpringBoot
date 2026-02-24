@@ -66,11 +66,11 @@ public class UserAccountService {
      * </ul>
      *
      * @param form formulario de registro
-     * @return correo asociado al usuario creado
+     * @return usuario creado (persistido) con datos de acceso
      * @throws IllegalArgumentException si falta información requerida o alguna validación de negocio falla
      */
     @Transactional
-    public String registerFromExistingPerson(UserRegisterForm form) {
+    public AppUser registerFromExistingPerson(UserRegisterForm form) {
         String idTypeValue = normalize(form == null ? null : form.getIdType());
         String idNumberNorm = normalize(form == null ? null : form.getIdNumber());
         String firstNameValue = normalize(form == null ? null : form.getFirstName());
@@ -116,14 +116,20 @@ public class UserAccountService {
             throw new IllegalArgumentException("Tipo de identificación inválido.");
         }
 
-        Person person = personRepository.findByIdNumber(idNumberNorm)
+        Person person = personRepository.findByIdTypeAndIdNumber(idType, idNumberNorm)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "No existe una persona registrada con esa identificación."
+                        "No existe una persona registrada con ese tipo y número de identificación."
                 ));
 
-        if (appUserRepository.existsById(person.getId())) {
-            throw new IllegalArgumentException("Ya existe un usuario asociado a esta persona.");
-        }
+        appUserRepository.findById(person.getId()).ifPresent(existingUser -> {
+            throw new IllegalArgumentException(
+                    "Ya existe un usuario asociado a esta persona (correo: "
+                            + normalize(existingUser.getEmail())
+                            + ", rol: "
+                            + normalize(existingUser.getRole())
+                            + ")."
+            );
+        });
 
         appUserRepository.findByEmailIgnoreCase(emailValue).ifPresent(existing -> {
             if (!existing.getPersonId().equals(person.getId())) {
@@ -131,12 +137,8 @@ public class UserAccountService {
             }
         });
 
-        person.setIdType(idType);
-        person.setFirstName(firstNameValue);
-        person.setLastName(lastNameValue);
-        person.setEmail(emailValue);
-        person.setPhone(phoneValue);
-        person.setBirthdate(birthdateValue);
+        validateIdentityFieldsAgainstPerson(person, firstNameValue, lastNameValue);
+        updateContactDataIfChanged(person, emailValue, phoneValue, birthdateValue);
 
         AppUser user = new AppUser();
         user.setPersonId(person.getId());
@@ -146,14 +148,59 @@ public class UserAccountService {
         user.setRole(USER_ROLE);
         user.setIsActive(Boolean.TRUE);
 
-        personRepository.save(person);
-        appUserRepository.save(user);
-        return emailValue;
+        personRepository.saveAndFlush(person);
+        return appUserRepository.save(user);
     }
 
     private String buildFullName(Person person) {
         String fullName = normalize(person.getFullName());
         return fullName.isBlank() ? person.getIdNumber() : fullName;
+    }
+
+    /**
+     * Valida que los nombres/apellidos ingresados coincidan con la persona ya registrada.
+     *
+     * <p>La identificación (tipo y número) ya fue validada previamente para ubicar la persona.
+     * Esta comprobación evita que se creen usuarios usando una identificación válida con nombres
+     * diferentes a los registrados.</p>
+     *
+     * @param person persona encontrada en base de datos
+     * @param firstNameValue nombres ingresados en el formulario
+     * @param lastNameValue apellidos ingresados en el formulario
+     */
+    private void validateIdentityFieldsAgainstPerson(Person person, String firstNameValue, String lastNameValue) {
+        String dbFirstName = normalize(person.getFirstName());
+        String dbLastName = normalize(person.getLastName());
+
+        if (!dbFirstName.equalsIgnoreCase(normalize(firstNameValue))
+                || !dbLastName.equalsIgnoreCase(normalize(lastNameValue))) {
+            throw new IllegalArgumentException(
+                    "Los nombres o apellidos no coinciden con la persona registrada para esa identificación."
+            );
+        }
+    }
+
+    /**
+     * Actualiza en {@code persons} únicamente los datos de contacto que difieran de lo ingresado.
+     *
+     * @param person persona a actualizar
+     * @param emailValue correo ingresado
+     * @param phoneValue teléfono ingresado
+     * @param birthdateValue fecha de nacimiento ingresada
+     */
+    private void updateContactDataIfChanged(Person person,
+                                            String emailValue,
+                                            String phoneValue,
+                                            java.time.LocalDate birthdateValue) {
+        if (!normalize(person.getEmail()).equalsIgnoreCase(normalize(emailValue))) {
+            person.setEmail(emailValue);
+        }
+        if (!normalize(person.getPhone()).equals(normalize(phoneValue))) {
+            person.setPhone(phoneValue);
+        }
+        if (person.getBirthdate() == null || !person.getBirthdate().equals(birthdateValue)) {
+            person.setBirthdate(birthdateValue);
+        }
     }
 
     private String normalize(String value) {
