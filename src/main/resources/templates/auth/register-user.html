@@ -53,6 +53,37 @@
           </div>
         </div>
 
+        <div th:if="${awaitingRegisterEmailVerification}" class="cc-form-section mb-3">
+          <div class="cc-section-title">
+            <i class="bi bi-envelope-check"></i>Verificar correo electrónico
+          </div>
+          <p class="small text-muted mb-2">
+            Enviamos un código al correo
+            <strong th:text="${registerEmailVerificationMaskedEmail}">co***@mail.com</strong>.
+            Ingresa ese código para completar el registro.
+          </p>
+          <div th:if="${registerEmailVerificationNextStepTotp}" class="small text-muted mb-2">
+            Después de validar el correo, podrás configurar el autenticador de celular (porque marcaste esa opción).
+          </div>
+          <div th:if="${verifyEmailError}" class="alert alert-danger py-2 mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <span th:text="${verifyEmailError}">Código inválido</span>
+          </div>
+
+          <form method="post" th:action="@{/register/user}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <input type="hidden" name="registrationEmailToken" th:value="${registerEmailVerificationToken}" />
+            <div class="mb-3">
+              <label for="registrationEmailCode" class="form-label">Código de verificación</label>
+              <input id="registrationEmailCode" class="form-control" type="text" inputmode="numeric" maxlength="8"
+                     name="registrationEmailCode" placeholder="Código de 6 dígitos" required />
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-check2-circle me-2"></i>Verificar correo y continuar
+            </button>
+          </form>
+        </div>
+
         <div th:if="${showRegisterTotpSetup}" class="cc-form-section mb-3" id="registerTotpPanel"
              th:attr="data-person-id=${registerTotpPersonId},data-otpauth-uri=${registerTotpOtpAuthUri}">
           <div class="cc-section-title">
@@ -106,7 +137,8 @@
           </a>
         </div>
 
-        <form method="post" th:if="${showRegisterTotpSetup == null or !showRegisterTotpSetup}"
+        <form method="post"
+              th:if="${(showRegisterTotpSetup == null or !showRegisterTotpSetup) and (awaitingRegisterEmailVerification == null or !awaitingRegisterEmailVerification)}"
               th:action="@{/register/user}" th:object="${form}">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
 
@@ -202,11 +234,12 @@
           </div>
 
           <button type="submit" class="btn btn-primary w-100 mt-3">
-            <i class="bi bi-person-check me-2"></i>Crear usuario
+            <i class="bi bi-envelope-check me-2"></i>Enviar código y continuar
           </button>
         </form>
 
-        <div class="mt-3 text-center" th:if="${showRegisterTotpSetup == null or !showRegisterTotpSetup}">
+        <div class="mt-3 text-center"
+             th:if="${(showRegisterTotpSetup == null or !showRegisterTotpSetup) and (awaitingRegisterEmailVerification == null or !awaitingRegisterEmailVerification)}">
           <a href="/login/user" class="small text-decoration-none">
             Ya tengo cuenta. Ir a iniciar sesión
           </a>
