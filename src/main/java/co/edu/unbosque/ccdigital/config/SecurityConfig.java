@@ -5,10 +5,12 @@ import co.edu.unbosque.ccdigital.entity.EntityUser;
 import co.edu.unbosque.ccdigital.repository.AppUserRepository;
 import co.edu.unbosque.ccdigital.repository.EntityUserRepository;
 import co.edu.unbosque.ccdigital.security.IssuerPrincipal;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,6 +20,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -33,6 +36,7 @@ import org.springframework.security.web.SecurityFilterChain;
  *   <li><strong>Admin</strong>: rutas {@code /admin/**} y {@code /login/admin}.</li>
  *   <li><strong>Issuer</strong>: rutas {@code /issuer/**} y {@code /login/issuer}.</li>
  *   <li><strong>User</strong>: rutas {@code /user/**} y {@code /login/user} (incluye endpoints AJAX en {@code /user/auth/**}).</li>
+ *   <li><strong>API</strong>: rutas {@code /api/**} restringidas a administración.</li>
  *   <li><strong>Default</strong>: rutas públicas (home y recursos estáticos).</li>
  * </ul>
  *
@@ -48,6 +52,9 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    @Value("${app.security.require-https:false}")
+    private boolean requireHttps;
 
     /**
      * Encoder de contraseñas para hashes BCrypt.
@@ -185,7 +192,7 @@ public class SecurityConfig {
             HttpSecurity http,
             @Qualifier("adminAuthProvider") AuthenticationProvider adminAuthProvider
     ) throws Exception {
-
+        applyCommonHardening(http);
         http.securityMatcher("/admin/**", "/login/admin", "/admin/logout")
                 .authenticationProvider(adminAuthProvider)
                 .authorizeHttpRequests(auth -> auth
@@ -232,7 +239,7 @@ public class SecurityConfig {
             HttpSecurity http,
             @Qualifier("issuerAuthProvider") AuthenticationProvider issuerAuthProvider
     ) throws Exception {
-
+        applyCommonHardening(http);
         http.securityMatcher("/issuer/**", "/login/issuer", "/issuer/logout")
                 .authenticationProvider(issuerAuthProvider)
                 .authorizeHttpRequests(auth -> auth
@@ -280,13 +287,12 @@ public class SecurityConfig {
     @Bean
     @Order(3)
     public SecurityFilterChain userSecurityFilterChain(HttpSecurity http) throws Exception {
-
+        applyCommonHardening(http);
         http.securityMatcher("/user/**", "/login/user", "/user/logout")
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login/user", "/user/auth/**", "/user/logout").permitAll()
                         .anyRequest().hasRole("USER")
                 )
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/user/auth/**"))
                 .formLogin(form -> form
                         .loginPage("/login/user")
                         .defaultSuccessUrl("/user/dashboard", true)
@@ -312,6 +318,43 @@ public class SecurityConfig {
     }
 
     /**
+     * Cadena de seguridad para APIs REST internas.
+     *
+     * <p>Se restringe a personal administrativo para evitar exposición pública de recursos
+     * consultables por ID bajo {@code /api/**} (personas, documentos, definiciones, archivos).</p>
+     *
+     * @param http builder de seguridad HTTP
+     * @return cadena para APIs internas
+     * @throws Exception en caso de error de configuración
+     */
+    /**
+     * Cadena de seguridad para APIs REST internas ({@code /api/**}).
+     *
+     * <p>Se restringe a administración para evitar exposición por URLs directas con IDs predecibles
+     * (personas, documentos, archivos y catálogos).</p>
+     *
+     * @param http builder de seguridad HTTP
+     * @return cadena para APIs internas
+     * @throws Exception en caso de error de configuración
+     */
+    @Bean
+    @Order(4)
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+        applyCommonHardening(http);
+        http.securityMatcher("/api/**")
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().hasRole("GOBIERNO")
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authEx) ->
+                                response.sendRedirect("/login/admin?denied=true"))
+                        .accessDeniedHandler((request, response, accessDeniedEx) ->
+                                response.sendRedirect("/login/admin?denied=true"))
+                );
+        return http.build();
+    }
+
+    /**
      * Cadena por defecto para recursos públicos.
      *
      * @param http builder de seguridad HTTP
@@ -321,13 +364,64 @@ public class SecurityConfig {
     @Bean
     @Order(99)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+        applyCommonHardening(http);
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                         "/", "/login",
+                        "/error",
+                        "/register/user", "/register/user/**",
+                        "/login/user", "/login/user/forgot",
+                        "/login/admin", "/login/issuer",
+                        "/user", "/user/login",
+                        "/favicon.ico",
                         "/css/**", "/js/**", "/images/**", "/webjars/**"
                 ).permitAll()
-                .anyRequest().permitAll()
+                .anyRequest().denyAll()
         );
         return http.build();
+    }
+
+    /**
+     * Aplica endurecimiento HTTP común a todas las cadenas de seguridad.
+     *
+     * <p>Incluye headers de seguridad, CSP compatible con los templates actuales (CDN + scripts inline)
+     * y forzado opcional de HTTPS por propiedad.</p>
+     *
+     * @param http builder de seguridad HTTP
+     */
+    private void applyCommonHardening(HttpSecurity http) {
+        try {
+            // Activación opcional por propiedad para entornos detrás de HTTPS/proxy.
+            if (requireHttps) {
+                http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
+            }
+
+            http.headers(headers -> {
+                headers.contentTypeOptions(Customizer.withDefaults());
+                headers.referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN));
+                headers.frameOptions(frame -> frame.deny());
+                headers.httpStrictTransportSecurity(hsts -> hsts
+                        .includeSubDomains(true)
+                        .maxAgeInSeconds(31536000));
+                headers.permissionsPolicy(policy -> policy
+                        .policy("geolocation=(), camera=(), microphone=(), payment=()"));
+                // CSP permisiva controlada para compatibilidad con CDN actuales e inline scripts
+                // de Thymeleaf (Bootstrap/QR/login JS). Se puede endurecer más al migrar JS inline.
+                headers.contentSecurityPolicy(csp -> csp.policyDirectives(
+                        "default-src 'self'; " +
+                                "base-uri 'self'; " +
+                                "frame-ancestors 'none'; " +
+                                "object-src 'none'; " +
+                                "form-action 'self'; " +
+                                "connect-src 'self'; " +
+                                "img-src 'self' data: blob:; " +
+                                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
+                                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; " +
+                                "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com;"
+                ));
+            });
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo aplicar endurecimiento HTTP común", e);
+        }
     }
 }
