@@ -13,9 +13,9 @@
 <body class="bg-body-tertiary">
 <nav class="navbar cc-navbar">
   <div class="container d-flex justify-content-between align-items-center">
-    <span class="navbar-brand fw-semibold cc-brand">
+    <a href="/" class="navbar-brand fw-semibold cc-brand text-decoration-none">
       <i class="bi bi-person-badge me-2"></i>CCDigital · Usuario
-    </span>
+    </a>
   </div>
 </nav>
 
@@ -207,6 +207,7 @@
         return;
       }
 
+      window.CCDigitalLoader?.show('Validando datos y preparando verificación...');
       setBusy(true, 'Validando...');
       resetOtpSection();
       currentPresExId = null;
@@ -228,6 +229,7 @@
             clearInterval(pollTimer);
             pollTimer = null;
             setBusy(false);
+            window.CCDigitalLoader?.hide(true);
             showOtpSection({ method: pollRes.otpMethod || 'email', maskedEmail: pollRes.maskedEmail || '' });
             setStatus(pollRes.message || 'Se envió un código de verificación al correo.', 'info');
             return;
@@ -236,6 +238,7 @@
           if (pollRes.authenticated) {
             clearInterval(pollTimer);
             pollTimer = null;
+            window.CCDigitalLoader?.update('Ingreso validado. Redirigiendo...');
             setStatus('Verificación completa. Redirigiendo...', 'success');
             window.location.href = pollRes.redirectUrl || '/user/dashboard';
             return;
@@ -245,20 +248,24 @@
             clearInterval(pollTimer);
             pollTimer = null;
             setBusy(false);
+            window.CCDigitalLoader?.hide(true);
             setStatus('Se agotó el tiempo de espera. Intenta nuevamente.', 'warning');
             return;
           }
 
+          window.CCDigitalLoader?.update('Verificando credencial digital...');
           setStatus('Estamos verificando tu credencial. Estado: ' + (pollRes.state || '...'), 'info');
         } catch (e) {
           clearInterval(pollTimer);
           pollTimer = null;
           setBusy(false);
+          window.CCDigitalLoader?.hide(true);
           setStatus(e.message || 'No pudimos consultar el estado de verificación.', 'danger');
         }
       }, 700);
 
     } catch (e) {
+      window.CCDigitalLoader?.hide(true);
       setBusy(false);
       setStatus(e.message || 'No fue posible iniciar la validación.', 'danger');
     }
@@ -266,13 +273,16 @@
 
   btnOtpVerify.addEventListener('click', async () => {
     try {
+      window.CCDigitalLoader?.show('Validando código de seguridad...');
       const code = (otpCodeEl.value || '').trim();
       if (!currentPresExId) {
         resetOtpSection();
+        window.CCDigitalLoader?.hide(true);
         setStatus('La sesión de validación expiró. Inicia nuevamente.', 'warning');
         return;
       }
       if (!code) {
+        window.CCDigitalLoader?.hide(true);
         setStatus('Ingresa el código de verificación.', 'warning');
         return;
       }
@@ -282,13 +292,16 @@
       const res = await postJson('/user/auth/otp/verify', { presExId: currentPresExId, code });
 
       if (res.authenticated) {
+        window.CCDigitalLoader?.update('Ingreso confirmado. Redirigiendo...');
         setStatus('Verificación completa. Redirigiendo...', 'success');
         window.location.href = res.redirectUrl || '/user/dashboard';
         return;
       }
 
+      window.CCDigitalLoader?.hide(true);
       setStatus('No fue posible validar el código.', 'danger');
     } catch (e) {
+      window.CCDigitalLoader?.hide(true);
       if ((e.message || '').toLowerCase().includes('expir')) {
         resetOtpSection();
         currentPresExId = null;
@@ -300,6 +313,7 @@
   });
 </script>
 
+<script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

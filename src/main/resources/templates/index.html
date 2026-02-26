@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CCDigital: plataforma para gestionar documentos ciudadanos con seguridad, trazabilidad y validación de identidad.">
+  <title>CCDigital · Ciudadanía Digital Segura</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/ccdigital.css">
+
+  <style>
+    body.cc-landing{
+      font-family: "Manrope", sans-serif;
+      background:
+        radial-gradient(circle at 15% 15%, rgba(33, 104, 248, .14), transparent 38%),
+        radial-gradient(circle at 88% 10%, rgba(15, 157, 88, .10), transparent 35%),
+        linear-gradient(180deg, #f5f8ff 0%, #eef3fb 55%, #f8fafc 100%);
+      color: #0f172a;
+    }
+
+    .landing-shell{
+      position: relative;
+      overflow: hidden;
+    }
+
+    .landing-shell::before{
+      content: "";
+      position: absolute;
+      inset: -120px auto auto -120px;
+      width: 320px;
+      height: 320px;
+      border-radius: 28% 72% 58% 42% / 34% 36% 64% 66%;
+      background: linear-gradient(145deg, rgba(47,111,237,.18), rgba(15,23,42,.04));
+      filter: blur(2px);
+      pointer-events: none;
+    }
+
+    .landing-shell::after{
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: 120px;
+      width: 220px;
+      height: 220px;
+      border-radius: 999px;
+      border: 22px solid rgba(15, 157, 88, .08);
+      pointer-events: none;
+    }
+
+    .cc-gov-strip{
+      background: linear-gradient(90deg, #0b3d91, #1f5fbf);
+      color: #fff;
+      font-size: .86rem;
+      border-bottom: 1px solid rgba(255,255,255,.18);
+    }
+
+    .cc-gov-strip .container{
+      min-height: 38px;
+    }
+
+    .cc-landing-nav{
+      background: rgba(255,255,255,.86);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(15,23,42,.08);
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+    }
+
+    .cc-landing-brand{
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      color: #0f172a;
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      text-decoration: none;
+    }
+
+    .cc-landing-brand .badge-icon{
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, #ffffff 0%, #eaf1ff 100%);
+      border: 1px solid rgba(47,111,237,.2);
+      box-shadow: 0 8px 20px rgba(47,111,237,.12);
+      color: #2f6fed;
+    }
+
+    .hero-wrap{
+      padding: 2.3rem 0 1rem;
+    }
+
+    .hero-card{
+      border: 1px solid rgba(15,23,42,.08);
+      background:
+        linear-gradient(160deg, rgba(255,255,255,.98), rgba(247,250,255,.98)),
+        linear-gradient(90deg, rgba(47,111,237,.08), transparent);
+      border-radius: 1.25rem;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, .08);
+      padding: 1.1rem;
+    }
+
+    .hero-panel{
+      border-radius: 1rem;
+      border: 1px solid rgba(15,23,42,.07);
+      background: #fff;
+      padding: 1rem;
+      box-shadow: 0 8px 20px rgba(15,23,42,.05);
+      height: 100%;
+    }
+
+    .hero-eyebrow{
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .35rem .65rem;
+      border-radius: 999px;
+      border: 1px solid rgba(47,111,237,.15);
+      background: rgba(47,111,237,.06);
+      color: #1f4fb5;
+      font-size: .82rem;
+      font-weight: 700;
+    }
+
+    .hero-title{
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -.03em;
+      font-size: clamp(1.95rem, 4vw, 3.15rem);
+      margin: .9rem 0 .7rem;
+      color: #0f172a;
+    }
+
+    .hero-title .accent{
+      color: #1f5fd6;
+    }
+
+    .hero-lead{
+      color: #475467;
+      font-size: 1rem;
+      max-width: 62ch;
+      margin-bottom: 1rem;
+    }
+
+    .cta-group{
+      display: flex;
+      flex-wrap: wrap;
+      gap: .65rem;
+      margin-bottom: .9rem;
+    }
+
+    .btn-landing-primary{
+      background: linear-gradient(180deg, #2f6fed 0%, #245ed7 100%);
+      border: none;
+      box-shadow: 0 10px 18px rgba(47,111,237,.2);
+    }
+
+    .btn-landing-primary:hover{
+      background: linear-gradient(180deg, #2b66e6 0%, #1f56c7 100%);
+    }
+
+    .hero-trust{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: .6rem;
+      margin-top: .85rem;
+    }
+
+    .trust-pill{
+      border-radius: .9rem;
+      border: 1px solid rgba(15,23,42,.08);
+      background: rgba(255,255,255,.88);
+      padding: .7rem .75rem;
+      display: flex;
+      align-items: flex-start;
+      gap: .55rem;
+      min-height: 74px;
+    }
+
+    .trust-pill i{
+      color: #2f6fed;
+      font-size: 1rem;
+      margin-top: .1rem;
+    }
+
+    .trust-pill small{
+      color: #475467;
+      display: block;
+      line-height: 1.25;
+    }
+
+    .module-grid{
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: 1fr;
+    }
+
+    .module-card{
+      border: 1px solid rgba(15,23,42,.08);
+      border-radius: 1rem;
+      background: linear-gradient(180deg, #fff 0%, #fafcff 100%);
+      padding: .95rem;
+      box-shadow: 0 10px 20px rgba(15,23,42,.05);
+      display: flex;
+      flex-direction: column;
+      gap: .65rem;
+    }
+
+    .module-card .icon{
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 1.15rem;
+      border: 1px solid rgba(15,23,42,.08);
+    }
+
+    .module-card.user .icon{ background: rgba(47,111,237,.08); color: #2f6fed; }
+    .module-card.issuer .icon{ background: rgba(14,165,233,.08); color: #0284c7; }
+    .module-card.admin .icon{ background: rgba(245,158,11,.08); color: #d97706; }
+
+    .module-card h3{
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 1rem;
+      margin: 0;
+    }
+
+    .module-card p{
+      color: #475467;
+      margin: 0;
+      font-size: .92rem;
+    }
+
+    .module-links{
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem;
+      margin-top: auto;
+    }
+
+    .section-block{
+      margin-top: 1rem;
+      border-radius: 1.1rem;
+      border: 1px solid rgba(15,23,42,.08);
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 10px 24px rgba(15,23,42,.05);
+      padding: 1rem;
+    }
+
+    .section-title{
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 1.25rem;
+      margin: 0 0 .25rem;
+      letter-spacing: -.02em;
+    }
+
+    .section-sub{
+      color: #475467;
+      margin-bottom: .85rem;
+    }
+
+    .step-grid{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: .75rem;
+    }
+
+    .step-card{
+      border: 1px solid rgba(15,23,42,.08);
+      border-radius: 1rem;
+      background: #fff;
+      padding: .85rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .step-no{
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #2f6fed, #245ed7);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: .92rem;
+      margin-bottom: .55rem;
+    }
+
+    .step-card h4{
+      font-size: .98rem;
+      margin: 0 0 .35rem;
+      font-weight: 700;
+    }
+
+    .step-card p{
+      margin: 0;
+      color: #475467;
+      font-size: .9rem;
+    }
+
+    .security-grid{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: .75rem;
+    }
+
+    .security-card{
+      border-radius: 1rem;
+      padding: .95rem;
+      background: linear-gradient(180deg, #fff, #fbfcff);
+      border: 1px solid rgba(15,23,42,.08);
+    }
+
+    .security-card .title{
+      font-weight: 700;
+      margin-bottom: .35rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .security-card p{
+      margin: 0;
+      color: #475467;
+      font-size: .9rem;
+    }
+
+    .audience-grid{
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .audience-card{
+      border: 1px solid rgba(15,23,42,.08);
+      border-radius: 1rem;
+      background: #fff;
+      padding: .95rem;
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+
+    .audience-card ul{
+      margin: 0;
+      padding-left: 1rem;
+      color: #475467;
+      font-size: .9rem;
+    }
+
+    .audience-card li + li{ margin-top: .25rem; }
+
+    .footer-note{
+      color: #667085;
+      font-size: .88rem;
+    }
+
+    @media (min-width: 992px) {
+      .hero-card{ padding: 1.25rem; }
+      .module-grid{ grid-template-columns: repeat(3, 1fr); }
+      .hero-wrap{ padding-top: 2.8rem; }
+    }
+  </style>
+</head>
+
+<body class="cc-landing">
+<div class="cc-gov-strip">
+  <div class="container d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-building-check me-2"></i>Plataforma académica de ciudadanía digital</span>
+    <span class="d-none d-md-inline">Gestión segura de documentos y trazabilidad con tecnologías descentralizadas</span>
+  </div>
+</div>
+
+<nav class="navbar cc-landing-nav">
+  <div class="container py-2 d-flex align-items-center justify-content-between gap-2">
+    <a href="/" class="cc-landing-brand">
+      <span class="badge-icon"><i class="bi bi-person-vcard"></i></span>
+      <span>CCDigital</span>
+    </a>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/login/user" class="btn btn-primary btn-sm btn-landing-primary">
+        <i class="bi bi-person-check me-1"></i>Ingresar
+      </a>
+      <a href="/register/user" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-person-plus me-1"></i>Registrarme
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main class="landing-shell">
+  <div class="container hero-wrap">
+    <section class="hero-card">
+      <div class="row g-3 align-items-stretch">
+        <div class="col-12 col-lg-7">
+          <div class="hero-panel">
+            <span class="hero-eyebrow">
+              <i class="bi bi-shield-lock"></i>Ciudadanía digital con enfoque en seguridad y trazabilidad
+            </span>
+
+            <h1 class="hero-title">
+              Tu información, tus decisiones, tu
+              <span class="accent">control digital</span>
+            </h1>
+
+            <p class="hero-lead">
+              CCDigital centraliza documentos ciudadanos, permite solicitudes controladas de acceso por entidades
+              emisoras y valida identidad con mecanismos de seguridad avanzados antes de compartir información.
+            </p>
+
+            <div class="cta-group">
+              <a href="/login/user" class="btn btn-primary btn-landing-primary">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Ingresar como ciudadano
+              </a>
+              <a href="/register/user" class="btn btn-outline-primary">
+                <i class="bi bi-person-plus me-2"></i>Crear cuenta
+              </a>
+              <a href="/login/issuer" class="btn btn-outline-secondary">
+                <i class="bi bi-diagram-3 me-2"></i>Módulo emisor
+              </a>
+            </div>
+
+            <div class="hero-trust">
+              <div class="trust-pill">
+                <i class="bi bi-person-bounding-box"></i>
+                <div>
+                  <strong class="d-block small">Validación de identidad</strong>
+                  <small>Inicio de sesión con verificación de credencial digital.</small>
+                </div>
+              </div>
+              <div class="trust-pill">
+                <i class="bi bi-envelope-check"></i>
+                <div>
+                  <strong class="d-block small">Verificación por correo</strong>
+                  <small>Códigos temporales en registro, recuperación y acceso.</small>
+                </div>
+              </div>
+              <div class="trust-pill">
+                <i class="bi bi-phone"></i>
+                <div>
+                  <strong class="d-block small">Autenticador móvil (TOTP)</strong>
+                  <small>Compatible con Aegis, Google Authenticator y Microsoft Authenticator.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+          <div class="hero-panel">
+            <h2 class="section-title mb-2">Acceso a módulos</h2>
+            <p class="section-sub mb-3">Selecciona el perfil con el que vas a trabajar en la plataforma.</p>
+
+            <div class="module-grid">
+              <article class="module-card user">
+                <div class="icon"><i class="bi bi-person-heart"></i></div>
+                <h3>Ciudadano / Usuario</h3>
+                <p>Consulta tus solicitudes, aprueba o rechaza acceso a documentos y gestiona tu seguridad de cuenta.</p>
+                <div class="module-links">
+                  <a href="/login/user" class="btn btn-sm btn-primary btn-landing-primary">Ingresar</a>
+                  <a href="/register/user" class="btn btn-sm btn-outline-primary">Registro</a>
+                </div>
+              </article>
+
+              <article class="module-card issuer">
+                <div class="icon"><i class="bi bi-buildings"></i></div>
+                <h3>Entidad Emisora</h3>
+                <p>Solicita acceso a documentos aprobados y consulta la información solo con consentimiento del ciudadano.</p>
+                <div class="module-links">
+                  <a href="/login/issuer" class="btn btn-sm btn-outline-secondary">Ingreso emisor</a>
+                </div>
+              </article>
+
+              <article class="module-card admin">
+                <div class="icon"><i class="bi bi-shield-gear"></i></div>
+                <h3>Administración</h3>
+                <p>Gestiona catálogo de personas, documentos, revisiones y procesos de sincronización con redes externas.</p>
+                <div class="module-links">
+                  <a href="/login/admin" class="btn btn-sm btn-outline-dark">Ingreso admin</a>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-block mt-4">
+      <h2 class="section-title">Cómo funciona</h2>
+      <p class="section-sub">Flujo pensado para que el usuario entienda y controle qué entidad accede a su información.</p>
+      <div class="step-grid">
+        <article class="step-card">
+          <div class="step-no">1</div>
+          <h4>Registro y validación del correo</h4>
+          <p>El usuario completa sus datos, verifica el correo con un código y puede activar autenticador móvil desde el inicio.</p>
+        </article>
+        <article class="step-card">
+          <div class="step-no">2</div>
+          <h4>Ingreso seguro</h4>
+          <p>Se validan credenciales, credencial digital y un segundo factor (app autenticadora o código por correo).</p>
+        </article>
+        <article class="step-card">
+          <div class="step-no">3</div>
+          <h4>Consentimiento explícito</h4>
+          <p>La entidad emisora solicita documentos y el ciudadano decide aprobar o rechazar con fecha y trazabilidad registrada.</p>
+        </article>
+        <article class="step-card">
+          <div class="step-no">4</div>
+          <h4>Trazabilidad y consulta</h4>
+          <p>Los documentos aprobados se validan y sincronizan para garantizar integridad, origen y control de visualización.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <h2 class="section-title">Seguridad y trazabilidad del proyecto</h2>
+      <p class="section-sub">La plataforma combina controles de aplicación con verificación de identidad y registro de evidencia.</p>
+      <div class="security-grid">
+        <article class="security-card">
+          <div class="title"><i class="bi bi-key"></i>Contraseñas protegidas</div>
+          <p>Las contraseñas se almacenan con hash BCrypt y nunca se guardan en texto plano.</p>
+        </article>
+        <article class="security-card">
+          <div class="title"><i class="bi bi-person-vcard"></i>Credenciales verificables</div>
+          <p>El ingreso de usuario valida credenciales digitales antes de completar la autenticación de sesión.</p>
+        </article>
+        <article class="security-card">
+          <div class="title"><i class="bi bi-shield-check"></i>MFA por correo y app</div>
+          <p>Se soporta doble factor con códigos temporales por correo y TOTP compatible con apps de autenticación.</p>
+        </article>
+        <article class="security-card">
+          <div class="title"><i class="bi bi-diagram-2"></i>Trazabilidad on-chain</div>
+          <p>La integración con Hyperledger Fabric permite validar la existencia y origen de documentos aprobados.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <h2 class="section-title">¿Qué puede hacer cada perfil?</h2>
+      <p class="section-sub">Una experiencia separada por módulos para reducir errores y hacer más clara la operación.</p>
+      <div class="audience-grid">
+        <article class="audience-card">
+          <h3 class="h6 mb-1"><i class="bi bi-person me-2 text-primary"></i>Usuario / Ciudadano</h3>
+          <ul>
+            <li>Registrarse y verificar correo.</li>
+            <li>Activar autenticación con app móvil (QR o clave manual).</li>
+            <li>Aceptar o rechazar solicitudes de acceso.</li>
+            <li>Visualizar el estado y fecha de cada decisión.</li>
+          </ul>
+          <div class="mt-1">
+            <a href="/login/user" class="btn btn-sm btn-primary btn-landing-primary me-1">Ingresar</a>
+            <a href="/register/user" class="btn btn-sm btn-outline-primary">Registrarme</a>
+          </div>
+        </article>
+
+        <article class="audience-card">
+          <h3 class="h6 mb-1"><i class="bi bi-buildings me-2 text-info"></i>Entidad Emisora</h3>
+          <ul>
+            <li>Buscar personas y gestionar solicitudes de acceso.</li>
+            <li>Consultar solicitudes aprobadas/rechazadas y sus fechas.</li>
+            <li>Visualizar documentos solo cuando exista consentimiento y trazabilidad válida.</li>
+          </ul>
+          <div class="mt-1">
+            <a href="/login/issuer" class="btn btn-sm btn-outline-secondary">Ingreso emisor</a>
+          </div>
+        </article>
+
+        <article class="audience-card">
+          <h3 class="h6 mb-1"><i class="bi bi-shield-gear me-2 text-warning"></i>Administrador</h3>
+          <ul>
+            <li>Administrar personas, documentos y revisiones.</li>
+            <li>Controlar sincronización con servicios externos.</li>
+            <li>Supervisar el flujo integral de ciudadanía digital.</li>
+          </ul>
+          <div class="mt-1">
+            <a href="/login/admin" class="btn btn-sm btn-outline-dark">Ingreso admin</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="py-4 px-1">
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-2">
+        <div class="footer-note">
+          <strong>CCDigital</strong> · Proyecto de ciudadanía digital con enfoque en seguridad, usabilidad y trazabilidad.
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="/login/user" class="btn btn-sm btn-outline-primary">Ingresar</a>
+          <a href="/register/user" class="btn btn-sm btn-outline-primary">Crear cuenta</a>
+          <a href="/login/issuer" class="btn btn-sm btn-outline-secondary">Emisor</a>
+          <a href="/login/admin" class="btn btn-sm btn-outline-dark">Admin</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+</main>
+</body>
+</html>

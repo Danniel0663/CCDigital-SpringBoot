@@ -41,6 +41,14 @@ public record FabricDocView(
         Long sizeBytes,
         String filePath
 ) {
+    /**
+     * Zona horaria de presentación para timestamps provenientes de Fabric.
+     *
+     * <p>Se fija explícitamente en Colombia para evitar desfases cuando el JVM se ejecuta con otra
+     * zona horaria (por ejemplo, UTC en el IDE o en despliegues).</p>
+     */
+    private static final ZoneId UI_ZONE = ZoneId.of("America/Bogota");
+
 
     /**
      * Constructor compacto del record.
@@ -64,7 +72,7 @@ public record FabricDocView(
         try {
             Instant inst = Instant.parse(createdAt);
             DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                    .withZone(ZoneId.systemDefault());
+                    .withZone(UI_ZONE);
             return fmt.format(inst);
         } catch (Exception e) {
             return createdAt;

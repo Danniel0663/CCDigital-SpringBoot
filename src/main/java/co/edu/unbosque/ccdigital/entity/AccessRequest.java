@@ -64,10 +64,12 @@ public class AccessRequest {
 
     /**
      * Fecha/hora en la que se registró la solicitud.
-     * - insertable=false, updatable=false: normalmente se controla desde BD (DEFAULT CURRENT_TIMESTAMP),
-     *   evitando que la aplicación sobrescriba ese valor.
+     *
+     * <p>Se asigna desde la aplicación (ver {@link #ensureRequestedAt()}) para mantener consistencia
+     * con otras fechas del flujo (por ejemplo {@code decidedAt}) y evitar desfases cuando la zona horaria
+     * de la base de datos difiere de la zona usada por la JVM.</p>
      */
-    @Column(name = "requested_at", insertable = false, updatable = false)
+    @Column(name = "requested_at", updatable = false)
     private LocalDateTime requestedAt;
 
     /**
@@ -155,6 +157,11 @@ public class AccessRequest {
     public LocalDateTime getRequestedAt() { return requestedAt; }
 
     /**
+     * @param requestedAt Fecha/hora de creación de la solicitud
+     */
+    public void setRequestedAt(LocalDateTime requestedAt) { this.requestedAt = requestedAt; }
+
+    /**
      * @return Fecha/hora en que se tomó la decisión (si aplica)
      */
     public LocalDateTime getDecidedAt() { return decidedAt; }
@@ -196,4 +203,17 @@ public class AccessRequest {
      * @param items lista de items
      */
     public void setItems(List<AccessRequestItem> items) { this.items = items; }
+
+    /**
+     * Asegura una fecha de creación consistente cuando la solicitud se persiste desde la aplicación.
+     *
+     * <p>Si la BD tiene un {@code DEFAULT CURRENT_TIMESTAMP} seguirá siendo un respaldo, pero este valor
+     * se envía explícitamente para evitar diferencias de zona horaria entre BD y aplicación.</p>
+     */
+    @PrePersist
+    void ensureRequestedAt() {
+        if (requestedAt == null) {
+            requestedAt = LocalDateTime.now();
+        }
+    }
 }

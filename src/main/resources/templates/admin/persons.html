@@ -16,7 +16,17 @@
     <a class="navbar-brand fw-semibold text-decoration-none cc-brand" th:href="@{/admin/dashboard}">
       <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
     </a>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
+      <div class="cc-profile-chip"
+           th:if="${ccActiveProfileDisplay != null and !#strings.isEmpty(ccActiveProfileDisplay)}">
+        <span class="cc-profile-icon">
+          <i class="bi" th:classappend="${(ccActiveProfileIcon != null and !#strings.isEmpty(ccActiveProfileIcon)) ? ' ' + ccActiveProfileIcon : ' bi-shield-lock'}"></i>
+        </span>
+        <span>
+          <span class="cc-profile-label" th:text="${ccActiveProfileLabel}">Perfil</span>
+          <span class="cc-profile-value" th:text="${ccActiveProfileDisplay}">admin@dominio.com</span>
+        </span>
+      </div>
       <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}">
         <i class="bi bi-house"></i> Dashboard
       </a>

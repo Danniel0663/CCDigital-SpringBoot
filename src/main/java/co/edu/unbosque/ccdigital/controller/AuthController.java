@@ -18,6 +18,21 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class AuthController {
 
     /**
+     * Portada pública principal del proyecto.
+     *
+     * <p>
+     * Presenta el propósito de CCDigital, los módulos disponibles y accesos directos a login/registro.
+     * Se publica en la raíz ({@code /}) como carta de presentación del sitio.
+     * </p>
+     *
+     * @return vista principal pública
+     */
+    @GetMapping("/")
+    public String landing() {
+        return "index";
+    }
+
+    /**
      * Vista raíz de autenticación.
      *
      * @return nombre de la vista de login para usuario final

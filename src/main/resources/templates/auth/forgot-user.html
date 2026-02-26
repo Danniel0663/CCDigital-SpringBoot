@@ -17,9 +17,9 @@
 <body class="bg-body-tertiary">
 <nav class="navbar cc-navbar">
   <div class="container d-flex justify-content-between align-items-center">
-    <span class="navbar-brand fw-semibold cc-brand">
+    <a href="/" class="navbar-brand fw-semibold cc-brand text-decoration-none">
       <i class="bi bi-key me-2"></i>CCDigital · Recuperar contraseña
-    </span>
+    </a>
   </div>
 </nav>
 
@@ -206,12 +206,14 @@
       if (!idType) { showAlert('warning', 'Selecciona el tipo de identificación.'); return; }
       if (!idNumber) { showAlert('warning', 'Ingresa el número de identificación.'); return; }
 
+      window.CCDigitalLoader?.show('Enviando código de recuperación al correo...');
       btnVerify.disabled = true;
       btnVerify.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando código...';
 
       const r = await postJson('/user/auth/forgot/verify', { email, idType, idNumber });
 
       if (!r.accepted) {
+        window.CCDigitalLoader?.hide(true);
         showAlert('danger', r.message || 'No fue posible enviar el código de recuperación.');
         return;
       }
@@ -219,10 +221,12 @@
       requestPayload = { email, idType, idNumber };
       step1.classList.add('d-none');
       step2.classList.remove('d-none');
+      window.CCDigitalLoader?.hide(true);
       showAlert('info', r.message || 'Si los datos coinciden, enviamos un código temporal al correo.');
       resetCodeEl.focus();
 
     } catch (e) {
+      window.CCDigitalLoader?.hide(true);
       showAlert('danger', 'Error: ' + e.message);
     } finally {
       btnVerify.disabled = false;
@@ -253,20 +257,24 @@
       }
       if (p1 !== p2) { showAlert('warning', 'Las contraseñas no coinciden.'); return; }
 
+      window.CCDigitalLoader?.show('Actualizando contraseña...');
       btnReset.disabled = true;
       btnReset.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
 
       const r = await postJson('/user/auth/forgot/reset', { ...requestPayload, resetCode: code, newPassword: p1 });
 
       if (!r.ok) {
+        window.CCDigitalLoader?.hide(true);
         showAlert('danger', r.message || 'No fue posible actualizar la contraseña.');
         return;
       }
 
+      window.CCDigitalLoader?.update('Contraseña actualizada. Redirigiendo...');
       showAlert('success', r.message || 'Contraseña actualizada correctamente. Redirigiendo...');
       setTimeout(() => { window.location.href = '/login/user'; }, 1000);
 
     } catch (e) {
+      window.CCDigitalLoader?.hide(true);
       showAlert('danger', 'Error: ' + e.message);
     } finally {
       btnReset.disabled = false;
@@ -274,5 +282,6 @@
     }
   });
 </script>
+<script src="/js/ccdigital-loader.js"></script>
 </body>
 </html>
