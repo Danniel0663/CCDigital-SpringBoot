@@ -159,6 +159,36 @@
       "name": "app.security.totp.window-steps",
       "type": "java.lang.Integer",
       "description": "Ventana de tolerancia TOTP en pasos (ej. 1 permite +/- 1 intervalo)."
+    },
+    {
+      "name": "app.security.require-https",
+      "type": "java.lang.Boolean",
+      "description": "Si es true, fuerza HTTPS para todas las rutas de la aplicación."
+    },
+    {
+      "name": "app.security.signed-urls.secret",
+      "type": "java.lang.String",
+      "description": "Secreto HMAC usado para firmar URLs temporales de visualización de documentos."
+    },
+    {
+      "name": "app.security.signed-urls.ttl-seconds",
+      "type": "java.lang.Long",
+      "description": "Tiempo de vida (segundos) de las URLs firmadas de visualización de documentos."
+    },
+    {
+      "name": "app.security.rate-limit.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Activa/desactiva el rate limiting en endpoints sensibles."
+    },
+    {
+      "name": "app.security.rate-limit.window-seconds",
+      "type": "java.lang.Long",
+      "description": "Ventana de tiempo en segundos para el rate limiting de endpoints sensibles."
+    },
+    {
+      "name": "app.security.rate-limit.max-requests-per-window",
+      "type": "java.lang.Integer",
+      "description": "Número máximo de solicitudes POST permitidas por IP+endpoint dentro de la ventana de rate limiting."
     }
   ]
 }
