@@ -16,9 +16,21 @@
     <a class="navbar-brand fw-semibold text-decoration-none cc-brand" th:href="@{/admin/dashboard}">
       <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
     </a>
-    <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}">
-      <i class="bi bi-house"></i> Dashboard
-    </a>
+    <div class="d-flex align-items-center gap-2">
+      <div class="cc-profile-chip"
+           th:if="${ccActiveProfileDisplay != null and !#strings.isEmpty(ccActiveProfileDisplay)}">
+        <span class="cc-profile-icon">
+          <i class="bi" th:classappend="${(ccActiveProfileIcon != null and !#strings.isEmpty(ccActiveProfileIcon)) ? ' ' + ccActiveProfileIcon : ' bi-shield-lock'}"></i>
+        </span>
+        <span>
+          <span class="cc-profile-label" th:text="${ccActiveProfileLabel}">Perfil</span>
+          <span class="cc-profile-value" th:text="${ccActiveProfileDisplay}">admin@dominio.com</span>
+        </span>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}">
+        <i class="bi bi-house"></i> Dashboard
+      </a>
+    </div>
   </div>
 </nav>
 
@@ -35,7 +47,8 @@
         <h2 class="h6 text-uppercase text-muted mb-2">Fabric</h2>
         <div class="fw-semibold mb-3">Sync ALL</div>
         <p class="text-muted small mb-3">Ejecuta: <code>node sync-db-to-ledger.js --all</code></p>
-        <form th:action="@{/admin/sync/fabric/all}" method="post">
+        <form th:action="@{/admin/sync/fabric/all}" method="post"
+              data-cc-loader data-cc-loader-message="Ejecutando sincronización completa de Fabric...">
           <button class="btn btn-primary w-100" type="submit">
             <i class="bi bi-play-fill me-2"></i>Ejecutar
           </button>
@@ -49,7 +62,8 @@
         <h2 class="h6 text-uppercase text-muted mb-2">Fabric</h2>
         <div class="fw-semibold mb-3">Sync Persona</div>
 
-        <form th:action="@{/admin/sync/fabric/person}" method="post" th:object="${personForm}" class="row g-2">
+        <form th:action="@{/admin/sync/fabric/person}" method="post" th:object="${personForm}" class="row g-2"
+              data-cc-loader data-cc-loader-message="Sincronizando persona en Fabric...">
           <div class="col-5">
             <label class="form-label small text-muted mb-1">Tipo</label>
             <select class="form-select" th:field="*{idType}">
@@ -78,7 +92,8 @@
         <div class="fw-semibold mb-3">Emitir credenciales</div>
         <p class="text-muted small mb-3">Ejecuta el script Python desde DB.</p>
 
-        <form th:action="@{/admin/sync/indy/issue}" method="post">
+        <form th:action="@{/admin/sync/indy/issue}" method="post"
+              data-cc-loader data-cc-loader-message="Ejecutando emisión de credenciales Indy...">
           <button class="btn btn-outline-dark w-100" type="submit">
             <i class="bi bi-play-fill me-2"></i>Ejecutar
           </button>
@@ -120,6 +135,7 @@
   </div>
 </main>
 
+<script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

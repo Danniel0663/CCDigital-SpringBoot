@@ -17,13 +17,38 @@
       <i class="bi bi-building me-2"></i>CCDigital · Emisor
     </a>
 
-    <div class="d-flex align-items-center gap-3">
-      <span class="text-muted small">
-        Sesión: <b th:text="${issuer != null ? issuer.name : '—'}">Emisor</b>
-        <span>(<span th:text="${#authentication.name}">usuario</span>)</span>
-      </span>
+    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+      <div class="cc-profile-chip"
+           data-cc-profile-toggle="issuerHomeProfilePanel"
+           th:if="${ccActiveProfileDisplay != null and !#strings.isEmpty(ccActiveProfileDisplay)}">
+        <span class="cc-profile-icon">
+          <i class="bi" th:classappend="${(ccActiveProfileIcon != null and !#strings.isEmpty(ccActiveProfileIcon)) ? ' ' + ccActiveProfileIcon : ' bi-building'}"></i>
+        </span>
+        <span>
+          <span class="cc-profile-label" th:text="${ccActiveProfileLabel}">Perfil</span>
+          <span class="cc-profile-value" th:text="${ccActiveProfileDisplay}">Emisor</span>
+        </span>
+      </div>
 
-      <form th:action="@{/issuer/logout}" method="post" style="margin:0;">
+      <button type="button"
+              class="btn btn-sm btn-outline-secondary cc-notif-btn"
+              data-cc-panel-toggle="issuerHomeNotificationsPanel"
+              th:classappend="${ccNotificationHighlight ? ' cc-notif-btn--highlight' : ''}">
+        <i class="bi bi-bell"></i>
+        <span class="d-none d-md-inline">Notificaciones</span>
+        <span class="cc-notif-count" th:if="${ccNotificationCount != null and ccNotificationCount > 0}"
+              th:text="${ccNotificationCount}">1</span>
+      </button>
+
+      <a class="btn btn-sm btn-outline-secondary cc-nav-action-btn"
+         th:href="@{/issuer/access-requests}"
+         th:classappend="${ccCurrentUri == '/issuer/access-requests' ? ' is-active' : ''}">
+        <i class="bi bi-list-check me-1"></i>
+        <span class="d-none d-md-inline">Solicitudes</span>
+      </a>
+
+      <form th:action="@{/issuer/logout}" method="post" style="margin:0;"
+            data-cc-loader data-cc-loader-message="Cerrando sesión...">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <button class="btn btn-outline-dark btn-sm" type="submit">
           Cerrar sesión
@@ -34,6 +59,68 @@
 </nav>
 
 <main class="container py-4">
+
+  <div id="issuerHomeNotificationsPanel" class="cc-notif-panel mb-3 d-none">
+    <div class="cc-notif-head">
+      <div>
+        <h2><i class="bi bi-bell-fill me-2"></i><span th:text="${ccNotificationTitle != null ? ccNotificationTitle : 'Notificaciones'}">Notificaciones</span></h2>
+        <p>Respuestas recientes de usuarios a las solicitudes enviadas por tu entidad.</p>
+      </div>
+      <span class="badge text-bg-warning" th:if="${ccNotificationCount != null and ccNotificationCount > 0}"
+            th:text="${ccNotificationCount} + ' nuevas'">0 nuevas</span>
+    </div>
+    <div class="cc-notif-body">
+      <div class="cc-notif-empty" th:if="${#lists.isEmpty(ccNotifications)}">
+        <i class="bi bi-bell-slash d-block mb-2"></i>
+        <span th:text="${ccNotificationEmptyMessage != null ? ccNotificationEmptyMessage : 'No hay notificaciones nuevas.'}">No hay notificaciones nuevas.</span>
+      </div>
+      <div class="cc-notif-list" th:if="${!#lists.isEmpty(ccNotifications)}">
+        <a class="cc-notif-item text-decoration-none"
+           th:each="n : ${ccNotifications}"
+           th:href="${n.targetUrl()}">
+          <span class="cc-notif-item-icon"
+                th:classappend="${(n.tone() != null and !#strings.isEmpty(n.tone())) ? ' tone-' + n.tone() : ''}">
+            <i class="bi" th:classappend="${(n.iconClass() != null and !#strings.isEmpty(n.iconClass())) ? ' ' + n.iconClass() : ' bi-bell'}"></i>
+          </span>
+          <span>
+            <span class="cc-notif-item-title" th:text="${n.title()}">Notificación</span>
+            <span class="cc-notif-item-text d-block" th:text="${n.message()}">Detalle</span>
+          </span>
+          <span class="cc-notif-item-time" th:text="${n.timeHuman()}">2026-01-01 10:00</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div id="issuerHomeProfilePanel" class="cc-profile-panel mb-3 d-none" th:if="${ccIssuerProfile != null}">
+    <div class="cc-profile-head">
+      <div>
+        <h2><i class="bi bi-buildings me-2"></i>Perfil de la entidad emisora</h2>
+        <p>Identificación del perfil activo para este módulo.</p>
+      </div>
+      <span class="badge text-bg-primary">Emisor</span>
+    </div>
+    <div class="cc-profile-body">
+      <div class="cc-kv-grid">
+        <div class="cc-kv-item">
+          <div class="cc-kv-label">Entidad</div>
+          <div class="cc-kv-value" th:text="${ccIssuerProfile.entityName()}">Entidad</div>
+        </div>
+        <div class="cc-kv-item">
+          <div class="cc-kv-label">Usuario autenticado</div>
+          <div class="cc-kv-value" th:text="${ccIssuerProfile.username()}">correo@dominio.com</div>
+        </div>
+        <div class="cc-kv-item">
+          <div class="cc-kv-label">ID entidad</div>
+          <div class="cc-kv-value" th:text="${ccIssuerProfile.issuerId() != null ? ccIssuerProfile.issuerId() : '—'}">1</div>
+        </div>
+        <div class="cc-kv-item">
+          <div class="cc-kv-label">Estado</div>
+          <div class="cc-kv-value" th:text="${ccIssuerProfile.entityStatus() != null and !#strings.isEmpty(ccIssuerProfile.entityStatus()) ? ccIssuerProfile.entityStatus() : '—'}">APROBADA</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Solicitudes de acceso -->
   <div class="cc-card p-4 mb-3">
@@ -78,7 +165,8 @@
       <div class="cc-card p-4 h-100">
         <h2 class="h6 text-uppercase text-muted mb-3">Buscar persona</h2>
 
-        <form th:action="@{/issuer/search}" method="post" th:object="${searchForm}" class="row g-3">
+        <form th:action="@{/issuer/search}" method="post" th:object="${searchForm}" class="row g-3"
+              data-cc-loader data-cc-loader-message="Buscando persona...">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
 
           <div class="col-4">
@@ -135,7 +223,8 @@
               method="post"
               enctype="multipart/form-data"
               th:object="${uploadForm}"
-              class="row g-3">
+              class="row g-3"
+              data-cc-loader data-cc-loader-message="Subiendo documento y enviándolo a revisión...">
 
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
           <input type="hidden" th:field="*{personId}" />
@@ -193,6 +282,7 @@
   </div>
 </main>
 
+<script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
