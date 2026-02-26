@@ -134,6 +134,11 @@
         <p class="text-muted mb-0">Listado de solicitudes creadas por la entidad emisora.</p>
       </div>
     </div>
+    <!-- Aviso de negocio para errores de apertura de documentos (ej. solicitud expirada). -->
+    <div th:if="${error}" class="alert alert-warning py-2 mt-3 mb-0">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <span th:text="${error}">Aviso</span>
+    </div>
   </div>
 
   <div class="cc-card p-3 p-md-4">
@@ -212,7 +217,7 @@
                 <div class="d-flex flex-wrap gap-2 justify-content-end">
                   <a class="btn btn-sm btn-outline-primary"
                      th:each="i : ${r.items}"
-                     th:href="@{/issuer/access-requests/{rid}/documents/{pdid}/view(rid=${r.id}, pdid=${i.personDocument.id})}"
+                     th:href="${@signedUrlService.issuerDocumentViewUrl(r.id, i.personDocument.id)}"
                      target="_blank"
                      rel="noopener"
                      th:text="${i.personDocument.documentDefinition.title}">

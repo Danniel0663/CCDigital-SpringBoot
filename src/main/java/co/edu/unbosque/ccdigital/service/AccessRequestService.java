@@ -6,6 +6,8 @@ import co.edu.unbosque.ccdigital.repository.AccessRequestRepository;
 import co.edu.unbosque.ccdigital.repository.IssuingEntityRepository;
 import co.edu.unbosque.ccdigital.repository.PersonDocumentRepository;
 import co.edu.unbosque.ccdigital.repository.PersonRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +31,7 @@ import java.util.*;
  */
 @Service
 public class AccessRequestService {
+    private static final Logger log = LoggerFactory.getLogger(AccessRequestService.class);
 
     private final AccessRequestRepository accessRequestRepository;
     private final PersonRepository personRepository;
@@ -79,7 +82,7 @@ public class AccessRequestService {
      *   3) Estar aprobado para consulta (ReviewStatus.APPROVED)
      *
      * Comportamiento:
-     * - Se crea AccessRequest con expiresAt a 7 días (regla actual).
+     * - Se crea AccessRequest con expiresAt a 15 días (regla actual).
      * - Se crean AccessRequestItem por cada documento seleccionado.
      * - Se persiste la solicitud con cascade hacia items (por configuración en AccessRequest).
      *
@@ -115,8 +118,8 @@ public class AccessRequestService {
         request.setPurpose(purpose.trim());
         request.setStatus(AccessRequestStatus.PENDIENTE);
 
-        // Regla actual: expira en 7 días desde su creación
-        request.setExpiresAt(LocalDateTime.now().plusDays(7));
+        // Regla actual: expira en 15 días desde su creación (ampliado desde 7 días).
+        request.setExpiresAt(LocalDateTime.now().plusDays(15));
 
         // Construcción de items solicitados
         List<AccessRequestItem> items = new ArrayList<>();
@@ -216,6 +219,8 @@ public class AccessRequestService {
 
         // Autorización: solo la persona dueña puede decidir
         if (!Objects.equals(request.getPerson().getId(), personId)) {
+            log.warn("Intento no autorizado de decisión de solicitud. requestId={}, personIdSolicitante={}, personIdSesion={}",
+                    requestId, request.getPerson().getId(), personId);
             throw new IllegalArgumentException("No autorizado para decidir esta solicitud");
         }
 
@@ -249,6 +254,7 @@ public class AccessRequestService {
         }
 
         accessRequestRepository.save(request);
+        log.info("Solicitud decidida. requestId={}, personId={}, status={}", requestId, personId, request.getStatus());
     }
 
     /**
@@ -281,6 +287,8 @@ public class AccessRequestService {
 
         // Autorización: solo el emisor dueño de la solicitud puede usarla
         if (!Objects.equals(request.getEntity().getId(), entityId)) {
+            log.warn("Intento no autorizado de consulta de documento. requestId={}, entityIdSolicitud={}, entityIdSesion={}, personDocumentId={}",
+                    requestId, request.getEntity().getId(), entityId, personDocumentId);
             throw new IllegalArgumentException("No autorizado para consultar esta solicitud");
         }
 
@@ -319,6 +327,8 @@ public class AccessRequestService {
         // Seguridad/trazabilidad: antes de entregar el archivo al emisor, se exige
         // que el documento exista en la consulta on-chain de Fabric para la persona.
         ensureDocumentPresentInFabric(request.getPerson(), pd, latest);
+        log.info("Consulta autorizada de documento. requestId={}, entityId={}, personId={}, personDocumentId={}, fileId={}",
+                requestId, entityId, request.getPerson().getId(), personDocumentId, latest.getId());
 
         // Delegación a FileStorageService para resolver la ruta y devolver un Resource
         return fileStorageService.loadAsResource(latest);

@@ -78,8 +78,8 @@ public class UserAccountService {
         String emailValue = normalize(form == null ? null : form.getEmail());
         String phoneValue = normalize(form == null ? null : form.getPhone());
         var birthdateValue = form == null ? null : form.getBirthdate();
-        String rawPasswordValue = form == null || form.getPassword() == null ? "" : form.getPassword();
-        String confirmPasswordValue = form == null || form.getConfirmPassword() == null ? "" : form.getConfirmPassword();
+        String rawPasswordValue = normalize(form == null ? null : form.getPassword());
+        String confirmPasswordValue = normalize(form == null ? null : form.getConfirmPassword());
 
         if (idTypeValue.isBlank()) {
             throw new IllegalArgumentException("Tipo de identificación requerido.");
@@ -107,6 +107,11 @@ public class UserAccountService {
         }
         if (!rawPasswordValue.equals(confirmPasswordValue)) {
             throw new IllegalArgumentException("La confirmación de contraseña no coincide.");
+        }
+        if (!isStrongEnoughPassword(rawPasswordValue)) {
+            throw new IllegalArgumentException(
+                    "La contraseña debe tener mínimo 8 caracteres e incluir letras y números."
+            );
         }
 
         IdType idType;
@@ -205,5 +210,25 @@ public class UserAccountService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    /**
+     * Aplica la misma regla de complejidad usada en el flujo de restablecimiento de contraseña.
+     *
+     * <p>Regla mínima: 8 caracteres, con al menos una letra y un número.</p>
+     *
+     * @param pwd contraseña normalizada
+     * @return {@code true} si cumple la política mínima
+     */
+    private boolean isStrongEnoughPassword(String pwd) {
+        if (pwd == null || pwd.isBlank()) return false;
+        if (pwd.length() < 8) return false;
+        boolean hasLetter = false;
+        boolean hasDigit = false;
+        for (char c : pwd.toCharArray()) {
+            if (Character.isLetter(c)) hasLetter = true;
+            if (Character.isDigit(c)) hasDigit = true;
+        }
+        return hasLetter && hasDigit;
     }
 }
