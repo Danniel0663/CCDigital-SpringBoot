@@ -10,6 +10,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
+
 /**
  * Servicio de negocio para registro de cuentas de usuario final.
  *
@@ -125,8 +127,10 @@ public class UserAccountService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No existe una persona registrada con ese tipo y número de identificación."
                 ));
+        Long personId = requirePersonId(person);
 
-        appUserRepository.findById(person.getId()).ifPresent(existingUser -> {
+        Long safePersonId = Objects.requireNonNull(personId);
+        appUserRepository.findById(safePersonId).ifPresent(existingUser -> {
             throw new IllegalArgumentException(
                     "Ya existe un usuario asociado a esta persona (correo: "
                             + normalize(existingUser.getEmail())
@@ -137,7 +141,7 @@ public class UserAccountService {
         });
 
         appUserRepository.findByEmailIgnoreCase(emailValue).ifPresent(existing -> {
-            if (!existing.getPersonId().equals(person.getId())) {
+            if (!Objects.equals(existing.getPersonId(), safePersonId)) {
                 throw new IllegalArgumentException("El correo ingresado ya está en uso por otro usuario.");
             }
         });
@@ -146,15 +150,23 @@ public class UserAccountService {
         updateContactDataIfChanged(person, emailValue, phoneValue, birthdateValue);
 
         AppUser user = new AppUser();
-        user.setPersonId(person.getId());
+        user.setPersonId(safePersonId);
         user.setFullName(buildFullName(person));
         user.setEmail(emailValue);
         user.setPasswordHash(encoder.encode(rawPasswordValue));
         user.setRole(USER_ROLE);
         user.setIsActive(Boolean.TRUE);
 
-        personRepository.saveAndFlush(person);
+        personRepository.saveAndFlush(Objects.requireNonNull(person));
         return appUserRepository.save(user);
+    }
+
+    private Long requirePersonId(Person person) {
+        Long personId = person == null ? null : person.getId();
+        if (personId == null) {
+            throw new IllegalStateException("La persona no tiene identificador persistido.");
+        }
+        return personId;
     }
 
     private String buildFullName(Person person) {

@@ -147,8 +147,12 @@ public class UserTotpController {
         String idNumber = normalize(p.getIdNumber());
         Person person = personRepository.findByIdNumber(idNumber)
                 .orElseThrow(() -> new IllegalStateException("No se encontró la persona autenticada"));
+        Long personId = person.getId();
+        if (personId == null) {
+            throw new IllegalStateException("La persona autenticada no tiene identificador interno.");
+        }
 
-        return appUserRepository.findById(person.getId())
+        return appUserRepository.findById(personId)
                 .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
                 .orElseThrow(() -> new IllegalStateException("No se encontró el usuario asociado"));
     }

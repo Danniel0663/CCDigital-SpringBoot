@@ -10,6 +10,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Controlador REST para gestión de documentos asociados a personas y descarga de archivos.
@@ -104,9 +105,10 @@ public class PersonDocumentRestController {
         String contentType = (fileRecord.getMimeType() != null && !fileRecord.getMimeType().isBlank())
                 ? fileRecord.getMimeType()
                 : "application/octet-stream";
+        MediaType responseMediaType = MediaType.parseMediaType(Objects.requireNonNull(contentType));
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
+                .contentType(responseMediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename=\"" + resource.getFilename() + "\"")
                 .body(resource);

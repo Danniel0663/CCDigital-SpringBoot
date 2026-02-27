@@ -14,6 +14,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Objects;
 
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 
@@ -49,8 +50,12 @@ public class SignedUrlService {
      */
     public String userDocumentViewUrl(String docId) {
         long exp = expiryEpochSeconds();
-        String sig = sign(SCOPE_USER_DOC, safe(docId), Long.toString(exp));
-        String encodedDocId = UriUtils.encodePathSegment(safe(docId), StandardCharsets.UTF_8);
+        String normalizedDocId = safe(docId);
+        String sig = sign(SCOPE_USER_DOC, normalizedDocId, Long.toString(exp));
+        String encodedDocId = UriUtils.encodePathSegment(
+                Objects.requireNonNull(normalizedDocId),
+                Objects.requireNonNull(StandardCharsets.UTF_8)
+        );
         return "/user/docs/view/" + encodedDocId + "?exp=" + exp + "&sig=" + sig;
     }
 
@@ -62,8 +67,12 @@ public class SignedUrlService {
      */
     public String userDocumentDownloadUrl(String docId) {
         long exp = expiryEpochSeconds();
-        String sig = sign(SCOPE_USER_DOC_DOWNLOAD, safe(docId), Long.toString(exp));
-        String encodedDocId = UriUtils.encodePathSegment(safe(docId), StandardCharsets.UTF_8);
+        String normalizedDocId = safe(docId);
+        String sig = sign(SCOPE_USER_DOC_DOWNLOAD, normalizedDocId, Long.toString(exp));
+        String encodedDocId = UriUtils.encodePathSegment(
+                Objects.requireNonNull(normalizedDocId),
+                Objects.requireNonNull(StandardCharsets.UTF_8)
+        );
         return "/user/docs/download/" + encodedDocId + "?exp=" + exp + "&sig=" + sig;
     }
 
