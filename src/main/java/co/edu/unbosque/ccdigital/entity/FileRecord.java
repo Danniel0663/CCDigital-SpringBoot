@@ -1,7 +1,7 @@
 package co.edu.unbosque.ccdigital.entity;
 
 import jakarta.persistence.*;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 
 /**
@@ -39,6 +39,7 @@ public class FileRecord {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_id", nullable = false)
+    @JsonIgnore
     private DocumentDefinition document;
 
     /**
@@ -48,6 +49,7 @@ public class FileRecord {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "person_document_id")
+    @JsonIgnore
     private PersonDocument personDocument;
 
     /**
@@ -92,6 +94,7 @@ public class FileRecord {
      */
     @Lob
     @Column(name = "content")
+    @JsonIgnore
     private byte[] content;
 
     /**
