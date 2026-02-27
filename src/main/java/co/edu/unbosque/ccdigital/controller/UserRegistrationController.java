@@ -113,6 +113,21 @@ public class UserRegistrationController {
     }
 
     /**
+     * Request AJAX para reenviar código de verificación de correo en registro.
+     */
+    public static class RegisterEmailResendRequest {
+        private String emailToken;
+
+        public String getEmailToken() {
+            return emailToken;
+        }
+
+        public void setEmailToken(String emailToken) {
+            this.emailToken = emailToken;
+        }
+    }
+
+    /**
      * Muestra el formulario de registro de usuario final.
      *
      * <p>
@@ -214,6 +229,45 @@ public class UserRegistrationController {
     }
 
     /**
+     * Reenvía el código OTP de verificación de correo para un registro pendiente.
+     *
+     * @param req request con token del flujo de verificación de correo
+     * @param request request HTTP para leer formulario pendiente en sesión
+     * @return respuesta JSON con estado de reenvío
+     */
+    @PostMapping("/email-otp/resend")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> resendRegisterEmailOtp(@RequestBody RegisterEmailResendRequest req,
+                                                                       HttpServletRequest request) {
+        String token = normalize(req == null ? null : req.getEmailToken());
+        if (token.isBlank()) {
+            return noStore(ResponseEntity.badRequest().body(Map.of("error", "emailToken es requerido")));
+        }
+
+        UserRegisterForm pending = getPendingRegisterForm(request, token);
+        if (pending == null) {
+            return noStore(ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "La verificación expiró. Completa nuevamente el formulario.")));
+        }
+
+        boolean sent = userRegisterEmailOtpService.issueCode(
+                token,
+                normalize(pending.getEmail()),
+                displayName(pending)
+        );
+        if (!sent) {
+            return noStore(ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("error", "No fue posible reenviar el código. Intenta nuevamente.")));
+        }
+
+        return noStore(ResponseEntity.ok(Map.of(
+                "ok", true,
+                "maskedEmail", maskEmail(pending.getEmail()),
+                "message", "Si aplica, se reenvió el código al correo registrado."
+        )));
+    }
+
+    /**
      * Prepara en el modelo la sección opcional de activación TOTP después del registro exitoso.
      *
      * <p>Solo se ejecuta si el usuario marcó la opción de activar el autenticador de celular
@@ -253,9 +307,34 @@ public class UserRegistrationController {
      */
     private void handleRegistrationStart(UserRegisterForm form, Model model, HttpServletRequest request) {
         String email = normalize(form == null ? null : form.getEmail());
+        String password = normalize(form == null ? null : form.getPassword());
+        String confirmPassword = normalize(form == null ? null : form.getConfirmPassword());
         if (email.isBlank()) {
             model.addAttribute("form", form);
             model.addAttribute("error", "Correo requerido.");
+            return;
+        }
+        // Validación temprana para no enviar OTP cuando la contraseña no cumple política.
+        if (password.isBlank()) {
+            form.setPassword(null);
+            form.setConfirmPassword(null);
+            model.addAttribute("form", form);
+            model.addAttribute("error", "Contraseña requerida.");
+            return;
+        }
+        if (!password.equals(confirmPassword)) {
+            form.setPassword(null);
+            form.setConfirmPassword(null);
+            model.addAttribute("form", form);
+            model.addAttribute("error", "La confirmación de contraseña no coincide.");
+            return;
+        }
+        if (!isStrongEnoughPassword(password)) {
+            form.setPassword(null);
+            form.setConfirmPassword(null);
+            model.addAttribute("form", form);
+            model.addAttribute("error",
+                    "La contraseña debe tener mínimo 8 caracteres e incluir letras, números y un carácter especial.");
             return;
         }
 
@@ -273,6 +352,28 @@ public class UserRegistrationController {
         userRegisterEmailOtpService.invalidate(normalize(form.getRegistrationEmailToken()));
         showEmailVerificationStep(model, emailToken, email, Boolean.TRUE.equals(form.getEnableTotpNow()));
         model.addAttribute("form", new UserRegisterForm());
+    }
+
+    /**
+     * Regla de complejidad mínima para contraseña de registro.
+     *
+     * <p>Exige al menos 8 caracteres, con una letra, un número y un carácter especial.</p>
+     *
+     * @param pwd contraseña en texto plano ya normalizada
+     * @return {@code true} si cumple la política
+     */
+    private boolean isStrongEnoughPassword(String pwd) {
+        if (pwd == null || pwd.isBlank()) return false;
+        if (pwd.length() < 8) return false;
+        boolean hasLetter = false;
+        boolean hasDigit = false;
+        boolean hasSpecial = false;
+        for (char c : pwd.toCharArray()) {
+            if (Character.isLetter(c)) hasLetter = true;
+            if (Character.isDigit(c)) hasDigit = true;
+            if (!Character.isLetterOrDigit(c)) hasSpecial = true;
+        }
+        return hasLetter && hasDigit && hasSpecial;
     }
 
     /**

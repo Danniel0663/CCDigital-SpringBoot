@@ -61,6 +61,9 @@
           <button id="btnOtpVerify" type="button" class="btn btn-outline-primary w-100 mt-2">
             <i class="bi bi-check2-circle me-2"></i>Validar código
           </button>
+          <button id="btnOtpResend" type="button" class="btn btn-link w-100 mt-1 d-none">
+            Reenviar código al correo
+          </button>
         </div>
 
         <button id="btnStart" class="btn btn-primary w-100">
@@ -144,6 +147,7 @@
   const otpHelpEl = document.getElementById('otpHelp');
   const otpCodeEl = document.getElementById('otpCode');
   const btnOtpVerify = document.getElementById('btnOtpVerify');
+  const btnOtpResend = document.getElementById('btnOtpResend');
 
   function setStatus(msg, tone = 'info') {
     statusTextEl.textContent = msg;
@@ -183,12 +187,14 @@
           ? ('Ingresa el código que enviamos a ' + maskedEmail + '.')
           : 'Ingresa el código que enviamos a tu correo.');
     otpCodeEl.focus();
+    btnOtpResend.classList.toggle('d-none', method !== 'email');
   }
 
   function resetOtpSection() {
     otpSectionEl.classList.add('d-none');
     btn.classList.remove('d-none');
     otpCodeEl.value = '';
+    btnOtpResend.classList.add('d-none');
   }
 
   (function showUrlMessages() {
@@ -319,13 +325,36 @@
       setStatus('No fue posible validar el código.', 'danger');
     } catch (e) {
       window.CCDigitalLoader?.hide(true);
-      if ((e.message || '').toLowerCase().includes('expir')) {
+      const msg = (e.message || '').toLowerCase();
+      const mustRestart = msg.includes('agotaron los intentos')
+        || msg.includes('sesión de validación expiró')
+        || msg.includes('iniciar sesión nuevamente');
+      if (mustRestart) {
         resetOtpSection();
         currentPresExId = null;
       }
       setStatus(e.message || 'No fue posible validar el código.', 'danger');
     } finally {
       setOtpBusy(false);
+    }
+  });
+
+  btnOtpResend.addEventListener('click', async () => {
+    try {
+      if (!currentPresExId) {
+        setStatus('La sesión de validación expiró. Inicia nuevamente.', 'warning');
+        return;
+      }
+      btnOtpResend.disabled = true;
+      window.CCDigitalLoader?.show('Reenviando código...');
+      const r = await postJson('/user/auth/otp/resend', { presExId: currentPresExId });
+      window.CCDigitalLoader?.hide(true);
+      setStatus(r.message || 'Si aplica, se reenvió el código al correo.', 'info');
+    } catch (e) {
+      window.CCDigitalLoader?.hide(true);
+      setStatus(e.message || 'No fue posible reenviar el código.', 'danger');
+    } finally {
+      btnOtpResend.disabled = false;
     }
   });
 </script>

@@ -83,6 +83,13 @@
             <button type="submit" class="btn btn-primary w-100">
               <i class="bi bi-check2-circle me-2"></i>Verificar correo y continuar
             </button>
+            <button type="button"
+                    id="btnRegisterEmailResend"
+                    class="btn btn-link w-100 mt-1"
+                    th:attr="data-email-token=${registerEmailVerificationToken}">
+              Reenviar código al correo
+            </button>
+            <div id="registerEmailResendMsg" class="small text-muted text-center mt-1"></div>
           </form>
         </div>
 
@@ -215,7 +222,12 @@
               <div class="col-12">
                 <label for="password" class="form-label">Contraseña</label>
                 <input id="password" class="form-control" type="password" autocomplete="new-password"
-                       th:field="*{password}" placeholder="Ingresa una contraseña segura" required />
+                       th:field="*{password}"
+                       minlength="8"
+                       pattern="(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}"
+                       title="Mínimo 8 caracteres, con letras, números y al menos un carácter especial."
+                       placeholder="Ingresa una contraseña segura" required />
+                <div class="form-text">Mínimo 8 caracteres, con letras, números y un carácter especial.</div>
               </div>
               <div class="col-12">
                 <label for="confirmPassword" class="form-label">Confirmar contraseña</label>
@@ -255,6 +267,58 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/js/ccdigital-loader.js"></script>
 <script>
+  (function () {
+    const btnResend = document.getElementById('btnRegisterEmailResend');
+    if (!btnResend) return;
+
+    const token = btnResend.getAttribute('data-email-token') || '';
+    const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || '';
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
+    const msgEl = document.getElementById('registerEmailResendMsg');
+
+    const setMsg = (txt, danger) => {
+      if (!msgEl) return;
+      msgEl.textContent = txt || '';
+      msgEl.className = danger
+        ? 'small text-danger text-center mt-1'
+        : 'small text-muted text-center mt-1';
+    };
+
+    btnResend.addEventListener('click', async () => {
+      try {
+        if (!token) {
+          setMsg('La verificación expiró. Completa nuevamente el formulario.', true);
+          return;
+        }
+        btnResend.disabled = true;
+        window.CCDigitalLoader?.show('Reenviando código de verificación...');
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers[csrfHeader] = csrfToken;
+
+        const res = await fetch('/register/user/email-otp/resend', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ emailToken: token })
+        });
+        const text = await res.text();
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch (_) {}
+        if (!res.ok) {
+          throw new Error((data && (data.error || data.message)) || 'No fue posible reenviar el código.');
+        }
+
+        setMsg(data.message || 'Si aplica, se reenvió el código al correo.', false);
+        window.CCDigitalLoader?.hide(true);
+      } catch (e) {
+        window.CCDigitalLoader?.hide(true);
+        setMsg(e.message || 'No fue posible reenviar el código.', true);
+      } finally {
+        btnResend.disabled = false;
+      }
+    });
+  })();
+
   (function () {
     // Si el panel existe, significa que el usuario ya fue creado y está en el paso opcional
     // de activación del autenticador de celular (TOTP) dentro del mismo flujo de registro.

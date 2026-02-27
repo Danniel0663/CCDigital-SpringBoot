@@ -34,11 +34,14 @@ public class UserLoginOtpService {
 
     private static final class LoginOtpChallenge {
         private final String codeHash;
+        // Timestamp de creación para aplicar ventana anti-reenvío inmediato.
+        private final Instant issuedAt;
         private final Instant expiresAt;
         private int failedAttempts;
 
-        private LoginOtpChallenge(String codeHash, Instant expiresAt) {
+        private LoginOtpChallenge(String codeHash, Instant issuedAt, Instant expiresAt) {
             this.codeHash = codeHash;
+            this.issuedAt = issuedAt;
             this.expiresAt = expiresAt;
         }
     }
@@ -53,6 +56,12 @@ public class UserLoginOtpService {
 
     @Value("${app.security.login-otp.max-attempts:5}")
     private int maxAttempts;
+
+    /**
+     * Tiempo mínimo entre envíos consecutivos para un mismo flowId.
+     */
+    @Value("${app.security.login-otp.resend-cooldown-seconds:45}")
+    private long resendCooldownSeconds;
 
     @Value("${app.security.login-otp.mail.from:}")
     private String mailFrom;
@@ -78,10 +87,17 @@ public class UserLoginOtpService {
         }
 
         prune(flowId);
+        LoginOtpChallenge existing = challenges.get(flowId.trim());
+        if (existing != null
+                && Duration.between(existing.issuedAt, Instant.now()).getSeconds() < Math.max(1, resendCooldownSeconds)) {
+            // No genera código nuevo dentro de la ventana: evita spam y abuso del endpoint.
+            return true;
+        }
 
         String code = generateNumericCode(safeCodeLength());
         LoginOtpChallenge challenge = new LoginOtpChallenge(
                 sha256Base64(code),
+                Instant.now(),
                 Instant.now().plus(Duration.ofMinutes(Math.max(1, codeTtlMinutes)))
         );
 

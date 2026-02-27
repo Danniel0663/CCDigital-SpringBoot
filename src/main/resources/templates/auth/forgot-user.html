@@ -98,6 +98,9 @@
                    maxlength="8" autocomplete="one-time-code"
                    placeholder="Ingresa el código recibido por correo" required />
             <div class="form-text">El código vence en pocos minutos y solo sirve una vez.</div>
+            <button id="btnResendForgotCode" type="button" class="btn btn-link px-0 mt-1">
+              Reenviar código al correo
+            </button>
           </div>
 
           <div class="mb-3">
@@ -192,6 +195,7 @@
 
   const btnVerify = document.getElementById('btnVerify');
   const btnReset = document.getElementById('btnReset');
+  const btnResendForgotCode = document.getElementById('btnResendForgotCode');
 
   // Paso 1: solicita envío de código temporal al correo.
   btnVerify.addEventListener('click', async () => {
@@ -231,6 +235,28 @@
     } finally {
       btnVerify.disabled = false;
       btnVerify.innerHTML = '<i class="bi bi-envelope me-2"></i>Enviar código al correo';
+    }
+  });
+
+  // Paso 2 (opcional): reenvía el código usando los mismos datos ya validados del paso 1.
+  btnResendForgotCode.addEventListener('click', async () => {
+    try {
+      hideAlert();
+      if (!requestPayload) {
+        showAlert('warning', 'Primero solicita el código de seguridad.');
+        return;
+      }
+
+      btnResendForgotCode.disabled = true;
+      window.CCDigitalLoader?.show('Reenviando código de recuperación...');
+      const r = await postJson('/user/auth/forgot/verify', requestPayload);
+      window.CCDigitalLoader?.hide(true);
+      showAlert('info', r.message || 'Si los datos coinciden, enviamos un nuevo código al correo.');
+    } catch (e) {
+      window.CCDigitalLoader?.hide(true);
+      showAlert('danger', 'Error: ' + e.message);
+    } finally {
+      btnResendForgotCode.disabled = false;
     }
   });
 

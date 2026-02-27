@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Collections;
+import java.util.Locale;
 
 /**
  * Controlador web para el módulo de Emisor (Issuer).
@@ -150,12 +151,15 @@ public class IssuerController {
      */
     @PostMapping("/upload")
     public String upload(@ModelAttribute("uploadForm") IssuerUploadForm form,
-                         @RequestParam("file") MultipartFile file,
+                         @RequestParam(value = "file", required = false) MultipartFile file,
                          RedirectAttributes ra) {
-
-        Long issuerId = currentIssuerId();
-
+        Long personId = form != null ? form.getPersonId() : null;
         try {
+            Long issuerId = currentIssuerId();
+            if (!isPdfUpload(file)) {
+                ra.addFlashAttribute("msgErr", "Solo se permite subir archivos PDF.");
+                return "redirect:/issuer" + (personId != null ? "?personId=" + personId : "");
+            }
             personDocumentService.uploadFromIssuer(
                     issuerId,
                     form.getPersonId(),
@@ -166,10 +170,28 @@ public class IssuerController {
                     file
             );
             ra.addFlashAttribute("msgOk", "Documento cargado y enviado a revisión.");
+        } catch (IllegalArgumentException ex) {
+            ra.addFlashAttribute("msgErr", ex.getMessage());
         } catch (Exception ex) {
             ra.addFlashAttribute("msgErr", "Error al cargar el documento: " + ex.getMessage());
         }
 
-        return "redirect:/issuer?personId=" + form.getPersonId();
+        return "redirect:/issuer" + (personId != null ? "?personId=" + personId : "");
+    }
+
+    /**
+     * Validación ligera en controlador para aceptar únicamente archivos PDF desde el formulario emisor.
+     *
+     * <p>La validación definitiva se mantiene en servicio; aquí se busca devolver un mensaje amigable
+     * antes de ejecutar el flujo de carga.</p>
+     *
+     * @param file archivo recibido
+     * @return {@code true} si parece PDF por nombre o mime type
+     */
+    private boolean isPdfUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) return false;
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().trim().toLowerCase(Locale.ROOT);
+        String mime = file.getContentType() == null ? "" : file.getContentType().trim().toLowerCase(Locale.ROOT);
+        return name.endsWith(".pdf") || mime.contains("pdf");
     }
 }
