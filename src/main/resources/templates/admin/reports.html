@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Reportes · CCDigital</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
+  <style>
+    /* Alturas fijas por tipo de grafica para evitar auto-expansiones de Chart.js. */
+    .cc-chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 280px;
+    }
+
+    .cc-chart-wrap--short {
+      height: 240px;
+    }
+
+    .cc-chart-wrap > canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+  </style>
+</head>
+
+<body class="bg-body-tertiary">
+<nav class="navbar cc-navbar">
+  <div class="container d-flex justify-content-between align-items-center">
+    <a class="navbar-brand fw-semibold text-decoration-none cc-brand" th:href="@{/admin/dashboard}">
+      <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
+    </a>
+    <div class="d-flex align-items-center gap-2">
+      <div class="cc-profile-chip"
+           th:if="${ccActiveProfileDisplay != null and !#strings.isEmpty(ccActiveProfileDisplay)}">
+        <span class="cc-profile-icon">
+          <i class="bi" th:classappend="${(ccActiveProfileIcon != null and !#strings.isEmpty(ccActiveProfileIcon)) ? ' ' + ccActiveProfileIcon : ' bi-shield-lock'}"></i>
+        </span>
+        <span>
+          <span class="cc-profile-label" th:text="${ccActiveProfileLabel}">Perfil</span>
+          <span class="cc-profile-value" th:text="${ccActiveProfileDisplay}">admin@dominio.com</span>
+        </span>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}">
+        <i class="bi bi-house me-1"></i>Dashboard
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main class="container py-4">
+  <div class="cc-card p-4 mb-3">
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+      <div>
+        <h1 class="h4 mb-1">Reportes de trazabilidad</h1>
+        <p class="text-muted mb-0">
+          Monitoreo integral del uso del sistema: solicitudes, consultas de documentos, depósitos y tendencias.
+        </p>
+      </div>
+      <div class="d-flex gap-2">
+        <!-- Exporta el reporte completo con los mismos filtros activos en la vista. -->
+        <a class="btn btn-outline-secondary btn-sm"
+           th:href="@{/admin/reports/pdf(from=${report.fromDate},to=${report.toDate},period=${report.period.name()})}"
+           data-cc-loader data-cc-loader-message="Generando PDF de trazabilidad...">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF
+        </a>
+        <a class="btn btn-outline-primary btn-sm" th:href="@{/admin/sync}">
+          <i class="bi bi-arrow-repeat me-1"></i>Ir a sincronización
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros del reporte -->
+  <div class="cc-card p-3 p-md-4 mb-3">
+    <form class="row g-2 align-items-end" method="get" th:action="@{/admin/reports}"
+          data-cc-loader data-cc-loader-message="Aplicando filtros de trazabilidad...">
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label mb-1">Desde</label>
+        <input class="form-control" type="date" name="from" th:value="${report.fromDate}" required>
+      </div>
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label mb-1">Hasta</label>
+        <input class="form-control" type="date" name="to" th:value="${report.toDate}" required>
+      </div>
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label mb-1">Tendencia</label>
+        <select class="form-select" name="period">
+          <option th:each="p : ${periodOptions}"
+                  th:value="${p.name()}"
+                  th:text="${p.label}"
+                  th:selected="${p.name() == report.period.name()}">Día</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-3 d-flex gap-2">
+        <button class="btn btn-primary flex-fill" type="submit">
+          <i class="bi bi-funnel me-1"></i>Aplicar
+        </button>
+        <a class="btn btn-outline-secondary flex-fill" th:href="@{/admin/reports}">
+          Limpiar
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- KPI principales -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="cc-card p-3 h-100">
+        <div class="text-muted small text-uppercase">Solicitudes (total)</div>
+        <div class="display-6 fw-semibold" th:text="${report.totalRequests}">0</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="cc-card p-3 h-100">
+        <div class="text-muted small text-uppercase">Exitosas vs no exitosas</div>
+        <div class="h5 mb-1">
+          <span class="text-success fw-semibold" th:text="${report.successfulRequests}">0</span>
+          <span class="text-muted"> / </span>
+          <span class="text-danger fw-semibold" th:text="${report.unsuccessfulRequests}">0</span>
+        </div>
+        <small class="text-muted"
+               th:text="${report.totalRequests > 0 ? #numbers.formatDecimal((report.successfulRequests * 100.0) / report.totalRequests, 1, 1) + '% éxito' : '0.0% éxito'}">
+          0.0% éxito
+        </small>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="cc-card p-3 h-100">
+        <div class="text-muted small text-uppercase">Documentos consultados / vistos</div>
+        <div class="display-6 fw-semibold text-primary" th:text="${report.documentsConsulted}">0</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="cc-card p-3 h-100">
+        <div class="text-muted small text-uppercase">Documentos depositados / registrados</div>
+        <div class="display-6 fw-semibold text-success" th:text="${report.documentsDeposited}">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graficas interactivas -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xl-8">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+          <h2 class="h6 text-uppercase text-muted mb-0">Tendencia interactiva</h2>
+          <div class="btn-group btn-group-sm" role="group" aria-label="Metrica tendencia">
+            <button type="button" class="btn btn-outline-primary active" data-trend-metric="consulted">
+              Consultados
+            </button>
+            <button type="button" class="btn btn-outline-primary" data-trend-metric="deposited">
+              Depositados
+            </button>
+            <button type="button" class="btn btn-outline-primary" data-trend-metric="successful">
+              Exitosas
+            </button>
+          </div>
+        </div>
+        <div class="small text-muted mb-2">
+          Barra: solicitudes totales. Linea: metrica seleccionada.
+        </div>
+        <div class="cc-chart-wrap">
+          <canvas id="adminTrendChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-4">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Exito de solicitudes</h2>
+        <div class="cc-chart-wrap cc-chart-wrap--short">
+          <canvas id="adminSuccessChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top documentos consultados</h2>
+        <div class="cc-chart-wrap cc-chart-wrap--short">
+          <canvas id="adminTopDocsChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top emisores solicitantes</h2>
+        <div class="cc-chart-wrap cc-chart-wrap--short">
+          <canvas id="adminTopIssuersChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tendencia temporal -->
+  <div class="cc-card p-3 p-md-4 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 text-uppercase text-muted mb-0">Tendencia por tiempo</h2>
+      <span class="badge text-bg-light border"
+            th:text="${report.period.name() == 'DAY' ? 'Por día' : (report.period.name() == 'WEEK' ? 'Por semana' : 'Por mes')}">
+        Por día
+      </span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+        <tr>
+          <th>Periodo</th>
+          <th class="text-end">Solicitudes</th>
+          <th class="text-end">Exitosas</th>
+          <th class="text-end">No exitosas</th>
+          <th class="text-end">Consultados</th>
+          <th class="text-end">Depositados</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:if="${#lists.isEmpty(report.trendRows)}">
+          <td colspan="6" class="text-center text-muted py-4">Sin datos para el rango seleccionado.</td>
+        </tr>
+        <tr th:each="row : ${report.trendRows}">
+          <td class="fw-semibold" th:text="${row.periodLabel}">26/02/2026</td>
+          <td class="text-end" th:text="${row.totalRequests}">0</td>
+          <td class="text-end text-success fw-semibold" th:text="${row.successfulRequests}">0</td>
+          <td class="text-end text-danger fw-semibold" th:text="${row.unsuccessfulRequests}">0</td>
+          <td class="text-end" th:text="${row.documentsConsulted}">0</td>
+          <td class="text-end" th:text="${row.documentsDeposited}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tablas Top -->
+  <div class="row g-3">
+    <div class="col-12 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top documentos más consultados</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th>Documento</th>
+              <th class="text-end">Consultas</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topDocuments)}">
+              <td colspan="2" class="text-center text-muted py-3">No hay datos.</td>
+            </tr>
+            <tr th:each="t : ${report.topDocuments}">
+              <td th:text="${t.label}">Documento X</td>
+              <td class="text-end fw-semibold" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top usuarios / datos más consultados</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th>Usuario / identificación</th>
+              <th class="text-end">Consultas</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topPeople)}">
+              <td colspan="2" class="text-center text-muted py-3">No hay datos.</td>
+            </tr>
+            <tr th:each="t : ${report.topPeople}">
+              <td th:text="${t.label}">Persona X</td>
+              <td class="text-end fw-semibold" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top emisores más solicitados</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th>Emisor</th>
+              <th class="text-end">Solicitudes</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topIssuers)}">
+              <td colspan="2" class="text-center text-muted py-3">No hay datos.</td>
+            </tr>
+            <tr th:each="t : ${report.topIssuers}">
+              <td th:text="${t.label}">Entidad X</td>
+              <td class="text-end fw-semibold" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Errores más frecuentes</h2>
+        <p class="text-muted small mb-2">
+          Basado en solicitudes no exitosas (rechazadas o expiradas) y notas de decisión disponibles.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th>Error / motivo normalizado</th>
+              <th class="text-end">Frecuencia</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topErrors)}">
+              <td colspan="2" class="text-center text-muted py-3">No hay datos para normalizar errores.</td>
+            </tr>
+            <tr th:each="t : ${report.topErrors}">
+              <td th:text="${t.label}">Solicitud expirada</td>
+              <td class="text-end fw-semibold" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dataset para graficas (renderizado server-side y consumido por JS). -->
+  <div id="reportChartData" class="d-none"
+       th:attr="data-success-total=${report.successfulRequests},
+                data-unsuccess-total=${report.unsuccessfulRequests}">
+    <span th:each="row : ${report.trendRows}" class="trend-point"
+          th:attr="data-label=${row.periodLabel},
+                   data-total=${row.totalRequests},
+                   data-success=${row.successfulRequests},
+                   data-unsuccess=${row.unsuccessfulRequests},
+                   data-consulted=${row.documentsConsulted},
+                   data-deposited=${row.documentsDeposited}"></span>
+    <span th:each="t : ${report.topDocuments}" class="top-doc-point"
+          th:attr="data-label=${t.label},data-value=${t.total}"></span>
+    <span th:each="t : ${report.topIssuers}" class="top-issuer-point"
+          th:attr="data-label=${t.label},data-value=${t.total}"></span>
+  </div>
+</main>
+
+<script src="/js/ccdigital-loader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  (() => {
+    // Inicializa las gráficas solo si Chart.js está cargado y existe dataset embebido.
+    if (!window.Chart) return;
+    const dataHost = document.getElementById('reportChartData');
+    if (!dataHost) return;
+
+    const asInt = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    // Traduce datos renderizados por Thymeleaf a estructuras que consumen las gráficas.
+    const trendRows = Array.from(dataHost.querySelectorAll('.trend-point')).map((el) => ({
+      label: el.getAttribute('data-label') || '',
+      total: asInt(el.getAttribute('data-total')),
+      success: asInt(el.getAttribute('data-success')),
+      unsuccess: asInt(el.getAttribute('data-unsuccess')),
+      consulted: asInt(el.getAttribute('data-consulted')),
+      deposited: asInt(el.getAttribute('data-deposited'))
+    }));
+
+    const topDocs = Array.from(dataHost.querySelectorAll('.top-doc-point')).map((el) => ({
+      label: el.getAttribute('data-label') || 'Documento',
+      value: asInt(el.getAttribute('data-value'))
+    }));
+
+    const topIssuers = Array.from(dataHost.querySelectorAll('.top-issuer-point')).map((el) => ({
+      label: el.getAttribute('data-label') || 'Emisor',
+      value: asInt(el.getAttribute('data-value'))
+    }));
+
+    const totalSuccess = asInt(dataHost.getAttribute('data-success-total'));
+    const totalUnsuccess = asInt(dataHost.getAttribute('data-unsuccess-total'));
+
+    const trendLabels = trendRows.map((r) => r.label);
+    const trendTotals = trendRows.map((r) => r.total);
+    const trendConsulted = trendRows.map((r) => r.consulted);
+    const trendDeposited = trendRows.map((r) => r.deposited);
+    const trendSuccess = trendRows.map((r) => r.success);
+
+    const metricMap = {
+      consulted: { label: 'Documentos consultados', data: trendConsulted, color: '#1e66f5' },
+      deposited: { label: 'Documentos depositados', data: trendDeposited, color: '#0e9f6e' },
+      successful: { label: 'Solicitudes exitosas', data: trendSuccess, color: '#16a34a' }
+    };
+
+    // Gráfica mixta de tendencia: barras para volumen total y línea para métrica seleccionada.
+    const trendCanvas = document.getElementById('adminTrendChart');
+    if (trendCanvas && trendLabels.length > 0) {
+      const initialMetric = metricMap.consulted;
+      const trendChart = new Chart(trendCanvas, {
+        type: 'bar',
+        data: {
+          labels: trendLabels,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Solicitudes totales',
+              data: trendTotals,
+              backgroundColor: 'rgba(100, 116, 139, 0.35)',
+              borderColor: 'rgba(71, 85, 105, 0.85)',
+              borderWidth: 1,
+              yAxisID: 'y'
+            },
+            {
+              type: 'line',
+              label: initialMetric.label,
+              data: initialMetric.data,
+              borderColor: initialMetric.color,
+              backgroundColor: initialMetric.color,
+              borderWidth: 2,
+              pointRadius: 3,
+              pointHoverRadius: 4,
+              tension: 0.25,
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'bottom' }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 }
+            }
+          }
+        }
+      });
+
+      // Permite alternar la línea de tendencia sin recargar la página.
+      document.querySelectorAll('[data-trend-metric]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const metricKey = btn.getAttribute('data-trend-metric') || '';
+          const metric = metricMap[metricKey];
+          if (!metric) return;
+
+          document.querySelectorAll('[data-trend-metric]').forEach((other) => {
+            other.classList.remove('active');
+          });
+          btn.classList.add('active');
+
+          trendChart.data.datasets[1].label = metric.label;
+          trendChart.data.datasets[1].data = metric.data;
+          trendChart.data.datasets[1].borderColor = metric.color;
+          trendChart.data.datasets[1].backgroundColor = metric.color;
+          trendChart.update();
+        });
+      });
+    }
+
+    // Distribución general de éxito vs no éxito en solicitudes.
+    const successCanvas = document.getElementById('adminSuccessChart');
+    if (successCanvas) {
+      new Chart(successCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['Exitosas', 'No exitosas'],
+          datasets: [{
+            data: [totalSuccess, totalUnsuccess],
+            backgroundColor: ['#16a34a', '#dc2626'],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+    }
+
+    // Ranking horizontal de documentos más consultados.
+    const topDocsCanvas = document.getElementById('adminTopDocsChart');
+    if (topDocsCanvas && topDocs.length > 0) {
+      const labels = topDocs.slice(0, 7).map((x) => x.label);
+      const values = topDocs.slice(0, 7).map((x) => x.value);
+      new Chart(topDocsCanvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Consultas',
+            data: values,
+            backgroundColor: 'rgba(30, 102, 245, 0.7)',
+            borderColor: 'rgba(30, 102, 245, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    }
+
+    // Ranking horizontal de emisores con mayor volumen de solicitudes.
+    const topIssuersCanvas = document.getElementById('adminTopIssuersChart');
+    if (topIssuersCanvas && topIssuers.length > 0) {
+      const labels = topIssuers.slice(0, 7).map((x) => x.label);
+      const values = topIssuers.slice(0, 7).map((x) => x.value);
+      new Chart(topIssuersCanvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Solicitudes',
+            data: values,
+            backgroundColor: 'rgba(14, 159, 110, 0.7)',
+            borderColor: 'rgba(14, 159, 110, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    }
+  })();
+</script>
+</body>
+</html>

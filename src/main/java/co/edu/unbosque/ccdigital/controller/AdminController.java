@@ -6,14 +6,22 @@ import co.edu.unbosque.ccdigital.dto.SyncPersonForm;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
+import co.edu.unbosque.ccdigital.service.AdminReportPdfService;
+import co.edu.unbosque.ccdigital.service.AdminReportService;
 import co.edu.unbosque.ccdigital.service.ExternalToolsService;
 import co.edu.unbosque.ccdigital.service.PersonDocumentService;
 import co.edu.unbosque.ccdigital.service.PersonService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -39,6 +47,8 @@ public class AdminController {
     private final PersonService personService;
     private final PersonDocumentService personDocumentService;
     private final ExternalToolsService externalToolsService;
+    private final AdminReportService adminReportService;
+    private final AdminReportPdfService adminReportPdfService;
 
     /**
      * Constructor del controlador administrativo.
@@ -46,13 +56,19 @@ public class AdminController {
      * @param personService servicio para operaciones sobre {@link Person}
      * @param personDocumentService servicio para operaciones sobre {@link PersonDocument}
      * @param externalToolsService servicio de ejecución de herramientas externas
+     * @param adminReportService servicio de consolidación de trazabilidad administrativa
+     * @param adminReportPdfService servicio de exportación PDF del dashboard de reportes
      */
     public AdminController(PersonService personService,
                            PersonDocumentService personDocumentService,
-                           ExternalToolsService externalToolsService) {
+                           ExternalToolsService externalToolsService,
+                           AdminReportService adminReportService,
+                           AdminReportPdfService adminReportPdfService) {
         this.personService = personService;
         this.personDocumentService = personDocumentService;
         this.externalToolsService = externalToolsService;
+        this.adminReportService = adminReportService;
+        this.adminReportPdfService = adminReportPdfService;
     }
 
     /**
@@ -70,6 +86,57 @@ public class AdminController {
     @GetMapping({"", "/", "/dashboard"})
     public String dashboard() {
         return "admin/dashboard";
+    }
+
+    /**
+     * Muestra el dashboard de trazabilidad (Admin > Reportes) con filtros por rango y granularidad.
+     *
+     * <p>Si no se envía rango temporal, se calcula sobre los últimos 30 días.</p>
+     *
+     * @param from fecha inicial (incluyente), opcional
+     * @param to fecha final (incluyente), opcional
+     * @param period granularidad de tendencia (DAY/WEEK/MONTH), opcional
+     * @param model modelo de Spring MVC
+     * @return vista de reportes administrativos
+     */
+    @GetMapping("/reports")
+    public String reports(@RequestParam(value = "from", required = false)
+                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                          @RequestParam(value = "to", required = false)
+                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                          @RequestParam(value = "period", required = false, defaultValue = "DAY") String period,
+                          Model model) {
+        AdminReportService.DashboardReport report = adminReportService.buildDashboard(from, to, period);
+        model.addAttribute("report", report);
+        model.addAttribute("periodOptions", AdminReportService.TrendPeriod.values());
+        return "admin/reports";
+    }
+
+    /**
+     * Exporta en PDF el reporte de trazabilidad administrativo con los filtros actuales.
+     *
+     * @param from fecha inicial (incluyente), opcional
+     * @param to fecha final (incluyente), opcional
+     * @param period granularidad de tendencia (DAY/WEEK/MONTH), opcional
+     * @return archivo PDF en modo descarga
+     */
+    @GetMapping("/reports/pdf")
+    public ResponseEntity<byte[]> reportsPdf(@RequestParam(value = "from", required = false)
+                                             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                             @RequestParam(value = "to", required = false)
+                                             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                             @RequestParam(value = "period", required = false, defaultValue = "DAY") String period) {
+        AdminReportService.DashboardReport report = adminReportService.buildDashboard(from, to, period);
+        byte[] pdf = adminReportPdfService.generateReportPdf(report);
+
+        String fromLabel = report.getFromDate().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String toLabel = report.getToDate().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String filename = "ccdigital-reporte-trazabilidad-" + fromLabel + "-" + toLabel + ".pdf";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(pdf);
     }
 
     /**
