@@ -9,6 +9,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -65,8 +66,47 @@ public class UserDocsController {
                                             @RequestParam("exp") Long exp,
                                             @RequestParam("sig") String sig,
                                             Authentication auth) {
+        return serveDoc(docId, exp, sig, auth, false);
+    }
+
+    /**
+     * Descarga un documento del usuario, sirviéndolo como archivo adjunto.
+     *
+     * @param docId identificador del documento en Fabric
+     * @param exp expiración de la URL firmada (epoch seconds)
+     * @param sig firma HMAC de la URL
+     * @param auth autenticación actual
+     * @return respuesta HTTP con el archivo como {@link Resource}
+     */
+    @GetMapping("/user/docs/download/{docId}")
+    public ResponseEntity<Resource> downloadDoc(@PathVariable String docId,
+                                                @RequestParam("exp") Long exp,
+                                                @RequestParam("sig") String sig,
+                                                Authentication auth) {
+        return serveDoc(docId, exp, sig, auth, true);
+    }
+
+    /**
+     * Resuelve un documento de Fabric y lo responde en modo inline o attachment.
+     *
+     * @param docId identificador del documento en Fabric
+     * @param exp expiración de la URL firmada (epoch seconds)
+     * @param sig firma HMAC de la URL
+     * @param auth autenticación actual del usuario final
+     * @param asAttachment {@code true} para descarga; {@code false} para vista integrada
+     * @return respuesta HTTP con el archivo del documento
+     */
+    private ResponseEntity<Resource> serveDoc(String docId,
+                                              Long exp,
+                                              String sig,
+                                              Authentication auth,
+                                              boolean asAttachment) {
         IndyUserPrincipal p = (IndyUserPrincipal) auth.getPrincipal();
-        signedUrlService.validateUserDocumentView(docId, exp, sig);
+        if (asAttachment) {
+            signedUrlService.validateUserDocumentDownload(docId, exp, sig);
+        } else {
+            signedUrlService.validateUserDocumentView(docId, exp, sig);
+        }
 
         var doc = fabric.findDocById(p.getIdType(), p.getIdNumber(), docId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Documento no encontrado en Fabric"));
@@ -87,15 +127,15 @@ public class UserDocsController {
                 throw new ResponseStatusException(NOT_FOUND, "Archivo no existe o no es legible");
             }
 
-            String contentType = Files.probeContentType(file);
-            if (contentType == null || contentType.isBlank()) {
-                contentType = "application/octet-stream";
-            }
+            // Intenta detectar MIME real para soportar vista inline (PDF/imagen) en el modal.
+            String contentType = detectContentType(file, doc.fileName());
 
             Resource resource = new FileSystemResource(file);
 
-            ContentDisposition disposition = ContentDisposition
-                    .inline()
+            ContentDisposition.Builder dispositionBuilder = asAttachment
+                    ? ContentDisposition.attachment()
+                    : ContentDisposition.inline();
+            ContentDisposition disposition = dispositionBuilder
                     .filename(doc.fileName())
                     .build();
 
@@ -109,5 +149,43 @@ public class UserDocsController {
         } catch (Exception e) {
             throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "No se pudo abrir el documento", e);
         }
+    }
+
+    /**
+     * Detecta el tipo de contenido del archivo para favorecer renderizado inline en navegador.
+     *
+     * <p>Primero usa el filesystem, luego extensión de nombre lógico y por último extensión
+     * del path físico. Si no se puede resolver, retorna {@code application/octet-stream}.</p>
+     *
+     * @param file ruta física
+     * @param logicalName nombre lógico del documento
+     * @return MIME type seguro para responder
+     */
+    private String detectContentType(Path file, String logicalName) {
+        try {
+            String byFs = Files.probeContentType(file);
+            if (byFs != null && !byFs.isBlank()) {
+                return byFs;
+            }
+        } catch (Exception ignored) {
+            // Continúa con detección por extensión.
+        }
+
+        if (logicalName != null && !logicalName.isBlank()) {
+            var mt = MediaTypeFactory.getMediaType(logicalName);
+            if (mt.isPresent()) {
+                return mt.get().toString();
+            }
+        }
+
+        String physicalName = file.getFileName() != null ? file.getFileName().toString() : "";
+        if (!physicalName.isBlank()) {
+            var mt = MediaTypeFactory.getMediaType(physicalName);
+            if (mt.isPresent()) {
+                return mt.get().toString();
+            }
+        }
+
+        return MediaType.APPLICATION_OCTET_STREAM_VALUE;
     }
 }

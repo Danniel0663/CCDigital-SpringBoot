@@ -33,11 +33,14 @@ public class UserRegisterEmailOtpService {
 
     private static final class Challenge {
         private final String codeHash;
+        // Timestamp de creación para controlar reenvío inmediato del mismo flujo.
+        private final Instant issuedAt;
         private final Instant expiresAt;
         private int failedAttempts;
 
-        private Challenge(String codeHash, Instant expiresAt) {
+        private Challenge(String codeHash, Instant issuedAt, Instant expiresAt) {
             this.codeHash = codeHash;
+            this.issuedAt = issuedAt;
             this.expiresAt = expiresAt;
         }
     }
@@ -52,6 +55,12 @@ public class UserRegisterEmailOtpService {
 
     @Value("${app.security.register-email-otp.max-attempts:5}")
     private int maxAttempts;
+
+    /**
+     * Ventana mínima entre reenvíos de OTP para el mismo token de registro.
+     */
+    @Value("${app.security.register-email-otp.resend-cooldown-seconds:45}")
+    private long resendCooldownSeconds;
 
     @Value("${app.security.register-email-otp.mail.from:}")
     private String mailFrom;
@@ -81,10 +90,17 @@ public class UserRegisterEmailOtpService {
 
         String key = flowId.trim();
         prune(key);
+        Challenge existing = challenges.get(key);
+        if (existing != null
+                && Duration.between(existing.issuedAt, Instant.now()).getSeconds() < Math.max(1, resendCooldownSeconds)) {
+            // Dentro de la ventana no se emite un nuevo código para evitar spam de correo.
+            return true;
+        }
 
         String code = generateNumericCode(safeCodeLength());
         Challenge c = new Challenge(
                 sha256Base64(code),
+                Instant.now(),
                 Instant.now().plus(Duration.ofMinutes(Math.max(1, codeTtlMinutes)))
         );
 

@@ -223,6 +223,7 @@
               method="post"
               enctype="multipart/form-data"
               th:object="${uploadForm}"
+              id="issuerUploadForm"
               class="row g-3"
               data-cc-loader data-cc-loader-message="Subiendo documento y enviándolo a revisión...">
 
@@ -236,9 +237,6 @@
               <option th:each="d : ${allowedDocs}" th:value="${d.id}"
                       th:text="${d.title + ' - ' + d.issuingEntity}"></option>
             </select>
-            <div class="form-text">
-              Si la lista sale vacía, revisa la tabla <code>entity_document_definitions</code>.
-            </div>
           </div>
 
           <div class="col-12">
@@ -263,10 +261,9 @@
 
           <div class="col-12">
             <label class="form-label">Archivo</label>
-            <input class="form-control" type="file" name="file" required />
-            <div class="form-text">
-              Se guarda ruta + hash SHA256 automáticamente. Queda PENDING para revisión.
-            </div>
+            <input class="form-control" id="issuerUploadFile" type="file" name="file" accept=".pdf,application/pdf" required />
+            <div class="form-text">Solo se permite formato PDF.</div>
+            <div id="issuerUploadFileError" class="invalid-feedback d-none"></div>
           </div>
 
           <div class="col-12">
@@ -283,6 +280,65 @@
 </main>
 
 <script src="/js/ccdigital-loader.js"></script>
+<script>
+  (() => {
+    // Validación cliente del archivo para bloquear formatos no PDF antes de enviar el formulario.
+    const form = document.getElementById('issuerUploadForm');
+    const fileInput = document.getElementById('issuerUploadFile');
+    const errorBox = document.getElementById('issuerUploadFileError');
+    if (!form || !fileInput || !errorBox) return;
+
+    const isPdfFile = (file) => {
+      if (!file) return false;
+      const name = (file.name || '').trim().toLowerCase();
+      const type = (file.type || '').trim().toLowerCase();
+      return name.endsWith('.pdf') || type.includes('pdf');
+    };
+
+    const showFileError = (message) => {
+      errorBox.textContent = message;
+      errorBox.classList.remove('d-none');
+      fileInput.classList.add('is-invalid');
+    };
+
+    const clearFileError = () => {
+      errorBox.textContent = '';
+      errorBox.classList.add('d-none');
+      fileInput.classList.remove('is-invalid');
+    };
+
+    fileInput.addEventListener('change', () => {
+      const selected = fileInput.files && fileInput.files.length > 0 ? fileInput.files[0] : null;
+      if (!selected) {
+        clearFileError();
+        return;
+      }
+      if (!isPdfFile(selected)) {
+        showFileError('Solo se permite subir archivos PDF.');
+        return;
+      }
+      clearFileError();
+    });
+
+    // Se usa captura para validar antes del loader global del formulario.
+    form.addEventListener('submit', (event) => {
+      const selected = fileInput.files && fileInput.files.length > 0 ? fileInput.files[0] : null;
+      if (!selected) {
+        event.preventDefault();
+        event.stopPropagation();
+        showFileError('Debes seleccionar un archivo PDF.');
+        return;
+      }
+      if (!isPdfFile(selected)) {
+        event.preventDefault();
+        event.stopPropagation();
+        showFileError('Solo se permite subir archivos PDF.');
+        return;
+      }
+      clearFileError();
+    }, true);
+  })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

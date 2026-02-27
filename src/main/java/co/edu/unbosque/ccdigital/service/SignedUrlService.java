@@ -29,7 +29,9 @@ public class SignedUrlService {
     private static final Logger log = LoggerFactory.getLogger(SignedUrlService.class);
     private static final String HMAC_ALG = "HmacSHA256";
     private static final String SCOPE_USER_DOC = "user-doc-view";
+    private static final String SCOPE_USER_DOC_DOWNLOAD = "user-doc-download";
     private static final String SCOPE_ISSUER_DOC = "issuer-doc-view";
+    private static final String SCOPE_ISSUER_DOC_DOWNLOAD = "issuer-doc-download";
 
     @Value("${app.security.signed-urls.secret:}")
     private String configuredSecret;
@@ -53,6 +55,19 @@ public class SignedUrlService {
     }
 
     /**
+     * Construye una URL firmada para descarga de documento del usuario final.
+     *
+     * @param docId identificador del documento en Fabric
+     * @return URL relativa firmada con expiración para descarga
+     */
+    public String userDocumentDownloadUrl(String docId) {
+        long exp = expiryEpochSeconds();
+        String sig = sign(SCOPE_USER_DOC_DOWNLOAD, safe(docId), Long.toString(exp));
+        String encodedDocId = UriUtils.encodePathSegment(safe(docId), StandardCharsets.UTF_8);
+        return "/user/docs/download/" + encodedDocId + "?exp=" + exp + "&sig=" + sig;
+    }
+
+    /**
      * Construye una URL firmada para visualización de documento aprobado del módulo emisor.
      *
      * @param requestId id de la solicitud de acceso
@@ -68,6 +83,21 @@ public class SignedUrlService {
     }
 
     /**
+     * Construye una URL firmada para descarga de documento aprobado del módulo emisor.
+     *
+     * @param requestId id de la solicitud de acceso
+     * @param personDocumentId id del documento de persona solicitado
+     * @return URL relativa firmada con expiración para descarga
+     */
+    public String issuerDocumentDownloadUrl(Long requestId, Long personDocumentId) {
+        long exp = expiryEpochSeconds();
+        String rid = requestId == null ? "" : requestId.toString();
+        String pdid = personDocumentId == null ? "" : personDocumentId.toString();
+        String sig = sign(SCOPE_ISSUER_DOC_DOWNLOAD, rid, pdid, Long.toString(exp));
+        return "/issuer/access-requests/" + rid + "/documents/" + pdid + "/download?exp=" + exp + "&sig=" + sig;
+    }
+
+    /**
      * Valida firma y expiración de una URL de documento del usuario final.
      *
      * @param docId docId de Fabric en la URL
@@ -76,6 +106,17 @@ public class SignedUrlService {
      */
     public void validateUserDocumentView(String docId, Long exp, String sig) {
         validate(SCOPE_USER_DOC, exp, sig, safe(docId));
+    }
+
+    /**
+     * Valida firma y expiración de una URL de descarga de documento del usuario final.
+     *
+     * @param docId docId de Fabric en la URL
+     * @param exp expiración UNIX epoch seconds
+     * @param sig firma recibida en query string
+     */
+    public void validateUserDocumentDownload(String docId, Long exp, String sig) {
+        validate(SCOPE_USER_DOC_DOWNLOAD, exp, sig, safe(docId));
     }
 
     /**
@@ -89,6 +130,24 @@ public class SignedUrlService {
     public void validateIssuerDocumentView(Long requestId, Long personDocumentId, Long exp, String sig) {
         validate(
                 SCOPE_ISSUER_DOC,
+                exp,
+                sig,
+                requestId == null ? "" : requestId.toString(),
+                personDocumentId == null ? "" : personDocumentId.toString()
+        );
+    }
+
+    /**
+     * Valida firma y expiración de una URL de descarga del módulo emisor.
+     *
+     * @param requestId solicitud de acceso
+     * @param personDocumentId documento solicitado
+     * @param exp expiración UNIX epoch seconds
+     * @param sig firma recibida en query string
+     */
+    public void validateIssuerDocumentDownload(Long requestId, Long personDocumentId, Long exp, String sig) {
+        validate(
+                SCOPE_ISSUER_DOC_DOWNLOAD,
                 exp,
                 sig,
                 requestId == null ? "" : requestId.toString(),

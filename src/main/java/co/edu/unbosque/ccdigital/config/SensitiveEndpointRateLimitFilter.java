@@ -38,9 +38,11 @@ public class SensitiveEndpointRateLimitFilter extends OncePerRequestFilter {
             "/login/issuer",
             "/user/auth/start",
             "/user/auth/otp/verify",
+            "/user/auth/otp/resend",
             "/user/auth/forgot/verify",
             "/user/auth/forgot/reset",
             "/register/user",
+            "/register/user/email-otp/resend",
             "/register/user/totp/confirm"
     );
 

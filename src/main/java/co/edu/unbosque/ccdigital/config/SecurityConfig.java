@@ -5,6 +5,10 @@ import co.edu.unbosque.ccdigital.entity.EntityUser;
 import co.edu.unbosque.ccdigital.repository.AppUserRepository;
 import co.edu.unbosque.ccdigital.repository.EntityUserRepository;
 import co.edu.unbosque.ccdigital.security.IssuerPrincipal;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -18,10 +22,17 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
 
 /**
  * Configuración de seguridad de la aplicación.
@@ -53,8 +64,23 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private static final String SESSION_APP_INSTANCE_ID = "ccdigital.security.appInstanceId";
+
     @Value("${app.security.require-https:false}")
     private boolean requireHttps;
+
+    /**
+     * Identificador único de la instancia actual de la aplicación.
+     *
+     * <p>Se renueva en cada arranque para invalidar sesiones de admin/emisor provenientes
+     * de una instancia anterior del backend.</p>
+     *
+     * @return ID de instancia en ejecución
+     */
+    @Bean("appInstanceId")
+    public String appInstanceId() {
+        return UUID.randomUUID().toString();
+    }
 
     /**
      * Encoder de contraseñas para hashes BCrypt.
@@ -190,11 +216,16 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain adminSecurityFilterChain(
             HttpSecurity http,
-            @Qualifier("adminAuthProvider") AuthenticationProvider adminAuthProvider
+            @Qualifier("adminAuthProvider") AuthenticationProvider adminAuthProvider,
+            @Qualifier("appInstanceId") String appInstanceId
     ) throws Exception {
         applyCommonHardening(http);
         http.securityMatcher("/admin/**", "/login/admin", "/admin/logout")
                 .authenticationProvider(adminAuthProvider)
+                .addFilterAfter(
+                        new AppInstanceSessionValidationFilter(appInstanceId, "/admin", "/login/admin"),
+                        SecurityContextHolderFilter.class
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login/admin", "/admin/logout").permitAll()
                         .anyRequest().hasRole("GOBIERNO")
@@ -202,7 +233,7 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login/admin")
                         .loginProcessingUrl("/login/admin")
-                        .defaultSuccessUrl("/admin/dashboard", true)
+                        .successHandler(markingSuccessHandler(appInstanceId, "/admin/dashboard"))
                         .failureUrl("/login/admin?error=true")
                         .permitAll()
                 )
@@ -237,11 +268,16 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain issuerSecurityFilterChain(
             HttpSecurity http,
-            @Qualifier("issuerAuthProvider") AuthenticationProvider issuerAuthProvider
+            @Qualifier("issuerAuthProvider") AuthenticationProvider issuerAuthProvider,
+            @Qualifier("appInstanceId") String appInstanceId
     ) throws Exception {
         applyCommonHardening(http);
         http.securityMatcher("/issuer/**", "/login/issuer", "/issuer/logout")
                 .authenticationProvider(issuerAuthProvider)
+                .addFilterAfter(
+                        new AppInstanceSessionValidationFilter(appInstanceId, "/issuer", "/login/issuer"),
+                        SecurityContextHolderFilter.class
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login/issuer", "/issuer/logout").permitAll()
                         .anyRequest().hasRole("ISSUER")
@@ -249,7 +285,7 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login/issuer")
                         .loginProcessingUrl("/login/issuer")
-                        .defaultSuccessUrl("/issuer", true)
+                        .successHandler(markingSuccessHandler(appInstanceId, "/issuer"))
                         .failureUrl("/login/issuer?error=true")
                         .permitAll()
                 )
@@ -399,7 +435,8 @@ public class SecurityConfig {
             http.headers(headers -> {
                 headers.contentTypeOptions(Customizer.withDefaults());
                 headers.referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN));
-                headers.frameOptions(frame -> frame.deny());
+                // Permite iframes solo del mismo origen (necesario para preview interno de documentos).
+                headers.frameOptions(frame -> frame.sameOrigin());
                 headers.httpStrictTransportSecurity(hsts -> hsts
                         .includeSubDomains(true)
                         .maxAgeInSeconds(31536000));
@@ -410,7 +447,7 @@ public class SecurityConfig {
                 headers.contentSecurityPolicy(csp -> csp.policyDirectives(
                         "default-src 'self'; " +
                                 "base-uri 'self'; " +
-                                "frame-ancestors 'none'; " +
+                                "frame-ancestors 'self'; " +
                                 "object-src 'none'; " +
                                 "form-action 'self'; " +
                                 "connect-src 'self'; " +
@@ -422,6 +459,61 @@ public class SecurityConfig {
             });
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo aplicar endurecimiento HTTP común", e);
+        }
+    }
+
+    /**
+     * Crea un {@link AuthenticationSuccessHandler} que marca la sesión con el ID de la instancia
+     * y redirige al destino por defecto del módulo.
+     *
+     * @param appInstanceId ID de la instancia en ejecución
+     * @param targetUrl URL destino post-login
+     * @return success handler con marcado de sesión
+     */
+    private AuthenticationSuccessHandler markingSuccessHandler(String appInstanceId, String targetUrl) {
+        return (request, response, authentication) -> {
+            request.getSession(true).setAttribute(SESSION_APP_INSTANCE_ID, appInstanceId);
+            response.sendRedirect(targetUrl);
+        };
+    }
+
+    /**
+     * Filtro que invalida sesiones autenticadas cuando pertenecen a una instancia previa del backend.
+     */
+    private static final class AppInstanceSessionValidationFilter extends OncePerRequestFilter {
+        private final String currentAppInstanceId;
+        private final String protectedPrefix;
+        private final String loginUrl;
+
+        private AppInstanceSessionValidationFilter(String currentAppInstanceId,
+                                                   String protectedPrefix,
+                                                   String loginUrl) {
+            this.currentAppInstanceId = currentAppInstanceId;
+            this.protectedPrefix = protectedPrefix;
+            this.loginUrl = loginUrl;
+        }
+
+        @Override
+        protected void doFilterInternal(HttpServletRequest request,
+                                        HttpServletResponse response,
+                                        FilterChain filterChain) throws ServletException, IOException {
+            String uri = request.getRequestURI();
+            if (uri != null && (uri.equals(protectedPrefix) || uri.startsWith(protectedPrefix + "/"))) {
+                var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
+                    var session = request.getSession(false);
+                    String marker = session == null ? null : (String) session.getAttribute(SESSION_APP_INSTANCE_ID);
+                    if (marker == null || !marker.equals(currentAppInstanceId)) {
+                        if (session != null) {
+                            session.invalidate();
+                        }
+                        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+                        response.sendRedirect(loginUrl + "?expired=true");
+                        return;
+                    }
+                }
+            }
+            filterChain.doFilter(request, response);
         }
     }
 }

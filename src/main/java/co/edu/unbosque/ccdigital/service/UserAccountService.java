@@ -110,7 +110,7 @@ public class UserAccountService {
         }
         if (!isStrongEnoughPassword(rawPasswordValue)) {
             throw new IllegalArgumentException(
-                    "La contraseña debe tener mínimo 8 caracteres e incluir letras y números."
+                    "La contraseña debe tener mínimo 8 caracteres e incluir letras, números y un carácter especial."
             );
         }
 
@@ -215,7 +215,7 @@ public class UserAccountService {
     /**
      * Aplica la misma regla de complejidad usada en el flujo de restablecimiento de contraseña.
      *
-     * <p>Regla mínima: 8 caracteres, con al menos una letra y un número.</p>
+     * <p>Regla mínima: 8 caracteres, con al menos una letra, un número y un carácter especial.</p>
      *
      * @param pwd contraseña normalizada
      * @return {@code true} si cumple la política mínima
@@ -225,10 +225,12 @@ public class UserAccountService {
         if (pwd.length() < 8) return false;
         boolean hasLetter = false;
         boolean hasDigit = false;
+        boolean hasSpecial = false;
         for (char c : pwd.toCharArray()) {
             if (Character.isLetter(c)) hasLetter = true;
             if (Character.isDigit(c)) hasDigit = true;
+            if (!Character.isLetterOrDigit(c)) hasSpecial = true;
         }
-        return hasLetter && hasDigit;
+        return hasLetter && hasDigit && hasSpecial;
     }
 }

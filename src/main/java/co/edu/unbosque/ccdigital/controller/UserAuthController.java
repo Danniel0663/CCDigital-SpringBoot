@@ -37,6 +37,10 @@ import java.util.Map;
 @RequestMapping("/user/auth")
 public class UserAuthController {
 
+    /**
+     * Número máximo de intentos permitidos para validar segundo factor en un mismo flujo de login.
+     */
+    private static final int MAX_OTP_LOGIN_ATTEMPTS = 3;
     private static final String SESSION_EXPECTED_ID_NUMBERS = "user.auth.expectedIdNumbersByPresExId";
     private static final String SESSION_EXPECTED_EMAILS = "user.auth.expectedEmailsByPresExId";
     private static final String SESSION_PENDING_OTP_CONTEXTS = "user.auth.pendingOtpContextsByPresExId";
@@ -145,6 +149,21 @@ public class UserAuthController {
     }
 
     /**
+     * Request para reenviar el código OTP por correo durante login.
+     */
+    public static class OtpResendRequest {
+        private String presExId;
+
+        public String getPresExId() {
+            return presExId;
+        }
+
+        public void setPresExId(String presExId) {
+            this.presExId = presExId;
+        }
+    }
+
+    /**
      * Contexto temporal pendiente de autenticación final mientras se valida OTP.
      */
     public static class PendingOtpContext {
@@ -156,6 +175,10 @@ public class UserAuthController {
         private String profileEmail;
         private String loginEmail;
         private String secondFactorMethod;
+        /**
+         * Intentos fallidos acumulados del segundo factor (correo o TOTP) para este contexto temporal.
+         */
+        private int failedOtpAttempts;
 
         public Long getPersonId() { return personId; }
         public void setPersonId(Long personId) { this.personId = personId; }
@@ -173,6 +196,8 @@ public class UserAuthController {
         public void setLoginEmail(String loginEmail) { this.loginEmail = loginEmail; }
         public String getSecondFactorMethod() { return secondFactorMethod; }
         public void setSecondFactorMethod(String secondFactorMethod) { this.secondFactorMethod = secondFactorMethod; }
+        public int getFailedOtpAttempts() { return failedOtpAttempts; }
+        public void setFailedOtpAttempts(int failedOtpAttempts) { this.failedOtpAttempts = failedOtpAttempts; }
     }
 
     /**
@@ -381,11 +406,33 @@ public class UserAuthController {
             ok = userLoginOtpService.verifyCode(presExId, code);
         }
         if (!ok) {
+            int failed = Math.max(0, pending.getFailedOtpAttempts()) + 1;
+            pending.setFailedOtpAttempts(failed);
+
+            int remaining = MAX_OTP_LOGIN_ATTEMPTS - failed;
+            if (remaining <= 0) {
+                removeExpectedIdNumber(request, presExId);
+                removeExpectedEmail(request, presExId);
+                removePendingOtpContext(request, presExId);
+                userLoginOtpService.invalidate(presExId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .cacheControl(CacheControl.noStore())
+                        .body(Map.of(
+                                "error", "Se agotaron los intentos de verificación. Debes iniciar sesión nuevamente.",
+                                "restartLogin", true
+                        ));
+            }
+
+            savePendingOtpContext(request, presExId, pending);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .cacheControl(CacheControl.noStore())
-                    .body(Map.of("error", isTotpFactor(pending)
-                            ? "Código de la app inválido o expirado."
-                            : "Código inválido o expirado."));
+                    .body(Map.of(
+                            "error", (isTotpFactor(pending)
+                                    ? "Código de la app inválido."
+                                    : "Código inválido.")
+                                    + " Te quedan " + remaining + " intento(s).",
+                            "attemptsRemaining", remaining
+                    ));
         }
 
         IndyUserPrincipal principal = new IndyUserPrincipal(
@@ -408,6 +455,53 @@ public class UserAuthController {
                         "authenticated", true,
                         "redirectUrl", "/user/dashboard",
                         "displayName", principal.getDisplayName()
+                ));
+    }
+
+    /**
+     * Reenvía el OTP por correo para un flujo de login ya verificado por credencial Indy.
+     *
+     * @param req request con presExId del flujo en curso
+     * @param request request HTTP para acceder al contexto pendiente en sesión
+     * @return estado de reenvío y mensaje amigable
+     */
+    @PostMapping("/otp/resend")
+    public ResponseEntity<Map<String, Object>> resendOtp(@RequestBody OtpResendRequest req,
+                                                          HttpServletRequest request) {
+        String presExId = req == null ? null : normalize(req.getPresExId());
+        if (presExId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "presExId es requerido"));
+        }
+
+        PendingOtpContext pending = getPendingOtpContext(request, presExId);
+        if (pending == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .cacheControl(CacheControl.noStore())
+                    .body(Map.of("error", "La sesión de validación expiró. Inicia sesión nuevamente."));
+        }
+        if (isTotpFactor(pending)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .cacheControl(CacheControl.noStore())
+                    .body(Map.of("error", "Este usuario usa app autenticadora. No aplica reenvío por correo."));
+        }
+
+        boolean sent = userLoginOtpService.issueCode(
+                presExId,
+                pending.getLoginEmail(),
+                displayNameFromPending(pending)
+        );
+        if (!sent) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .cacheControl(CacheControl.noStore())
+                    .body(Map.of("error", "No fue posible reenviar el código. Intenta nuevamente."));
+        }
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(Map.of(
+                        "ok", true,
+                        "maskedEmail", maskEmail(pending.getLoginEmail()),
+                        "message", "Si aplica, se reenvió un código a tu correo."
                 ));
     }
 

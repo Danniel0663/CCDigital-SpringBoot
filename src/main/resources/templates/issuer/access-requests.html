@@ -139,6 +139,10 @@
       <i class="bi bi-exclamation-triangle me-2"></i>
       <span th:text="${error}">Aviso</span>
     </div>
+    <div id="issuerDocClientAlert" class="alert alert-warning py-2 mt-3 mb-0 d-none" role="alert">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <span id="issuerDocClientAlertText">Aviso</span>
+    </div>
   </div>
 
   <div class="cc-card p-3 p-md-4">
@@ -213,16 +217,25 @@
 
             <td class="text-end">
               <div th:if="${r.status.name() == 'APROBADA'}" class="d-flex flex-column gap-2 align-items-end">
-                <div class="text-muted small">Ver documentos:</div>
-                <div class="d-flex flex-wrap gap-2 justify-content-end">
-                  <a class="btn btn-sm btn-outline-primary"
-                     th:each="i : ${r.items}"
-                     th:href="${@signedUrlService.issuerDocumentViewUrl(r.id, i.personDocument.id)}"
-                     target="_blank"
-                     rel="noopener"
-                     th:text="${i.personDocument.documentDefinition.title}">
-                    Ver
-                  </a>
+                <div class="text-muted small">Documentos autorizados:</div>
+                <div class="d-flex flex-column gap-2 align-items-end w-100">
+                  <div th:each="i : ${r.items}" class="border rounded p-2 w-100 bg-light-subtle">
+                    <div class="small fw-semibold mb-2 text-start"
+                         th:text="${i.personDocument.documentDefinition.title}">Documento</div>
+                    <div class="d-flex gap-2 justify-content-end">
+                      <button type="button"
+                              class="btn btn-sm btn-outline-primary"
+                              data-issuer-doc-open
+                              th:attr="data-doc-view-url=${@signedUrlService.issuerDocumentViewUrl(r.id, i.personDocument.id)},data-doc-title=${i.personDocument.documentDefinition.title}">
+                        <i class="bi bi-eye me-1"></i>Ver
+                      </button>
+                      <a class="btn btn-sm btn-outline-secondary"
+                         data-issuer-doc-download
+                         th:href="${@signedUrlService.issuerDocumentDownloadUrl(r.id, i.personDocument.id)}">
+                        <i class="bi bi-download me-1"></i>Descargar
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -234,9 +247,215 @@
       </table>
     </div>
   </div>
+
+  <section id="issuerDocPreviewPanel" class="cc-form-section mt-3 d-none" aria-live="polite">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 mb-0" id="issuerDocPreviewTitle">Vista de documento</h2>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCloseIssuerDocPreview">
+        <i class="bi bi-x-lg me-1"></i>Cerrar vista
+      </button>
+    </div>
+    <div id="issuerDocPreviewLoading" class="small text-muted py-2 d-none">
+      <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      Cargando documento...
+    </div>
+    <iframe id="issuerDocPreviewFrame"
+            title="Vista previa de documento autorizado"
+            style="width:100%;height:72vh;border:1px solid var(--cc-border-color);border-radius:.75rem;"
+            loading="lazy"></iframe>
+  </section>
 </main>
 
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  (function () {
+    const panelEl = document.getElementById('issuerDocPreviewPanel');
+    let frameEl = document.getElementById('issuerDocPreviewFrame');
+    const loadingEl = document.getElementById('issuerDocPreviewLoading');
+    const titleEl = document.getElementById('issuerDocPreviewTitle');
+    const closeBtn = document.getElementById('btnCloseIssuerDocPreview');
+    const clientAlertEl = document.getElementById('issuerDocClientAlert');
+    const clientAlertTextEl = document.getElementById('issuerDocClientAlertText');
+    if (!panelEl || !frameEl || !titleEl) return;
+
+    let activeViewBtn = null;
+    let safetyHideTimer = null;
+    let openToken = 0;
+
+    function setViewButtonBusy(btn, busy) {
+      if (!btn) return;
+      window.CCDigitalLoader?.setButtonBusy(
+        btn,
+        busy,
+        '<span class="spinner-border spinner-border-sm me-1"></span>Abriendo...',
+        '<i class="bi bi-eye me-1"></i>Ver'
+      );
+    }
+
+    function clearOpenTimers() {
+      if (safetyHideTimer) {
+        clearTimeout(safetyHideTimer);
+        safetyHideTimer = null;
+      }
+    }
+
+    function finishOpenFlow() {
+      clearOpenTimers();
+      setViewButtonBusy(activeViewBtn, false);
+      activeViewBtn = null;
+      window.CCDigitalLoader?.hide(true);
+    }
+
+    function showClientAlert(message) {
+      if (!clientAlertEl || !clientAlertTextEl) return;
+      clientAlertTextEl.textContent = message || 'No fue posible abrir el documento solicitado.';
+      clientAlertEl.classList.remove('d-none');
+    }
+
+    function hideClientAlert() {
+      if (!clientAlertEl || !clientAlertTextEl) return;
+      clientAlertTextEl.textContent = '';
+      clientAlertEl.classList.add('d-none');
+    }
+
+    function setInlineLoading(isLoading) {
+      if (loadingEl) {
+        loadingEl.classList.toggle('d-none', !isLoading);
+      }
+      frameEl.classList.toggle('d-none', isLoading);
+      frameEl.setAttribute('aria-hidden', isLoading ? 'true' : 'false');
+    }
+
+    function attachFrameListeners(targetFrame) {
+      targetFrame.addEventListener('load', () => {
+        const tokenFromFrame = Number(targetFrame.dataset.openToken || '0');
+        if (!tokenFromFrame || tokenFromFrame !== openToken) {
+          return;
+        }
+        setInlineLoading(false);
+        finishOpenFlow();
+      });
+
+      targetFrame.addEventListener('error', () => {
+        const tokenFromFrame = Number(targetFrame.dataset.openToken || '0');
+        if (!tokenFromFrame || tokenFromFrame !== openToken) {
+          return;
+        }
+        finishOpenFlow();
+      });
+    }
+
+    function rebuildFrame() {
+      const freshFrame = frameEl.cloneNode(false);
+      freshFrame.dataset.openToken = '';
+      freshFrame.classList.add('d-none');
+      freshFrame.setAttribute('aria-hidden', 'true');
+      frameEl.replaceWith(freshFrame);
+      frameEl = freshFrame;
+      attachFrameListeners(frameEl);
+    }
+
+    function closePreview(resetFlow) {
+      panelEl.classList.add('d-none');
+      titleEl.textContent = 'Vista de documento';
+      // Reemplazar el iframe destruye inmediatamente el documento anterior y evita parpadeos.
+      rebuildFrame();
+      setInlineLoading(false);
+      if (resetFlow) {
+        finishOpenFlow();
+      }
+    }
+
+    closeBtn?.addEventListener('click', () => {
+      // Invalida cualquier apertura previa en curso.
+      openToken++;
+      closePreview(true);
+    });
+
+    attachFrameListeners(frameEl);
+
+    async function canOpenPreview(url) {
+      try {
+        const resp = await fetch(url, {
+          method: 'HEAD',
+          credentials: 'same-origin',
+          redirect: 'follow'
+        });
+        if (resp.ok) {
+          return { ok: true };
+        }
+        const encoded = resp.headers.get('X-CCDigital-Error') || '';
+        const message = encoded ? decodeURIComponent(encoded) : 'No fue posible abrir el documento solicitado.';
+        return { ok: false, message };
+      } catch (_) {
+        return { ok: false, message: 'No fue posible validar el acceso al documento.' };
+      }
+    }
+
+    document.querySelectorAll('[data-issuer-doc-open]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const url = btn.getAttribute('data-doc-view-url') || '';
+        const title = btn.getAttribute('data-doc-title') || 'Documento';
+        if (!url) return;
+
+        const token = ++openToken;
+        hideClientAlert();
+        clearOpenTimers();
+        setViewButtonBusy(activeViewBtn, false);
+        activeViewBtn = btn;
+        setViewButtonBusy(activeViewBtn, true);
+        window.CCDigitalLoader?.show('Abriendo documento autorizado...');
+
+        // Cierra/limpia primero el visor actual.
+        closePreview(false);
+
+        // Validación previa para no cargar en iframe respuestas de solicitud vencida.
+        const check = await canOpenPreview(url);
+        if (token !== openToken) return;
+        if (!check.ok) {
+          showClientAlert(check.message);
+          finishOpenFlow();
+          return;
+        }
+
+        titleEl.textContent = 'Vista de documento · ' + title;
+        panelEl.classList.remove('d-none');
+        panelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setInlineLoading(true);
+        frameEl.dataset.openToken = String(token);
+        frameEl.src = url;
+
+        // Fallback: si el navegador no dispara load/error, libera estado de carga.
+        safetyHideTimer = setTimeout(() => {
+          if (token !== openToken) return;
+          setInlineLoading(false);
+          finishOpenFlow();
+        }, 5000);
+      });
+    });
+
+    // En descarga directa no hay callback JS del navegador; se da feedback con loader temporal.
+    document.querySelectorAll('[data-issuer-doc-download]').forEach((link) => {
+      link.addEventListener('click', (e) => {
+        const href = link.getAttribute('href') || '';
+        if (!href || link.dataset.ccDownloading === 'true') return;
+        e.preventDefault();
+        link.dataset.ccDownloading = 'true';
+        link.classList.add('disabled', 'pe-none');
+        link.setAttribute('aria-disabled', 'true');
+        window.CCDigitalLoader?.show('Preparando descarga del documento...');
+        window.location.href = href;
+
+        setTimeout(() => {
+          window.CCDigitalLoader?.hide(true);
+          link.classList.remove('disabled', 'pe-none');
+          link.removeAttribute('aria-disabled');
+          link.dataset.ccDownloading = 'false';
+        }, 1800);
+      });
+    });
+  })();
+</script>
 </body>
 </html>
