@@ -28,6 +28,26 @@ import java.util.Optional;
 public interface AccessRequestRepository extends JpaRepository<AccessRequest, Long> {
 
     /**
+     * Carga todas las solicitudes con el detalle completo requerido por el dashboard de reportes
+     * administrativo (entidad, persona, ítems y título de documento).
+     *
+     * <p>
+     * Se usa en la construcción de trazabilidad consolidada para evitar consultas N+1 durante
+     * agregaciones de KPIs, tendencias y rankings "Top".
+     * </p>
+     *
+     * @return lista de solicitudes con detalle cargado para reporte
+     */
+    @Query("select distinct ar " +
+           "from AccessRequest ar " +
+           "join fetch ar.entity e " +
+           "join fetch ar.person p " +
+           "left join fetch ar.items i " +
+           "left join fetch i.personDocument pd " +
+           "left join fetch pd.documentDefinition dd")
+    List<AccessRequest> findAllWithDetailsForReport();
+
+    /**
      * Lista solicitudes para una persona específica, trayendo el detalle necesario para la UI del usuario:
      * - entity (quién solicita)
      * - items -> personDocument -> documentDefinition (qué documentos se solicitan)
