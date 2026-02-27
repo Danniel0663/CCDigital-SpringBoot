@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -64,7 +65,10 @@ public class PersonService {
      * @return {@link Optional} con la persona si existe; vacío si no existe
      */
     public Optional<Person> findById(Long id) {
-        return personRepository.findById(id);
+        if (id == null) {
+            return Optional.empty();
+        }
+        return personRepository.findById(Objects.requireNonNull(id));
     }
 
     /**
@@ -92,7 +96,7 @@ public class PersonService {
      */
     @Transactional
     public Person createPersonAndFolder(Person person) {
-        Person saved = personRepository.save(person);
+        Person saved = personRepository.save(Objects.requireNonNull(person));
         fileStorageService.ensurePersonFolder(saved);
         return saved;
     }

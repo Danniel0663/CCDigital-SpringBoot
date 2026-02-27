@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Controlador web del módulo administrativo (Gobierno) de CCDigital.
@@ -132,9 +133,10 @@ public class AdminController {
         String fromLabel = report.getFromDate().format(DateTimeFormatter.BASIC_ISO_DATE);
         String toLabel = report.getToDate().format(DateTimeFormatter.BASIC_ISO_DATE);
         String filename = "ccdigital-reporte-trazabilidad-" + fromLabel + "-" + toLabel + ".pdf";
+        MediaType pdfMediaType = Objects.requireNonNull(MediaType.APPLICATION_PDF);
 
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_PDF)
+                .contentType(pdfMediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .body(pdf);
     }

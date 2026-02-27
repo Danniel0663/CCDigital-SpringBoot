@@ -379,8 +379,8 @@ public class UserAuthController {
     @PostMapping("/otp/verify")
     public ResponseEntity<Map<String, Object>> verifyOtp(@RequestBody OtpVerifyRequest req,
                                                          HttpServletRequest request) {
-        String presExId = req == null ? null : normalize(req.getPresExId());
-        String code = req == null ? null : normalize(req.getCode());
+        String presExId = normalize(req == null ? null : req.getPresExId());
+        String code = normalize(req == null ? null : req.getCode());
 
         if (presExId.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "presExId es requerido"));
@@ -468,7 +468,7 @@ public class UserAuthController {
     @PostMapping("/otp/resend")
     public ResponseEntity<Map<String, Object>> resendOtp(@RequestBody OtpResendRequest req,
                                                           HttpServletRequest request) {
-        String presExId = req == null ? null : normalize(req.getPresExId());
+        String presExId = normalize(req == null ? null : req.getPresExId());
         if (presExId.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "presExId es requerido"));
         }

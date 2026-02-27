@@ -153,7 +153,8 @@ public class IssuerController {
     public String upload(@ModelAttribute("uploadForm") IssuerUploadForm form,
                          @RequestParam(value = "file", required = false) MultipartFile file,
                          RedirectAttributes ra) {
-        Long personId = form != null ? form.getPersonId() : null;
+        IssuerUploadForm safeForm = form != null ? form : new IssuerUploadForm();
+        Long personId = safeForm.getPersonId();
         try {
             Long issuerId = currentIssuerId();
             if (!isPdfUpload(file)) {
@@ -162,11 +163,11 @@ public class IssuerController {
             }
             personDocumentService.uploadFromIssuer(
                     issuerId,
-                    form.getPersonId(),
-                    form.getDocumentId(),
-                    form.getStatus(),
-                    form.getIssueDate(),
-                    form.getExpiryDate(),
+                    safeForm.getPersonId(),
+                    safeForm.getDocumentId(),
+                    safeForm.getStatus(),
+                    safeForm.getIssueDate(),
+                    safeForm.getExpiryDate(),
                     file
             );
             ra.addFlashAttribute("msgOk", "Documento cargado y enviado a revisión.");
@@ -190,8 +191,10 @@ public class IssuerController {
      */
     private boolean isPdfUpload(MultipartFile file) {
         if (file == null || file.isEmpty()) return false;
-        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().trim().toLowerCase(Locale.ROOT);
-        String mime = file.getContentType() == null ? "" : file.getContentType().trim().toLowerCase(Locale.ROOT);
+        String originalFilename = file.getOriginalFilename();
+        String contentType = file.getContentType();
+        String name = originalFilename == null ? "" : originalFilename.trim().toLowerCase(Locale.ROOT);
+        String mime = contentType == null ? "" : contentType.trim().toLowerCase(Locale.ROOT);
         return name.endsWith(".pdf") || mime.contains("pdf");
     }
 }

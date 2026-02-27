@@ -571,7 +571,7 @@ public class AdminReportService {
      */
     private void add(Map<String, Long> map, String label, long value) {
         String key = (label == null || label.isBlank()) ? "No identificado" : label.trim();
-        map.merge(key, value, Long::sum);
+        map.merge(key, value, (left, right) -> (left == null ? 0L : left) + (right == null ? 0L : right));
     }
 
     /**

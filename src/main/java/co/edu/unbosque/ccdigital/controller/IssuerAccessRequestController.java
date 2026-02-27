@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 /**
  * Controlador del módulo Emisor para gestionar solicitudes de acceso a documentos.
@@ -231,10 +232,10 @@ public class IssuerAccessRequestController {
             model.addAttribute("error", ex.getMessage());
 
             // Recargar la persona y sus documentos para volver a mostrar la pantalla completa
-            Person person = personRepository.findById(personId).orElse(null);
+            Person person = personId == null ? null : personRepository.findById(personId).orElse(null);
             model.addAttribute("person", person);
             model.addAttribute("personDocuments",
-                    person != null
+                    person != null && personId != null
                             ? personDocumentRepository.findApprovedByPersonIdWithFiles(personId)
                             : Collections.emptyList()
             );
@@ -368,11 +369,15 @@ public class IssuerAccessRequestController {
 
         String filename = resource.getFilename() != null ? resource.getFilename() : "documento";
         MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
+        if (mediaType == null) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+        MediaType responseMediaType = Objects.requireNonNull(mediaType);
         String dispositionType = asAttachment ? "attachment" : "inline";
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, dispositionType + "; filename=\"" + filename + "\"")
-                .contentType(mediaType)
+                .contentType(responseMediaType)
                 .body(resource);
     }
 }

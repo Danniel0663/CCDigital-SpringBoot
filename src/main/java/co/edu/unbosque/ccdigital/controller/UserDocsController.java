@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -138,9 +139,13 @@ public class UserDocsController {
             ContentDisposition disposition = dispositionBuilder
                     .filename(doc.fileName())
                     .build();
+            String safeContentType = (contentType == null || contentType.isBlank())
+                    ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+                    : contentType;
+            MediaType responseContentType = MediaType.parseMediaType(Objects.requireNonNull(safeContentType));
 
             return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
+                    .contentType(responseContentType)
                     .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                     .body(resource);
 

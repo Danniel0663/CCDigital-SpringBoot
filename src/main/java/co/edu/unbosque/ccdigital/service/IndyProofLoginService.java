@@ -9,6 +9,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Servicio que implementa el login basado en presentación de prueba (present-proof 2.0) con ACA-Py.
@@ -71,10 +72,12 @@ public class IndyProofLoginService {
         String verifierAdmin = require(props.getIssuerAdminUrl(), "ccdigital.indy.issuer-admin-url");
         String url = verifierAdmin + "/present-proof-2.0/send-request";
 
-        HttpEntity<Map<String, Object>> req = new HttpEntity<>(payload, buildAdminHeaders());
+        HttpHeaders adminHeaders = buildAdminHeaders();
+        HttpEntity<Map<String, Object>> req = new HttpEntity<>(payload, Objects.requireNonNull(adminHeaders));
+        HttpMethod postMethod = Objects.requireNonNull(HttpMethod.POST);
         ResponseEntity<Map<String, Object>> resp = rest.exchange(
                 url,
-                HttpMethod.POST,
+                postMethod,
                 req,
                 new ParameterizedTypeReference<>() {}
         );
@@ -247,10 +250,12 @@ public class IndyProofLoginService {
         String verifierAdmin = require(props.getIssuerAdminUrl(), "ccdigital.indy.issuer-admin-url");
         String url = verifierAdmin + "/present-proof-2.0/records/" + presExId;
 
-        HttpEntity<Void> req = new HttpEntity<>(buildAdminHeaders());
+        HttpHeaders adminHeaders = buildAdminHeaders();
+        HttpEntity<Void> req = new HttpEntity<>(Objects.requireNonNull(adminHeaders));
+        HttpMethod getMethod = Objects.requireNonNull(HttpMethod.GET);
         ResponseEntity<Map<String, Object>> resp = rest.exchange(
                 url,
-                HttpMethod.GET,
+                getMethod,
                 req,
                 new ParameterizedTypeReference<>() {}
         );
@@ -326,10 +331,12 @@ public class IndyProofLoginService {
         String issuerAdmin = require(props.getIssuerAdminUrl(), "ccdigital.indy.issuer-admin-url");
 
         String url = issuerAdmin + "/connections?state=active";
-        HttpEntity<Void> req = new HttpEntity<>(buildAdminHeaders());
+        HttpHeaders adminHeaders = buildAdminHeaders();
+        HttpEntity<Void> req = new HttpEntity<>(Objects.requireNonNull(adminHeaders));
+        HttpMethod getMethod = Objects.requireNonNull(HttpMethod.GET);
         ResponseEntity<Map<String, Object>> resp = rest.exchange(
                 url,
-                HttpMethod.GET,
+                getMethod,
                 req,
                 new ParameterizedTypeReference<>() {}
         );

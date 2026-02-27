@@ -29,6 +29,7 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -138,8 +139,7 @@ public class SecurityConfig {
             @Qualifier("adminUserDetailsService") UserDetailsService uds,
             PasswordEncoder encoder
     ) {
-        DaoAuthenticationProvider p = new DaoAuthenticationProvider();
-        p.setUserDetailsService(uds);
+        DaoAuthenticationProvider p = new DaoAuthenticationProvider(uds);
         p.setPasswordEncoder(encoder);
         return p;
     }
@@ -194,8 +194,7 @@ public class SecurityConfig {
             @Qualifier("issuerUserDetailsService") UserDetailsService uds,
             PasswordEncoder encoder
     ) {
-        DaoAuthenticationProvider p = new DaoAuthenticationProvider();
-        p.setUserDetailsService(uds);
+        DaoAuthenticationProvider p = new DaoAuthenticationProvider(uds);
         p.setPasswordEncoder(encoder);
         return p;
     }
@@ -425,6 +424,7 @@ public class SecurityConfig {
      *
      * @param http builder de seguridad HTTP
      */
+    @SuppressWarnings({"removal", "deprecation"})
     private void applyCommonHardening(HttpSecurity http) {
         try {
             // Activación opcional por propiedad para entornos detrás de HTTPS/proxy.
@@ -494,9 +494,9 @@ public class SecurityConfig {
         }
 
         @Override
-        protected void doFilterInternal(HttpServletRequest request,
-                                        HttpServletResponse response,
-                                        FilterChain filterChain) throws ServletException, IOException {
+        protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                        @NonNull HttpServletResponse response,
+                                        @NonNull FilterChain filterChain) throws ServletException, IOException {
             String uri = request.getRequestURI();
             if (uri != null && (uri.equals(protectedPrefix) || uri.startsWith(protectedPrefix + "/"))) {
                 var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Servicio de negocio para la gestión de documentos asociados a personas ({@link PersonDocument}).
@@ -104,12 +105,23 @@ public class PersonDocumentService {
      */
     @Transactional
     public PersonDocument create(PersonDocumentRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request de documento es obligatorio");
+        }
+        Long requestPersonId = request.getPersonId();
+        if (requestPersonId == null) {
+            throw new IllegalArgumentException("personId es obligatorio");
+        }
+        Long requestDocumentId = request.getDocumentId();
+        if (requestDocumentId == null) {
+            throw new IllegalArgumentException("documentId es obligatorio");
+        }
 
-        Person person = personRepository.findById(request.getPersonId())
+        Person person = personRepository.findById(Objects.requireNonNull(requestPersonId))
                 .orElseThrow(() -> new IllegalArgumentException("Persona no encontrada"));
 
-        DocumentDefinition def = documentDefinitionService.findById(request.getDocumentId())
-                .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + request.getDocumentId()));
+        DocumentDefinition def = documentDefinitionService.findById(requestDocumentId)
+                .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + requestDocumentId));
 
         IssuingEntity issuer = issuingEntityService.resolveEmitterByName(def.getIssuingEntity());
 
@@ -308,8 +320,14 @@ public class PersonDocumentService {
                                           java.time.LocalDate issueDate,
                                           java.time.LocalDate expiryDate,
                                           MultipartFile file) {
+        if (personId == null) {
+            throw new IllegalArgumentException("personId es obligatorio");
+        }
+        if (documentId == null) {
+            throw new IllegalArgumentException("documentId es obligatorio");
+        }
 
-        Person person = personRepository.findById(personId)
+        Person person = personRepository.findById(Objects.requireNonNull(personId))
                 .orElseThrow(() -> new IllegalArgumentException("Persona no encontrada"));
 
         DocumentDefinition def = documentDefinitionService.findById(documentId)
@@ -368,8 +386,11 @@ public class PersonDocumentService {
      */
     @Transactional
     public void review(Long personDocumentId, ReviewStatus status, String notes) {
+        if (personDocumentId == null) {
+            throw new IllegalArgumentException("personDocumentId es obligatorio");
+        }
 
-        PersonDocument pd = personDocumentRepository.findById(personDocumentId)
+        PersonDocument pd = personDocumentRepository.findById(Objects.requireNonNull(personDocumentId))
                 .orElseThrow(() -> new IllegalArgumentException("PersonDocument no encontrado"));
 
         pd.setReviewStatus(status != null ? status : ReviewStatus.PENDING);

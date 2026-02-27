@@ -306,51 +306,52 @@ public class UserRegistrationController {
      * @param request request HTTP para acceso a sesión
      */
     private void handleRegistrationStart(UserRegisterForm form, Model model, HttpServletRequest request) {
-        String email = normalize(form == null ? null : form.getEmail());
-        String password = normalize(form == null ? null : form.getPassword());
-        String confirmPassword = normalize(form == null ? null : form.getConfirmPassword());
+        UserRegisterForm safeForm = form != null ? form : new UserRegisterForm();
+        String email = normalize(safeForm.getEmail());
+        String password = normalize(safeForm.getPassword());
+        String confirmPassword = normalize(safeForm.getConfirmPassword());
         if (email.isBlank()) {
-            model.addAttribute("form", form);
+            model.addAttribute("form", safeForm);
             model.addAttribute("error", "Correo requerido.");
             return;
         }
         // Validación temprana para no enviar OTP cuando la contraseña no cumple política.
         if (password.isBlank()) {
-            form.setPassword(null);
-            form.setConfirmPassword(null);
-            model.addAttribute("form", form);
+            safeForm.setPassword(null);
+            safeForm.setConfirmPassword(null);
+            model.addAttribute("form", safeForm);
             model.addAttribute("error", "Contraseña requerida.");
             return;
         }
         if (!password.equals(confirmPassword)) {
-            form.setPassword(null);
-            form.setConfirmPassword(null);
-            model.addAttribute("form", form);
+            safeForm.setPassword(null);
+            safeForm.setConfirmPassword(null);
+            model.addAttribute("form", safeForm);
             model.addAttribute("error", "La confirmación de contraseña no coincide.");
             return;
         }
         if (!isStrongEnoughPassword(password)) {
-            form.setPassword(null);
-            form.setConfirmPassword(null);
-            model.addAttribute("form", form);
+            safeForm.setPassword(null);
+            safeForm.setConfirmPassword(null);
+            model.addAttribute("form", safeForm);
             model.addAttribute("error",
                     "La contraseña debe tener mínimo 8 caracteres e incluir letras, números y un carácter especial.");
             return;
         }
 
         String emailToken = UUID.randomUUID().toString();
-        boolean sent = userRegisterEmailOtpService.issueCode(emailToken, email, displayName(form));
+        boolean sent = userRegisterEmailOtpService.issueCode(emailToken, email, displayName(safeForm));
         if (!sent) {
-            form.setPassword(null);
-            form.setConfirmPassword(null);
-            model.addAttribute("form", form);
+            safeForm.setPassword(null);
+            safeForm.setConfirmPassword(null);
+            model.addAttribute("form", safeForm);
             model.addAttribute("error", "No fue posible enviar el código de verificación al correo.");
             return;
         }
 
-        savePendingRegisterForm(request, emailToken, copyFormForSession(form));
-        userRegisterEmailOtpService.invalidate(normalize(form.getRegistrationEmailToken()));
-        showEmailVerificationStep(model, emailToken, email, Boolean.TRUE.equals(form.getEnableTotpNow()));
+        savePendingRegisterForm(request, emailToken, copyFormForSession(safeForm));
+        userRegisterEmailOtpService.invalidate(normalize(safeForm.getRegistrationEmailToken()));
+        showEmailVerificationStep(model, emailToken, email, Boolean.TRUE.equals(safeForm.getEnableTotpNow()));
         model.addAttribute("form", new UserRegisterForm());
     }
 
