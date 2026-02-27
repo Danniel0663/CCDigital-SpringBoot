@@ -2,6 +2,8 @@ package co.edu.unbosque.ccdigital.entity;
 
 import jakarta.persistence.*;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -41,10 +43,12 @@ public class PersonDocument {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "person_id", nullable = false)
+    @JsonIgnore
     private Person person;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_id", nullable = false)
+    @JsonIgnore
     private DocumentDefinition documentDefinition;
 
     @Enumerated(EnumType.STRING)
@@ -65,6 +69,7 @@ public class PersonDocument {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "issuer_entity_id")
+    @JsonIgnore
     private IssuingEntity issuerEntity;
 
     @Column(name = "submitted_by_entity_user_id")
