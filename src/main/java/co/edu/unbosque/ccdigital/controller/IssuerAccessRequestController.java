@@ -305,7 +305,14 @@ public class IssuerAccessRequestController {
         IssuerPrincipal issuer = (IssuerPrincipal) auth.getPrincipal();
         signedUrlService.validateIssuerDocumentView(requestId, personDocumentId, exp, sig);
         try {
-            accessRequestService.loadApprovedDocumentResource(issuer.getIssuerId(), requestId, personDocumentId);
+            // Validación técnica previa para la UI (HEAD): no registra auditoría para evitar duplicados.
+            accessRequestService.loadApprovedDocumentResource(
+                    issuer.getIssuerId(),
+                    requestId,
+                    personDocumentId,
+                    "DOC_VIEW_PRECHECK",
+                    false
+            );
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
                     .build();
@@ -413,8 +420,13 @@ public class IssuerAccessRequestController {
         final Resource resource;
         try {
             // Carga el recurso solo si la solicitud está aprobada y corresponde al emisor.
+            // En GET real sí se registra auditoría on-chain con evento diferenciado (ver/descargar).
             resource = accessRequestService.loadApprovedDocumentResource(
-                    issuer.getIssuerId(), requestId, personDocumentId
+                    issuer.getIssuerId(),
+                    requestId,
+                    personDocumentId,
+                    asAttachment ? "DOC_DOWNLOAD_GRANTED" : "DOC_VIEW_GRANTED",
+                    true
             );
         } catch (IllegalArgumentException ex) {
             // Redirección con mensaje de negocio para evitar stacktrace/500 en la UI del emisor.

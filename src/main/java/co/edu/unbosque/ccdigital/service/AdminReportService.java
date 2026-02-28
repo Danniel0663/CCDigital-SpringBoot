@@ -1,5 +1,6 @@
 package co.edu.unbosque.ccdigital.service;
 
+import co.edu.unbosque.ccdigital.dto.FabricAuditEventView;
 import co.edu.unbosque.ccdigital.dto.FabricDocView;
 import co.edu.unbosque.ccdigital.entity.AccessRequest;
 import co.edu.unbosque.ccdigital.entity.AccessRequestItem;
@@ -48,6 +49,7 @@ public class AdminReportService {
     private final PersonDocumentRepository personDocumentRepository;
     private final PersonRepository personRepository;
     private final FabricLedgerCliService fabricLedgerCliService;
+    private final FabricAuditCliService fabricAuditCliService;
     private final IndyProofLoginService indyProofLoginService;
 
     /**
@@ -57,17 +59,20 @@ public class AdminReportService {
      * @param personDocumentRepository repositorio de documentos de persona
      * @param personRepository repositorio de personas para resolver trazabilidad por usuario
      * @param fabricLedgerCliService servicio de consulta de documentos en ledger Fabric
+     * @param fabricAuditCliService servicio de consulta de eventos de auditoría en ledger Fabric
      * @param indyProofLoginService servicio de consulta de records de verificación Indy
      */
     public AdminReportService(AccessRequestRepository accessRequestRepository,
                               PersonDocumentRepository personDocumentRepository,
                               PersonRepository personRepository,
                               FabricLedgerCliService fabricLedgerCliService,
+                              FabricAuditCliService fabricAuditCliService,
                               IndyProofLoginService indyProofLoginService) {
         this.accessRequestRepository = accessRequestRepository;
         this.personDocumentRepository = personDocumentRepository;
         this.personRepository = personRepository;
         this.fabricLedgerCliService = fabricLedgerCliService;
+        this.fabricAuditCliService = fabricAuditCliService;
         this.indyProofLoginService = indyProofLoginService;
     }
 
@@ -896,6 +901,29 @@ public class AdminReportService {
                 ));
                 fabricBlocks++;
             }
+
+            // Además del anclaje documental, se incluyen eventos de auditoría de consulta/verificación.
+            List<FabricAuditEventView> auditEvents = fabricAuditCliService.listEventsForPerson(idType.name(), traceIdNumber);
+            for (FabricAuditEventView event : auditEvents) {
+                LocalDateTime eventAt = parseFabricDate(event.createdAt());
+                if (!isInDateRange(eventAt, from, to)) {
+                    continue;
+                }
+                blocks.add(new BlockchainTraceBlock(
+                        "Fabric",
+                        normalizeOrFallback(event.txId(), "Sin referencia"),
+                        resolveFabricAuditOperation(event),
+                        resolveFabricAuditStatus(event),
+                        eventAt,
+                        personLabel,
+                        normalizeOrFallback(event.idType(), idType.name()),
+                        normalizeOrFallback(event.idNumber(), traceIdNumber),
+                        normalizeOrFallback(event.documentTitle(), "Documento trazado"),
+                        normalizeOrFallback(event.issuerName(), "Entidad no identificada"),
+                        resolveFabricAuditDetail(event)
+                ));
+                fabricBlocks++;
+            }
         } catch (Exception ex) {
             warningMessage = appendWarning(
                     warningMessage,
@@ -1015,6 +1043,40 @@ public class AdminReportService {
         }
 
         try {
+            List<FabricAuditEventView> auditEvents = fabricAuditCliService.listAllEvents();
+            for (FabricAuditEventView event : auditEvents) {
+                LocalDateTime eventAt = parseFabricDate(event.createdAt());
+                if (!isInDateRange(eventAt, from, to)) {
+                    continue;
+                }
+
+                String idType = normalizeOrFallback(event.idType(), "N/A");
+                String idNumber = normalizeOrFallback(event.idNumber(), "N/A");
+                String personLabel = resolvePersonLabelById(idType, idNumber);
+
+                blocks.add(new BlockchainTraceBlock(
+                        "Fabric",
+                        normalizeOrFallback(event.txId(), "Sin referencia"),
+                        resolveFabricAuditOperation(event),
+                        resolveFabricAuditStatus(event),
+                        eventAt,
+                        personLabel,
+                        idType,
+                        idNumber,
+                        normalizeOrFallback(event.documentTitle(), "Documento trazado"),
+                        normalizeOrFallback(event.issuerName(), "Entidad no identificada"),
+                        resolveFabricAuditDetail(event)
+                ));
+                fabricBlocks++;
+            }
+        } catch (Exception ex) {
+            warningMessage = appendWarning(
+                    warningMessage,
+                    "No fue posible consultar auditoría Fabric global: " + rootMessage(ex)
+            );
+        }
+
+        try {
             List<IndyProofLoginService.ProofTraceEvent> proofEvents = indyProofLoginService.listProofTraceEvents();
             for (IndyProofLoginService.ProofTraceEvent event : proofEvents) {
                 if (!isInDateRange(event.eventAt(), from, to)) {
@@ -1093,6 +1155,81 @@ public class AdminReportService {
                     .orElse(idPart.isBlank() ? "Usuario no identificado" : idPart);
         }
         return idPart.isBlank() ? "Usuario no identificado" : idPart;
+    }
+
+    /**
+     * Resuelve etiqueta de persona a partir de identificación para eventos Fabric de auditoría.
+     */
+    private String resolvePersonLabelById(String idType, String idNumber) {
+        String normalizedType = normalize(idType).toUpperCase(Locale.ROOT);
+        String normalizedNumber = normalize(idNumber);
+        if (normalizedType.isBlank() || normalizedNumber.isBlank() || "N/A".equalsIgnoreCase(normalizedNumber)) {
+            return "Usuario no identificado";
+        }
+
+        IdType parsedIdType = parseIdType(normalizedType);
+        if (parsedIdType == null) {
+            return normalizedType + " " + normalizedNumber;
+        }
+        return personRepository.findByIdTypeAndIdNumber(parsedIdType, normalizedNumber)
+                .map(this::resolvePersonLabel)
+                .orElse(normalizedType + " " + normalizedNumber);
+    }
+
+    /**
+     * Traduce eventType de auditoría Fabric a etiqueta funcional para tarjetas de reportes.
+     */
+    private String resolveFabricAuditOperation(FabricAuditEventView event) {
+        String eventType = normalize(event.eventType()).toUpperCase(Locale.ROOT);
+        return switch (eventType) {
+            case "REQUEST_CREATED" -> "Solicitud de acceso creada";
+            case "DOC_VERIFY_ON_REQUEST" -> "Verificación de documento en solicitud";
+            case "DOC_VIEW_GRANTED" -> "Visualización de documento autorizada";
+            case "DOC_DOWNLOAD_GRANTED" -> "Descarga de documento autorizada";
+            case "DOC_ACCESS_CHECK" -> "Verificación de acceso a documento";
+            case "DOC_BLOCK_TRACE_QUERY" -> "Consulta de trazabilidad de bloque";
+            default -> eventType.isBlank() ? "Evento de auditoría Fabric" : eventType;
+        };
+    }
+
+    /**
+     * Normaliza resultado de auditoría Fabric a badge de estado homogéneo.
+     */
+    private String resolveFabricAuditStatus(FabricAuditEventView event) {
+        String result = normalize(event.result()).toUpperCase(Locale.ROOT);
+        if (result.isBlank()) {
+            return "REGISTRADO";
+        }
+        return switch (result) {
+            case "OK", "SUCCESS" -> "CONFIRMADO";
+            case "FAIL", "ERROR", "DENIED" -> "FALLIDO";
+            default -> result;
+        };
+    }
+
+    /**
+     * Construye detalle legible para eventos de auditoría Fabric.
+     */
+    private String resolveFabricAuditDetail(FabricAuditEventView event) {
+        String action = normalize(event.action());
+        String reason = normalize(event.reason());
+        String requestId = normalize(event.requestId());
+        String personDocumentId = normalize(event.personDocumentId());
+
+        List<String> parts = new ArrayList<>();
+        if (!action.isBlank()) {
+            parts.add("Acción: " + action);
+        }
+        if (!requestId.isBlank()) {
+            parts.add("Solicitud: " + requestId);
+        }
+        if (!personDocumentId.isBlank()) {
+            parts.add("Documento local: " + personDocumentId);
+        }
+        if (!reason.isBlank()) {
+            parts.add(reason);
+        }
+        return parts.isEmpty() ? "Evento de auditoría de acceso registrado en Fabric." : String.join(" · ", parts);
     }
 
     /**
