@@ -65,6 +65,7 @@ public class AccessRequestService {
     private final FileStorageService fileStorageService;
     private final ExternalToolsService externalToolsService;
     private final FabricLedgerCliService fabricLedgerCliService;
+    private final FabricAuditCliService fabricAuditCliService;
 
     /**
      * Inyección de dependencias del servicio.
@@ -76,6 +77,7 @@ public class AccessRequestService {
      * @param fileStorageService servicio para resolver y cargar archivos desde almacenamiento
      * @param externalToolsService servicio de ejecución de scripts externos (sync a Fabric)
      * @param fabricLedgerCliService servicio de consulta de metadatos en Hyperledger Fabric
+     * @param fabricAuditCliService servicio de auditoría de eventos de consulta/verificación en Fabric
      */
     public AccessRequestService(
             AccessRequestRepository accessRequestRepository,
@@ -84,7 +86,8 @@ public class AccessRequestService {
             PersonDocumentRepository personDocumentRepository,
             FileStorageService fileStorageService,
             ExternalToolsService externalToolsService,
-            FabricLedgerCliService fabricLedgerCliService
+            FabricLedgerCliService fabricLedgerCliService,
+            FabricAuditCliService fabricAuditCliService
     ) {
         this.accessRequestRepository = accessRequestRepository;
         this.personRepository = personRepository;
@@ -93,6 +96,7 @@ public class AccessRequestService {
         this.fileStorageService = fileStorageService;
         this.externalToolsService = externalToolsService;
         this.fabricLedgerCliService = fabricLedgerCliService;
+        this.fabricAuditCliService = fabricAuditCliService;
     }
 
     /**
@@ -174,7 +178,21 @@ public class AccessRequestService {
 
         // Se asigna la lista de items al request y se persiste
         request.setItems(items);
-        return accessRequestRepository.save(request);
+        AccessRequest saved = accessRequestRepository.save(request);
+
+        // Se registra en Fabric la creación de la solicitud para trazabilidad transversal.
+        recordAuditBestEffort(
+                saved,
+                null,
+                null,
+                "REQUEST_CREATED",
+                "OK",
+                "Solicitud de acceso creada por entidad emisora",
+                "CREATE_REQUEST",
+                "ISSUER",
+                String.valueOf(saved.getEntity().getId())
+        );
+        return saved;
     }
 
     /**
@@ -306,6 +324,25 @@ public class AccessRequestService {
      */
     @Transactional(readOnly = true)
     public Resource loadApprovedDocumentResource(Long entityId, Long requestId, Long personDocumentId) {
+        return loadApprovedDocumentResource(entityId, requestId, personDocumentId, "DOC_VIEW_GRANTED", true);
+    }
+
+    /**
+     * Variante de carga de recurso con control explícito del evento de auditoría a registrar.
+     *
+     * @param entityId entidad emisora autenticada
+     * @param requestId solicitud aprobada
+     * @param personDocumentId documento solicitado
+     * @param auditEventType tipo de evento para auditoría Fabric
+     * @param recordAudit indica si debe persistirse evento de auditoría on-chain
+     * @return recurso del archivo solicitado
+     */
+    @Transactional(readOnly = true)
+    public Resource loadApprovedDocumentResource(Long entityId,
+                                                 Long requestId,
+                                                 Long personDocumentId,
+                                                 String auditEventType,
+                                                 boolean recordAudit) {
 
         AccessRequest request = accessRequestRepository.findByIdWithDetails(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
@@ -351,12 +388,28 @@ public class AccessRequestService {
 
         // Seguridad/trazabilidad: antes de entregar el archivo al emisor, se exige
         // que el documento exista en la consulta on-chain de Fabric para la persona.
-        ensureDocumentPresentInFabric(request.getPerson(), pd, latest);
+        FabricDocView matchedDoc = ensureDocumentPresentInFabric(request, pd, latest);
         log.info("Consulta autorizada de documento. requestId={}, entityId={}, personId={}, personDocumentId={}, fileId={}",
                 requestId, entityId, request.getPerson().getId(), personDocumentId, latest.getId());
 
         // Delegación a FileStorageService para resolver la ruta y devolver un Resource
-        return fileStorageService.loadAsResource(latest);
+        Resource resource = fileStorageService.loadAsResource(latest);
+
+        if (recordAudit) {
+            recordAuditStrict(
+                    request,
+                    pd,
+                    matchedDoc,
+                    safeText(auditEventType, "DOC_VIEW_GRANTED"),
+                    "OK",
+                    "Consulta de documento autorizada",
+                    eventTypeToAction(auditEventType),
+                    "ISSUER",
+                    String.valueOf(entityId)
+            );
+        }
+
+        return resource;
     }
 
     /**
@@ -406,6 +459,18 @@ public class AccessRequestService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No se encontró la referencia del documento en Fabric para esta solicitud."
                 ));
+
+        recordAuditStrict(
+                request,
+                pd,
+                fabricDoc,
+                "DOC_BLOCK_TRACE_QUERY",
+                "OK",
+                "Consulta de detalle blockchain de documento autorizado",
+                "READ_BLOCK_TRACE",
+                "ISSUER",
+                String.valueOf(entityId)
+        );
 
         return new DocumentBlockchainTrace(
                 "Hyperledger Fabric",
@@ -465,12 +530,36 @@ public class AccessRequestService {
                     .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + personDocumentId));
 
             FileRecord latest = findLatestFile(pd);
-            if (findMatchingFabricDoc(fabricDocs, pd, latest).isEmpty()) {
+            Optional<FabricDocView> match = findMatchingFabricDoc(fabricDocs, pd, latest);
+            if (match.isEmpty()) {
                 String title = pd.getDocumentDefinition() != null ? pd.getDocumentDefinition().getTitle() : "Documento";
+                recordAuditBestEffort(
+                        request,
+                        pd,
+                        null,
+                        "DOC_VERIFY_ON_REQUEST",
+                        "FAIL",
+                        "No se encontró el documento en Fabric durante validación de aprobación",
+                        "VERIFY_REQUEST",
+                        "USER",
+                        String.valueOf(person.getId())
+                );
                 throw new IllegalArgumentException(
                         "No se pudo validar en Fabric el documento '" + title + "'. Intente nuevamente."
                 );
             }
+
+            recordAuditStrict(
+                    request,
+                    pd,
+                    match.get(),
+                    "DOC_VERIFY_ON_REQUEST",
+                    "OK",
+                    "Documento validado en Fabric para aprobación de solicitud",
+                    "VERIFY_REQUEST",
+                    "USER",
+                    String.valueOf(person.getId())
+            );
         }
     }
 
@@ -481,13 +570,26 @@ public class AccessRequestService {
      * @param pd documento solicitado
      * @param latest archivo seleccionado para visualización
      */
-    private void ensureDocumentPresentInFabric(Person person, PersonDocument pd, FileRecord latest) {
-        List<FabricDocView> fabricDocs = loadFabricDocsForPerson(person);
-        if (findMatchingFabricDoc(fabricDocs, pd, latest).isEmpty()) {
+    private FabricDocView ensureDocumentPresentInFabric(AccessRequest request, PersonDocument pd, FileRecord latest) {
+        List<FabricDocView> fabricDocs = loadFabricDocsForPerson(request.getPerson());
+        Optional<FabricDocView> match = findMatchingFabricDoc(fabricDocs, pd, latest);
+        if (match.isEmpty()) {
+            recordAuditBestEffort(
+                    request,
+                    pd,
+                    null,
+                    "DOC_ACCESS_CHECK",
+                    "FAIL",
+                    "Documento no encontrado en Fabric durante consulta autorizada",
+                    "ACCESS_CHECK",
+                    "ISSUER",
+                    String.valueOf(request.getEntity().getId())
+            );
             throw new IllegalArgumentException(
                     "El documento no está disponible en Fabric para esta persona. Solicite una nueva aprobación."
             );
         }
+        return match.get();
     }
 
     /**
@@ -614,5 +716,103 @@ public class AccessRequestService {
             return fallback;
         }
         return value.trim();
+    }
+
+    /**
+     * Mapea el tipo de evento a una acción técnica homogénea para auditoría.
+     */
+    private String eventTypeToAction(String eventType) {
+        String normalized = safeText(eventType, "").toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "DOC_DOWNLOAD_GRANTED" -> "DOWNLOAD_DOCUMENT";
+            case "DOC_BLOCK_TRACE_QUERY" -> "READ_BLOCK_TRACE";
+            case "DOC_VIEW_GRANTED" -> "VIEW_DOCUMENT";
+            default -> "ACCESS_DOCUMENT";
+        };
+    }
+
+    /**
+     * Registra auditoría en Fabric y falla la operación si no puede persistirse.
+     */
+    private void recordAuditStrict(AccessRequest request,
+                                   PersonDocument pd,
+                                   FabricDocView fabricDoc,
+                                   String eventType,
+                                   String result,
+                                   String reason,
+                                   String action,
+                                   String actorType,
+                                   String actorId) {
+        try {
+            fabricAuditCliService.recordEvent(buildAuditCommand(
+                    request, pd, fabricDoc, eventType, result, reason, action, actorType, actorId
+            ));
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException(
+                    "No fue posible registrar la auditoría en Fabric para el evento " + eventType + "."
+            );
+        }
+    }
+
+    /**
+     * Registra auditoría en Fabric sin interrumpir la operación principal.
+     */
+    private void recordAuditBestEffort(AccessRequest request,
+                                       PersonDocument pd,
+                                       FabricDocView fabricDoc,
+                                       String eventType,
+                                       String result,
+                                       String reason,
+                                       String action,
+                                       String actorType,
+                                       String actorId) {
+        try {
+            fabricAuditCliService.recordEvent(buildAuditCommand(
+                    request, pd, fabricDoc, eventType, result, reason, action, actorType, actorId
+            ));
+        } catch (RuntimeException ex) {
+            log.warn("No se pudo registrar auditoría Fabric (best-effort). requestId={}, eventType={}, detail={}",
+                    request != null ? request.getId() : null,
+                    eventType,
+                    ex.getMessage());
+        }
+    }
+
+    /**
+     * Construye comando de auditoría para persistencia on-chain.
+     */
+    private FabricAuditCliService.AuditCommand buildAuditCommand(AccessRequest request,
+                                                                 PersonDocument pd,
+                                                                 FabricDocView fabricDoc,
+                                                                 String eventType,
+                                                                 String result,
+                                                                 String reason,
+                                                                 String action,
+                                                                 String actorType,
+                                                                 String actorId) {
+        Person person = request != null ? request.getPerson() : null;
+        String idType = person != null && person.getIdType() != null ? person.getIdType().name() : "";
+        String idNumber = person != null ? safeText(person.getIdNumber(), "") : "";
+        String title = pd != null && pd.getDocumentDefinition() != null
+                ? safeText(pd.getDocumentDefinition().getTitle(), "")
+                : "";
+
+        return new FabricAuditCliService.AuditCommand(
+                idType,
+                idNumber,
+                safeText(eventType, "UNSPECIFIED_EVENT"),
+                request != null ? request.getId() : null,
+                pd != null ? pd.getId() : null,
+                fabricDoc != null ? safeText(fabricDoc.docId(), "") : "",
+                title,
+                request != null && request.getEntity() != null ? request.getEntity().getId() : null,
+                request != null && request.getEntity() != null ? safeText(request.getEntity().getName(), "") : "",
+                safeText(action, "UNSPECIFIED_ACTION"),
+                safeText(result, "OK"),
+                safeText(reason, ""),
+                safeText(actorType, "SYSTEM"),
+                safeText(actorId, ""),
+                "CCDIGITAL_SPRING"
+        );
     }
 }
