@@ -101,12 +101,34 @@ public class UserLoginOtpService {
                 Instant.now().plus(Duration.ofMinutes(Math.max(1, codeTtlMinutes)))
         );
 
-        if (!sendEmail(email.trim(), displayName, code)) {
+        if (!sendLoginOtpEmail(email.trim(), displayName, code)) {
             return false;
         }
 
         challenges.put(flowId.trim(), challenge);
         return true;
+    }
+
+    /**
+     * Envía una alerta de seguridad al correo del usuario cuando se agotan los intentos
+     * de segundo factor durante el login.
+     *
+     * <p>Esta notificación es informativa para alertar al usuario sobre posible intento
+     * no autorizado de acceso.</p>
+     *
+     * @param email correo destino
+     * @param displayName nombre visible del usuario (opcional)
+     * @return {@code true} si se pudo enviar; {@code false} si hubo error de envío
+     */
+    public boolean sendSuspiciousLoginAlert(String email, String displayName) {
+        if (isBlank(email)) {
+            return false;
+        }
+        return sendEmail(
+                email.trim(),
+                "CCDigital - Alerta de seguridad en tu cuenta",
+                buildSuspiciousLoginBody(displayName)
+        );
     }
 
     /**
@@ -165,7 +187,15 @@ public class UserLoginOtpService {
         }
     }
 
-    private boolean sendEmail(String to, String displayName, String code) {
+    private boolean sendLoginOtpEmail(String to, String displayName, String code) {
+        return sendEmail(
+                to,
+                "CCDigital - Código de verificación de ingreso",
+                buildLoginOtpBody(displayName, code)
+        );
+    }
+
+    private boolean sendEmail(String to, String subject, String body) {
         JavaMailSender sender = mailSenderProvider.getIfAvailable();
         if (sender == null) {
             log.warn("Login OTP: JavaMailSender no está configurado.");
@@ -179,23 +209,33 @@ public class UserLoginOtpService {
                 msg.setFrom(from);
             }
             msg.setTo(to);
-            msg.setSubject("CCDigital - Código de verificación de ingreso");
-            msg.setText(buildBody(displayName, code));
+            msg.setSubject(subject);
+            msg.setText(body);
             sender.send(msg);
             return true;
         } catch (Exception ex) {
-            log.error("No se pudo enviar OTP de login a {}", to, ex);
+            log.error("No se pudo enviar correo de seguridad/login a {}", to, ex);
             return false;
         }
     }
 
-    private String buildBody(String displayName, String code) {
+    private String buildLoginOtpBody(String displayName, String code) {
         String name = isBlank(displayName) ? "usuario" : displayName.trim();
         long ttl = Math.max(1, codeTtlMinutes);
         return "Hola " + name + ",\n\n"
                 + "Tu código de verificación para ingresar a CCDigital es: " + code + "\n\n"
                 + "Este código vence en " + ttl + " minutos y solo puede usarse una vez.\n"
                 + "Si no intentaste iniciar sesión, ignora este correo.\n";
+    }
+
+    private String buildSuspiciousLoginBody(String displayName) {
+        String name = isBlank(displayName) ? "usuario" : displayName.trim();
+        return "Hola " + name + ",\n\n"
+                + "Se bloquearon intentos de ingreso en tu cuenta CCDigital al superar el máximo de errores "
+                + "en el código de verificación.\n\n"
+                + "Si no fuiste tú, por favor reporta este evento al soporte de la plataforma y cambia "
+                + "tu contraseña de inmediato.\n\n"
+                + "Este mensaje es automático de seguridad.";
     }
 
     private String generateNumericCode(int length) {

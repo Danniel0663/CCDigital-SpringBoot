@@ -6,6 +6,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +39,8 @@ import java.util.Objects;
 @Service
 public class IndyProofLoginService {
 
+    private static final ZoneId UI_ZONE = ZoneId.of("America/Bogota");
+
     private final RestTemplate rest;
     private final IndyProperties props;
 
@@ -48,6 +54,31 @@ public class IndyProofLoginService {
         this.rest = rest;
         this.props = props;
     }
+
+    /**
+     * Evento de trazabilidad de un intercambio de prueba (present-proof) para vistas administrativas.
+     *
+     * @param presExId identificador del exchange en ACA-Py
+     * @param state estado del flujo (done, abandoned, request-sent, etc.)
+     * @param verified indicador de verificación reportado por ACA-Py
+     * @param eventAt fecha/hora normalizada del evento (created/updated)
+     * @param idType tipo de identificación revelado o inferido del request
+     * @param idNumber número de identificación revelado o inferido del request
+     * @param firstName nombres revelados (si aplica)
+     * @param lastName apellidos revelados (si aplica)
+     * @param email correo revelado (si aplica)
+     */
+    public record ProofTraceEvent(
+            String presExId,
+            String state,
+            Boolean verified,
+            LocalDateTime eventAt,
+            String idType,
+            String idNumber,
+            String firstName,
+            String lastName,
+            String email
+    ) {}
 
     /**
      * Inicia un login por proof, filtrando credenciales por {@code idNumber}.
@@ -163,6 +194,36 @@ public class IndyProofLoginService {
         out.put("last_name", asString(rawAttrs.get("last_name")));
         out.put("email", asString(rawAttrs.get("email")));
         return out;
+    }
+
+    /**
+     * Lista eventos de trazabilidad de proof exchanges para consumo administrativo.
+     *
+     * <p>Consulta la lista de records de ACA-Py, extrae atributos revelados (o filtros del request)
+     * y normaliza fecha/hora para construir una vista estable por usuario.</p>
+     *
+     * @return lista de eventos de trazabilidad del flujo Indy
+     */
+    public List<ProofTraceEvent> listProofTraceEvents() {
+        String verifierAdmin = require(props.getIssuerAdminUrl(), "ccdigital.indy.issuer-admin-url");
+        String url = verifierAdmin + "/present-proof-2.0/records?limit=1000";
+
+        HttpHeaders adminHeaders = buildAdminHeaders();
+        HttpEntity<Void> req = new HttpEntity<>(Objects.requireNonNull(adminHeaders));
+        HttpMethod getMethod = Objects.requireNonNull(HttpMethod.GET);
+        ResponseEntity<Map<String, Object>> resp = rest.exchange(
+                url,
+                getMethod,
+                req,
+                new ParameterizedTypeReference<>() {}
+        );
+
+        Map<String, Object> body = castMap(resp.getBody());
+        List<Object> results = castList(body.get("results"));
+        return results.stream()
+                .map(IndyProofLoginService::castMap)
+                .map(this::toProofTraceEvent)
+                .toList();
     }
 
     /**
@@ -442,5 +503,104 @@ public class IndyProofLoginService {
         if (o instanceof Boolean b) return b;
         if (o == null) return null;
         return Boolean.valueOf(String.valueOf(o));
+    }
+
+    /**
+     * Convierte un record de ACA-Py a un evento tipado de trazabilidad.
+     */
+    private ProofTraceEvent toProofTraceEvent(Map<String, Object> record) {
+        String presExId = asString(record.get("pres_ex_id"));
+        if (presExId.isBlank()) {
+            presExId = asString(record.get("presentation_exchange_id"));
+        }
+
+        String state = asString(record.get("state"));
+        Boolean verified = asBoolean(record.get("verified"));
+        LocalDateTime eventAt = resolveRecordDate(record);
+
+        Map<String, Object> rawAttrs = extractRevealedAttrsRaw(record);
+        String idType = asString(rawAttrs.get("id_type"));
+        String idNumber = asString(rawAttrs.get("id_number"));
+
+        // Si aún no hay atributos revelados, se usa el filtro del proof request para no perder trazabilidad.
+        if (idType.isBlank() || idNumber.isBlank()) {
+            String fallbackIdNumber = extractRequestedIdNumber(record);
+            if (!fallbackIdNumber.isBlank()) {
+                idNumber = fallbackIdNumber;
+            }
+        }
+
+        String firstName = asString(rawAttrs.get("first_name"));
+        String lastName = asString(rawAttrs.get("last_name"));
+        String email = asString(rawAttrs.get("email"));
+
+        return new ProofTraceEvent(
+                presExId,
+                state,
+                verified,
+                eventAt,
+                idType,
+                idNumber,
+                firstName,
+                lastName,
+                email
+        );
+    }
+
+    /**
+     * Obtiene el {@code id_number} solicitado desde el proof request embebido en el record.
+     */
+    private String extractRequestedIdNumber(Map<String, Object> record) {
+        Map<String, Object> byFormat = asMap(record.get("by_format"));
+        Map<String, Object> presReq = asMap(byFormat.get("pres_request"));
+        Map<String, Object> indy = asMap(presReq.get("indy"));
+        Map<String, Object> requestedAttributes = asMap(indy.get("requested_attributes"));
+        for (Object groupObj : requestedAttributes.values()) {
+            Map<String, Object> group = asMap(groupObj);
+            List<Object> restrictions = castList(group.get("restrictions"));
+            for (Object restrictionObj : restrictions) {
+                Map<String, Object> restriction = asMap(restrictionObj);
+                String idNumber = asString(restriction.get("attr::id_number::value"));
+                if (!idNumber.isBlank()) {
+                    return idNumber;
+                }
+            }
+        }
+        return "";
+    }
+
+    /**
+     * Normaliza la fecha principal del record usando {@code updated_at} y luego {@code created_at}.
+     */
+    private LocalDateTime resolveRecordDate(Map<String, Object> record) {
+        LocalDateTime parsedUpdated = parseAcaPyDate(asString(record.get("updated_at")));
+        if (parsedUpdated != null) {
+            return parsedUpdated;
+        }
+        return parseAcaPyDate(asString(record.get("created_at")));
+    }
+
+    /**
+     * Parsea fechas ISO de ACA-Py (con o sin zona) y las normaliza a zona de presentación.
+     */
+    private LocalDateTime parseAcaPyDate(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(value).atZoneSameInstant(UI_ZONE).toLocalDateTime();
+        } catch (Exception ignored) {
+            // Se intenta siguiente formato.
+        }
+        try {
+            return Instant.parse(value).atZone(UI_ZONE).toLocalDateTime();
+        } catch (Exception ignored) {
+            // Se intenta siguiente formato.
+        }
+        try {
+            return LocalDateTime.parse(value);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

@@ -21,8 +21,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -335,6 +337,61 @@ public class IssuerAccessRequestController {
             @RequestParam("sig") String sig
     ) {
         return serveDocument(auth, requestId, personDocumentId, exp, sig, true);
+    }
+
+    /**
+     * Retorna metadatos de trazabilidad blockchain del documento autorizado (JSON para modal interactivo).
+     *
+     * <p>Usa URL firmada y validaciones de negocio del servicio para asegurar que solo el emisor
+     * propietario de la solicitud aprobada pueda consultar la referencia de bloque.</p>
+     *
+     * @param auth autenticación del emisor
+     * @param requestId id de la solicitud
+     * @param personDocumentId id del documento solicitado
+     * @param exp expiración de URL firmada (epoch seconds)
+     * @param sig firma HMAC de la URL
+     * @return respuesta JSON con detalle de bloque o error de negocio controlado
+     */
+    @GetMapping("/issuer/access-requests/{requestId}/documents/{personDocumentId}/block")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> blockDetail(
+            Authentication auth,
+            @PathVariable Long requestId,
+            @PathVariable Long personDocumentId,
+            @RequestParam("exp") Long exp,
+            @RequestParam("sig") String sig
+    ) {
+        IssuerPrincipal issuer = (IssuerPrincipal) auth.getPrincipal();
+        signedUrlService.validateIssuerDocumentBlock(requestId, personDocumentId, exp, sig);
+
+        try {
+            AccessRequestService.DocumentBlockchainTrace trace = accessRequestService
+                    .loadApprovedDocumentBlockchainTrace(issuer.getIssuerId(), requestId, personDocumentId);
+
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("requestId", requestId);
+            payload.put("personDocumentId", personDocumentId);
+            payload.put("network", trace.network());
+            payload.put("blockReference", trace.blockReference());
+            payload.put("documentTitle", trace.documentTitle());
+            payload.put("issuingEntity", trace.issuingEntity());
+            payload.put("status", trace.status());
+            payload.put("createdAtHuman", trace.createdAtHuman());
+            payload.put("sizeHuman", trace.sizeHuman());
+            payload.put("fileName", trace.fileName());
+            payload.put("filePath", trace.filePath());
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(payload);
+        } catch (IllegalArgumentException ex) {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("error", ex.getMessage());
+            payload.put("requestId", requestId);
+            payload.put("personDocumentId", personDocumentId);
+            return ResponseEntity.status(HttpStatus.GONE)
+                    .cacheControl(CacheControl.noStore())
+                    .body(payload);
+        }
     }
 
     /**

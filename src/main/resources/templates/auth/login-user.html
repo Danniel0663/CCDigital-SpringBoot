@@ -91,6 +91,8 @@
 <script>
   let pollTimer = null;
   let currentPresExId = null;
+  // Método de segundo factor actualmente activo en UI (email/totp).
+  let currentOtpMethod = 'email';
 
   function extractErrorMessage(status, text) {
     if (!text) return 'Ocurrió un error inesperado.';
@@ -179,6 +181,9 @@
   function showOtpSection(options) {
     const method = (options && options.method) ? String(options.method).toLowerCase() : 'email';
     const maskedEmail = options && options.maskedEmail ? options.maskedEmail : '';
+    // Si viene true desde backend, el usuario puede solicitar fallback a correo aun cuando usa TOTP.
+    const allowEmailFallback = Boolean(options && options.allowEmailFallback);
+    currentOtpMethod = method;
     otpSectionEl.classList.remove('d-none');
     btn.classList.add('d-none');
     otpHelpEl.textContent = method === 'totp'
@@ -187,7 +192,15 @@
           ? ('Ingresa el código que enviamos a ' + maskedEmail + '.')
           : 'Ingresa el código que enviamos a tu correo.');
     otpCodeEl.focus();
-    btnOtpResend.classList.toggle('d-none', method !== 'email');
+    if (method === 'totp') {
+      // CTA de contingencia: pasar de app autenticadora a código por correo.
+      btnOtpResend.classList.toggle('d-none', !allowEmailFallback);
+      btnOtpResend.innerHTML = '<i class="bi bi-envelope-arrow-up me-1"></i>No tengo acceso a la app. Enviar código al correo';
+    } else {
+      // Flujo normal de correo: reenvío del OTP.
+      btnOtpResend.classList.remove('d-none');
+      btnOtpResend.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Reenviar código al correo';
+    }
   }
 
   function resetOtpSection() {
@@ -195,6 +208,7 @@
     btn.classList.remove('d-none');
     otpCodeEl.value = '';
     btnOtpResend.classList.add('d-none');
+    currentOtpMethod = 'email';
   }
 
   (function showUrlMessages() {
@@ -253,7 +267,11 @@
             pollTimer = null;
             setBusy(false);
             window.CCDigitalLoader?.hide(true);
-            showOtpSection({ method: pollRes.otpMethod || 'email', maskedEmail: pollRes.maskedEmail || '' });
+            showOtpSection({
+              method: pollRes.otpMethod || 'email',
+              maskedEmail: pollRes.maskedEmail || '',
+              allowEmailFallback: !!pollRes.allowEmailFallback
+            });
             setStatus(pollRes.message || 'Se envió un código de verificación al correo.', 'info');
             return;
           }
@@ -346,9 +364,21 @@
         return;
       }
       btnOtpResend.disabled = true;
-      window.CCDigitalLoader?.show('Reenviando código...');
+      window.CCDigitalLoader?.show(
+        currentOtpMethod === 'totp'
+          ? 'Enviando código de respaldo al correo...'
+          : 'Reenviando código...'
+      );
       const r = await postJson('/user/auth/otp/resend', { presExId: currentPresExId });
       window.CCDigitalLoader?.hide(true);
+      if (r.otpMethod) {
+        // Si backend cambia el método (ej. totp -> email fallback), se refresca el bloque OTP.
+        showOtpSection({
+          method: r.otpMethod,
+          maskedEmail: r.maskedEmail || '',
+          allowEmailFallback: false
+        });
+      }
       setStatus(r.message || 'Si aplica, se reenvió el código al correo.', 'info');
     } catch (e) {
       window.CCDigitalLoader?.hide(true);

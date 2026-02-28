@@ -33,6 +33,31 @@ import java.util.*;
 public class AccessRequestService {
     private static final Logger log = LoggerFactory.getLogger(AccessRequestService.class);
 
+    /**
+     * Vista de trazabilidad blockchain para un documento autorizado en una solicitud.
+     *
+     * @param network nombre de la red blockchain
+     * @param blockReference identificador de bloque/referencia on-chain
+     * @param documentTitle título del documento
+     * @param issuingEntity entidad emisora/origen reportado por Fabric
+     * @param status estado del registro on-chain
+     * @param createdAtHuman fecha de registro en formato legible
+     * @param sizeHuman tamaño del archivo en formato legible
+     * @param fileName nombre del archivo asociado
+     * @param filePath ruta técnica reportada por Fabric
+     */
+    public record DocumentBlockchainTrace(
+            String network,
+            String blockReference,
+            String documentTitle,
+            String issuingEntity,
+            String status,
+            String createdAtHuman,
+            String sizeHuman,
+            String fileName,
+            String filePath
+    ) {}
+
     private final AccessRequestRepository accessRequestRepository;
     private final PersonRepository personRepository;
     private final IssuingEntityRepository issuingEntityRepository;
@@ -335,6 +360,67 @@ public class AccessRequestService {
     }
 
     /**
+     * Obtiene el detalle de trazabilidad blockchain de un documento autorizado de una solicitud.
+     *
+     * <p>Aplica las mismas validaciones de seguridad y negocio del flujo de visualización:
+     * entidad dueña de la solicitud, estado aprobado, no expiración y pertenencia del documento.</p>
+     *
+     * @param entityId entidad emisora autenticada
+     * @param requestId solicitud aprobada
+     * @param personDocumentId documento solicitado
+     * @return metadatos del bloque on-chain correspondiente al documento
+     */
+    @Transactional(readOnly = true)
+    public DocumentBlockchainTrace loadApprovedDocumentBlockchainTrace(Long entityId,
+                                                                       Long requestId,
+                                                                       Long personDocumentId) {
+        AccessRequest request = accessRequestRepository.findByIdWithDetails(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Solicitud no encontrada"));
+
+        if (!Objects.equals(request.getEntity().getId(), entityId)) {
+            log.warn("Intento no autorizado de trazabilidad de documento. requestId={}, entityIdSolicitud={}, entityIdSesion={}, personDocumentId={}",
+                    requestId, request.getEntity().getId(), entityId, personDocumentId);
+            throw new IllegalArgumentException("No autorizado para consultar esta solicitud");
+        }
+
+        if (request.getStatus() != AccessRequestStatus.APROBADA) {
+            throw new IllegalArgumentException("La solicitud no está aprobada");
+        }
+
+        if (request.getExpiresAt() != null && request.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("La solicitud se encuentra expirada");
+        }
+
+        boolean requested = request.getItems().stream()
+                .anyMatch(i -> Objects.equals(i.getPersonDocument().getId(), personDocumentId));
+        if (!requested) {
+            throw new IllegalArgumentException("El documento no pertenece a la solicitud");
+        }
+
+        PersonDocument pd = personDocumentRepository.findByIdWithFiles(personDocumentId)
+                .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado"));
+
+        FileRecord latest = findLatestFile(pd);
+        List<FabricDocView> fabricDocs = loadFabricDocsForPerson(request.getPerson());
+        FabricDocView fabricDoc = findMatchingFabricDoc(fabricDocs, pd, latest)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No se encontró la referencia del documento en Fabric para esta solicitud."
+                ));
+
+        return new DocumentBlockchainTrace(
+                "Hyperledger Fabric",
+                safeText(fabricDoc.docId(), "Sin referencia"),
+                safeText(fabricDoc.title(), "Documento sin título"),
+                safeText(fabricDoc.issuingEntity(), "Entidad no identificada"),
+                safeText(fabricDoc.status(), "Registrado"),
+                safeText(fabricDoc.createdAtHuman(), "No disponible"),
+                safeText(fabricDoc.sizeHuman(), "No disponible"),
+                safeText(fabricDoc.fileName(), "documento"),
+                safeText(fabricDoc.filePath(), "No disponible")
+        );
+    }
+
+    /**
      * Sincroniza en Fabric los documentos de la persona asociada a una solicitud aprobada.
      *
      * <p>Se invoca únicamente cuando el usuario aprueba una solicitud. Si la sincronización falla
@@ -518,5 +604,15 @@ public class AccessRequestService {
                 .filter(s -> !s.isBlank())
                 .findFirst()
                 .orElse(fallback);
+    }
+
+    /**
+     * Normaliza un texto y aplica valor de respaldo cuando sea nulo o vacío.
+     */
+    private String safeText(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        return value.trim();
     }
 }

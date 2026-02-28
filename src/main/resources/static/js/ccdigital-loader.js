@@ -102,6 +102,40 @@
     });
   }
 
+  function bindActionClicks(selector = 'a[data-cc-loader], button[data-cc-loader]') {
+    document.querySelectorAll(selector).forEach((actionEl) => {
+      if (actionEl.dataset.ccLoaderActionBound === 'true') return;
+      actionEl.dataset.ccLoaderActionBound = 'true';
+
+      // Soporta loader en acciones de navegación (links/botones) además de formularios.
+      actionEl.addEventListener('click', (event) => {
+        if (actionEl.disabled) return;
+
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+          return;
+        }
+
+        if (actionEl.tagName === 'A') {
+          const href = actionEl.getAttribute('href') || '';
+          const target = actionEl.getAttribute('target') || '';
+          if (!href || href === '#' || href.startsWith('javascript:') || target === '_blank') {
+            return;
+          }
+        }
+
+        const msg = actionEl.dataset.ccLoaderMessage || 'Procesando solicitud...';
+        if (actionEl.tagName === 'BUTTON') {
+          setButtonBusy(
+            actionEl,
+            true,
+            '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...'
+          );
+        }
+        show(msg);
+      });
+    });
+  }
+
   function bindProfileToggles(selector = '[data-cc-profile-toggle], [data-cc-panel-toggle]') {
     document.querySelectorAll(selector).forEach((trigger) => {
       if (trigger.dataset.ccProfileToggleBound === 'true') return;
@@ -151,16 +185,19 @@
     update,
     setButtonBusy,
     bindFormSubmits,
+    bindActionClicks,
     bindProfileToggles,
   };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       bindFormSubmits();
+      bindActionClicks();
       bindProfileToggles();
     });
   } else {
     bindFormSubmits();
+    bindActionClicks();
     bindProfileToggles();
   }
 })();
