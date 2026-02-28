@@ -8,10 +8,13 @@ import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
 import co.edu.unbosque.ccdigital.service.AdminReportPdfService;
 import co.edu.unbosque.ccdigital.service.AdminReportService;
+import co.edu.unbosque.ccdigital.service.BlockchainTraceDetailService;
 import co.edu.unbosque.ccdigital.service.ExternalToolsService;
 import co.edu.unbosque.ccdigital.service.PersonDocumentService;
 import co.edu.unbosque.ccdigital.service.PersonService;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -22,7 +25,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -50,6 +55,7 @@ public class AdminController {
     private final ExternalToolsService externalToolsService;
     private final AdminReportService adminReportService;
     private final AdminReportPdfService adminReportPdfService;
+    private final BlockchainTraceDetailService blockchainTraceDetailService;
 
     /**
      * Constructor del controlador administrativo.
@@ -59,17 +65,20 @@ public class AdminController {
      * @param externalToolsService servicio de ejecución de herramientas externas
      * @param adminReportService servicio de consolidación de trazabilidad administrativa
      * @param adminReportPdfService servicio de exportación PDF del dashboard de reportes
+     * @param blockchainTraceDetailService servicio de lectura de detalle técnico por referencia blockchain
      */
     public AdminController(PersonService personService,
                            PersonDocumentService personDocumentService,
                            ExternalToolsService externalToolsService,
                            AdminReportService adminReportService,
-                           AdminReportPdfService adminReportPdfService) {
+                           AdminReportPdfService adminReportPdfService,
+                           BlockchainTraceDetailService blockchainTraceDetailService) {
         this.personService = personService;
         this.personDocumentService = personDocumentService;
         this.externalToolsService = externalToolsService;
         this.adminReportService = adminReportService;
         this.adminReportPdfService = adminReportPdfService;
+        this.blockchainTraceDetailService = blockchainTraceDetailService;
     }
 
     /**
@@ -123,6 +132,52 @@ public class AdminController {
         model.addAttribute("periodOptions", AdminReportService.TrendPeriod.values());
         model.addAttribute("idTypeOptions", IdType.values());
         return "admin/reports";
+    }
+
+    /**
+     * Resuelve el detalle técnico completo de una referencia blockchain del dashboard Admin.
+     *
+     * <p>El botón "Ver bloque completo" envía la red y la referencia visible en la tarjeta.
+     * Para Fabric también se envían tipo/número de identificación para resolver el bloque real
+     * asociado al docId.</p>
+     *
+     * @param network red seleccionada (Fabric/Indy)
+     * @param reference referencia funcional (docId o pres_ex_id)
+     * @param idType tipo de identificación (solo Fabric)
+     * @param idNumber número de identificación (solo Fabric)
+     * @return payload JSON con detalle técnico, o error de validación
+     */
+    @GetMapping("/reports/block-detail")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> reportBlockDetail(
+            @RequestParam("network") String network,
+            @RequestParam("reference") String reference,
+            @RequestParam(value = "idType", required = false) String idType,
+            @RequestParam(value = "idNumber", required = false) String idNumber
+    ) {
+        try {
+            Map<String, Object> payload = blockchainTraceDetailService.readDetail(network, reference, idType, idNumber);
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(payload);
+        } catch (IllegalArgumentException ex) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", ex.getMessage());
+            error.put("network", network);
+            error.put("reference", reference);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .cacheControl(CacheControl.noStore())
+                    .body(error);
+        } catch (Exception ex) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "No fue posible consultar el detalle del bloque en este momento.");
+            error.put("detail", ex.getMessage());
+            error.put("network", network);
+            error.put("reference", reference);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .cacheControl(CacheControl.noStore())
+                    .body(error);
+        }
     }
 
     /**

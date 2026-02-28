@@ -227,6 +227,23 @@ public class IndyProofLoginService {
     }
 
     /**
+     * Retorna el record completo de ACA-Py para un {@code presExId}.
+     *
+     * <p>Este método se usa en reportes administrativos para inspección técnica detallada
+     * del intercambio (present-proof) asociado a una referencia Indy.</p>
+     *
+     * @param presExId identificador del exchange
+     * @return mapa completo del record reportado por ACA-Py
+     */
+    public Map<String, Object> getProofRecordDetail(String presExId) {
+        String normalized = asString(presExId).trim();
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException("El presExId es obligatorio para consultar detalle Indy.");
+        }
+        return new LinkedHashMap<>(getProofRecord(normalized));
+    }
+
+    /**
      * Construye el payload requerido por {@code /present-proof-2.0/send-request}.
      *
      * @param connectionId conexión ACA-Py con el holder

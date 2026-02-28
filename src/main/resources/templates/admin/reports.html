@@ -210,7 +210,7 @@
       <div class="col-12 col-md-3 col-lg-3">
         <label class="form-label mb-1">Número ID blockchain</label>
         <input class="form-control" type="text" name="traceIdNumber"
-               maxlength="40" placeholder="Ej. 1019983896"
+               maxlength="40" placeholder="Ej. 1234567890"
                th:value="${report.traceIdNumber}">
       </div>
       <div class="col-12 col-lg-4 d-flex gap-2">
@@ -565,6 +565,8 @@
             Documento anclado en ledger.
           </div>
           <div class="trace-block-actions">
+            <!-- Se embeben metadatos del bloque para que el modal consulte detalle real
+                 sin pedir parámetros manuales al usuario. -->
             <button type="button"
                     class="btn btn-sm btn-outline-primary trace-block-view-btn"
                     th:attr="data-trace-network=${block.network},
@@ -598,9 +600,9 @@
   <div class="modal fade" id="traceBlockDetailModal" tabindex="-1" aria-hidden="true"
        data-bs-backdrop="false" data-bs-keyboard="true"
        th:if="${reportView == 'blockchain'}">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
           <div>
             <h3 class="h6 mb-1">Detalle completo del bloque</h3>
             <div class="d-flex align-items-center gap-2">
@@ -611,24 +613,33 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
-          <dl class="trace-detail-list mb-3">
-            <dt>Operación</dt>
-            <dd id="traceDetailOperation">Registro de documento</dd>
-            <dt>Fecha / hora</dt>
-            <dd id="traceDetailEvent">2026-02-27 12:00</dd>
-            <dt>Bloque / referencia</dt>
-            <dd id="traceDetailBlockRef">doc-001</dd>
-            <dt>Documento</dt>
-            <dd id="traceDetailDocument">Documento X</dd>
-            <dt>Emisor / origen</dt>
-            <dd id="traceDetailIssuer">Entidad X</dd>
-            <dt>Usuario</dt>
-            <dd id="traceDetailPerson">Persona X</dd>
-            <dt>Identificación blockchain</dt>
-            <dd id="traceDetailIdentity">CC 1000000000</dd>
-          </dl>
-          <div class="mb-2 text-muted small fw-semibold text-uppercase">Detalle técnico del intercambio</div>
-          <pre id="traceDetailNotes" class="trace-detail-box">Documento anclado en ledger.</pre>
+          <div id="traceDetailLoading" class="d-none text-muted small py-1">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            Consultando detalle técnico completo...
+          </div>
+          <div id="traceDetailError" class="alert alert-warning d-none" role="alert"></div>
+          <div id="traceDetailContent" class="d-none">
+            <dl class="trace-detail-list mb-3">
+              <dt>Operación</dt>
+              <dd id="traceDetailOperation">Registro de documento</dd>
+              <dt>Fecha / hora</dt>
+              <dd id="traceDetailEvent">2026-02-27 12:00</dd>
+              <dt>Bloque / referencia</dt>
+              <dd id="traceDetailBlockRef">doc-001</dd>
+              <dt>Documento</dt>
+              <dd id="traceDetailDocument">Documento X</dd>
+              <dt>Emisor / origen</dt>
+              <dd id="traceDetailIssuer">Entidad X</dd>
+              <dt>Usuario</dt>
+              <dd id="traceDetailPerson">Persona X</dd>
+              <dt>Identificación blockchain</dt>
+              <dd id="traceDetailIdentity">CC 1000000000</dd>
+            </dl>
+            <div class="mb-2 text-muted small fw-semibold text-uppercase">Resumen técnico</div>
+            <pre id="traceDetailNotes" class="trace-detail-box mb-3">Documento anclado en ledger.</pre>
+            <div class="mb-2 text-muted small fw-semibold text-uppercase">Contenido completo</div>
+            <pre id="traceDetailRawJson" class="trace-detail-box">{}</pre>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary btn-sm" id="traceDetailCopyRefBtn">
@@ -741,6 +752,9 @@
       const traceViewButtons = Array.from(document.querySelectorAll('.trace-block-view-btn'));
       const traceDetailNetworkBadge = document.getElementById('traceDetailNetworkBadge');
       const traceDetailStatusBadge = document.getElementById('traceDetailStatusBadge');
+      const traceDetailLoading = document.getElementById('traceDetailLoading');
+      const traceDetailError = document.getElementById('traceDetailError');
+      const traceDetailContent = document.getElementById('traceDetailContent');
       const traceDetailOperation = document.getElementById('traceDetailOperation');
       const traceDetailEvent = document.getElementById('traceDetailEvent');
       const traceDetailBlockRef = document.getElementById('traceDetailBlockRef');
@@ -749,6 +763,7 @@
       const traceDetailPerson = document.getElementById('traceDetailPerson');
       const traceDetailIdentity = document.getElementById('traceDetailIdentity');
       const traceDetailNotes = document.getElementById('traceDetailNotes');
+      const traceDetailRawJson = document.getElementById('traceDetailRawJson');
       const traceDetailCopyRefBtn = document.getElementById('traceDetailCopyRefBtn');
 
       const setText = (el, value, fallback = 'Sin dato') => {
@@ -757,39 +772,127 @@
         el.textContent = text !== '' ? text : fallback;
       };
 
+      // Formatea payload técnico para mostrar JSON legible en modal.
+      const toPrettyJson = (value) => {
+        try {
+          return JSON.stringify(value ?? {}, null, 2);
+        } catch (_) {
+          return String(value ?? '');
+        }
+      };
+
+      // Actualiza color/estilo del badge de red según origen del bloque.
+      const normalizeNetworkBadge = (network) => {
+        if (!traceDetailNetworkBadge) return;
+        const networkText = typeof network === 'string' ? network.trim() : '';
+        traceDetailNetworkBadge.textContent = networkText || 'Sin red';
+        traceDetailNetworkBadge.className = 'badge rounded-pill';
+        if (networkText.toLowerCase() === 'fabric') {
+          traceDetailNetworkBadge.classList.add('text-bg-primary');
+        } else if (networkText.toLowerCase() === 'indy') {
+          traceDetailNetworkBadge.classList.add('text-bg-success');
+        } else {
+          traceDetailNetworkBadge.classList.add('text-bg-secondary');
+        }
+      };
+
+      // Máquina de estado simple del modal: loading / content / error.
+      const setModalState = (state, message) => {
+        if (traceDetailLoading) traceDetailLoading.classList.toggle('d-none', state !== 'loading');
+        if (traceDetailContent) traceDetailContent.classList.toggle('d-none', state !== 'content');
+        if (traceDetailError) {
+          traceDetailError.classList.toggle('d-none', state !== 'error');
+          traceDetailError.textContent = state === 'error' ? (message || 'No fue posible consultar el bloque.') : '';
+        }
+      };
+
+      // Pinta UI del modal combinando datos de backend y fallback de la tarjeta.
+      const applyDetailPayload = (payload, fallback) => {
+        const resolved = payload && payload.resolved ? payload.resolved : {};
+        const fallbackIdentity = [fallback.idType, fallback.idNumber].join(' ').trim();
+        const resolvedIdentity = [resolved.idType, resolved.idNumber].join(' ').trim();
+
+        normalizeNetworkBadge(payload.network || fallback.network);
+        setText(traceDetailStatusBadge, payload.status || fallback.status || 'CONFIRMADO');
+        setText(traceDetailOperation, payload.operation || fallback.operation || 'Registro de documento');
+        setText(traceDetailEvent, payload.eventAt || fallback.event || 'Sin fecha');
+        setText(traceDetailBlockRef, payload.reference || fallback.reference);
+        setText(traceDetailDocument, payload.documentTitle || fallback.documentTitle);
+        setText(traceDetailIssuer, payload.issuer || fallback.issuer);
+        setText(traceDetailPerson, payload.personLabel || fallback.person);
+        setText(traceDetailIdentity, resolvedIdentity || fallbackIdentity);
+        setText(traceDetailNotes, payload.summary || fallback.detail || 'Sin resumen técnico');
+        setText(traceDetailRawJson, toPrettyJson(payload.raw || payload), '{}');
+      };
+
       traceViewButtons.forEach((button) => {
-        button.addEventListener('click', () => {
+        button.addEventListener('click', async () => {
           if (typeof resetTraceCardFilters === 'function') {
             resetTraceCardFilters();
           }
-          const network = button.dataset.traceNetwork || '';
-          const status = button.dataset.traceStatus || '';
-          const idType = button.dataset.traceIdType || '';
-          const idNumber = button.dataset.traceIdNumber || '';
-          const identity = [idType, idNumber].join(' ').trim();
 
-          if (traceDetailNetworkBadge) {
-            traceDetailNetworkBadge.textContent = network || 'Sin red';
-            traceDetailNetworkBadge.className = 'badge rounded-pill';
-            if (network.toLowerCase() === 'fabric') {
-              traceDetailNetworkBadge.classList.add('text-bg-primary');
-            } else if (network.toLowerCase() === 'indy') {
-              traceDetailNetworkBadge.classList.add('text-bg-success');
-            } else {
-              traceDetailNetworkBadge.classList.add('text-bg-secondary');
-            }
+          // Snapshot local: permite abrir modal de inmediato mientras llega detalle completo.
+          const fallback = {
+            network: button.dataset.traceNetwork || '',
+            status: button.dataset.traceStatus || '',
+            event: button.dataset.traceEvent || '',
+            operation: button.dataset.traceOperation || '',
+            reference: button.dataset.traceBlockRef || '',
+            documentTitle: button.dataset.traceDocument || '',
+            issuer: button.dataset.traceIssuer || '',
+            person: button.dataset.tracePerson || '',
+            idType: button.dataset.traceIdType || '',
+            idNumber: button.dataset.traceIdNumber || '',
+            detail: button.dataset.traceDetail || ''
+          };
+
+          applyDetailPayload({
+            network: fallback.network,
+            status: fallback.status,
+            eventAt: fallback.event,
+            operation: fallback.operation,
+            reference: fallback.reference,
+            documentTitle: fallback.documentTitle,
+            issuer: fallback.issuer,
+            personLabel: fallback.person,
+            summary: fallback.detail,
+            raw: { loading: 'Consultando detalle técnico...' }
+          }, fallback);
+
+          traceBlockDetailModal.show();
+
+          const params = new URLSearchParams();
+          params.set('network', fallback.network);
+          params.set('reference', fallback.reference);
+          if (fallback.idType && fallback.idType.toUpperCase() !== 'N/A') {
+            params.set('idType', fallback.idType);
+          }
+          if (fallback.idNumber && fallback.idNumber.toUpperCase() !== 'N/A') {
+            params.set('idNumber', fallback.idNumber);
           }
 
-          setText(traceDetailStatusBadge, status);
-          setText(traceDetailOperation, button.dataset.traceOperation);
-          setText(traceDetailEvent, button.dataset.traceEvent);
-          setText(traceDetailBlockRef, button.dataset.traceBlockRef);
-          setText(traceDetailDocument, button.dataset.traceDocument);
-          setText(traceDetailIssuer, button.dataset.traceIssuer);
-          setText(traceDetailPerson, button.dataset.tracePerson);
-          setText(traceDetailIdentity, identity);
-          setText(traceDetailNotes, button.dataset.traceDetail);
-          traceBlockDetailModal.show();
+          setModalState('loading');
+          button.disabled = true;
+
+          try {
+            // Consulta backend que resuelve el bloque real (Fabric/Indy) por referencia.
+            const response = await fetch('/admin/reports/block-detail?' + params.toString(), {
+              method: 'GET',
+              credentials: 'same-origin',
+              cache: 'no-store',
+              headers: { 'Accept': 'application/json' }
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || (payload && payload.error)) {
+              throw new Error((payload && payload.error) || 'No fue posible consultar el detalle del bloque.');
+            }
+            applyDetailPayload(payload, fallback);
+            setModalState('content');
+          } catch (error) {
+            setModalState('error', error?.message || 'No fue posible consultar el detalle del bloque.');
+          } finally {
+            button.disabled = false;
+          }
         });
       });
 
