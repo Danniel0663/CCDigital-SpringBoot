@@ -105,15 +105,27 @@
 
           <div class="mb-3">
             <label for="newPassword" class="form-label">Nueva contraseña</label>
-            <input id="newPassword" class="form-control" type="password" autocomplete="new-password"
-                   placeholder="Ingresa tu nueva contraseña" required />
+            <div class="input-group">
+              <input id="newPassword" class="form-control" type="password" autocomplete="new-password"
+                     placeholder="Ingresa tu nueva contraseña" required />
+              <button id="btnToggleForgotNewPassword" type="button" class="btn btn-outline-secondary"
+                      aria-label="Mostrar u ocultar nueva contraseña">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
             <div class="form-text">Mínimo 8 caracteres, con letras y números.</div>
           </div>
 
           <div class="mb-3">
             <label for="confirmPassword" class="form-label">Confirmar contraseña</label>
-            <input id="confirmPassword" class="form-control" type="password" autocomplete="new-password"
-                   placeholder="Repite tu nueva contraseña" required />
+            <div class="input-group">
+              <input id="confirmPassword" class="form-control" type="password" autocomplete="new-password"
+                     placeholder="Repite tu nueva contraseña" required />
+              <button id="btnToggleForgotConfirmPassword" type="button" class="btn btn-outline-secondary"
+                      aria-label="Mostrar u ocultar confirmación de contraseña">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
           </div>
 
           <button id="btnReset" type="button" class="btn btn-primary w-100">
@@ -192,10 +204,24 @@
   const newPasswordEl = document.getElementById('newPassword');
   const confirmPasswordEl = document.getElementById('confirmPassword');
   const resetCodeEl = document.getElementById('resetCode');
+  const btnToggleForgotNewPassword = document.getElementById('btnToggleForgotNewPassword');
+  const btnToggleForgotConfirmPassword = document.getElementById('btnToggleForgotConfirmPassword');
 
   const btnVerify = document.getElementById('btnVerify');
   const btnReset = document.getElementById('btnReset');
   const btnResendForgotCode = document.getElementById('btnResendForgotCode');
+
+  // Permite confirmar visualmente las contraseñas en el restablecimiento.
+  const bindToggle = (inputEl, buttonEl) => {
+    if (!inputEl || !buttonEl) return;
+    buttonEl.addEventListener('click', () => {
+      const show = inputEl.type === 'password';
+      inputEl.type = show ? 'text' : 'password';
+      buttonEl.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+    });
+  };
+  bindToggle(newPasswordEl, btnToggleForgotNewPassword);
+  bindToggle(confirmPasswordEl, btnToggleForgotConfirmPassword);
 
   // Paso 1: solicita envío de código temporal al correo.
   btnVerify.addEventListener('click', async () => {
