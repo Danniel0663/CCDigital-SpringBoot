@@ -33,6 +33,7 @@ public class SignedUrlService {
     private static final String SCOPE_USER_DOC_DOWNLOAD = "user-doc-download";
     private static final String SCOPE_ISSUER_DOC = "issuer-doc-view";
     private static final String SCOPE_ISSUER_DOC_DOWNLOAD = "issuer-doc-download";
+    private static final String SCOPE_ISSUER_DOC_BLOCK = "issuer-doc-block";
 
     @Value("${app.security.signed-urls.secret:}")
     private String configuredSecret;
@@ -107,6 +108,21 @@ public class SignedUrlService {
     }
 
     /**
+     * Construye una URL firmada para consultar la referencia de bloque de un documento autorizado.
+     *
+     * @param requestId id de la solicitud de acceso
+     * @param personDocumentId id del documento de persona solicitado
+     * @return URL relativa firmada con expiración para trazabilidad blockchain
+     */
+    public String issuerDocumentBlockUrl(Long requestId, Long personDocumentId) {
+        long exp = expiryEpochSeconds();
+        String rid = requestId == null ? "" : requestId.toString();
+        String pdid = personDocumentId == null ? "" : personDocumentId.toString();
+        String sig = sign(SCOPE_ISSUER_DOC_BLOCK, rid, pdid, Long.toString(exp));
+        return "/issuer/access-requests/" + rid + "/documents/" + pdid + "/block?exp=" + exp + "&sig=" + sig;
+    }
+
+    /**
      * Valida firma y expiración de una URL de documento del usuario final.
      *
      * @param docId docId de Fabric en la URL
@@ -157,6 +173,24 @@ public class SignedUrlService {
     public void validateIssuerDocumentDownload(Long requestId, Long personDocumentId, Long exp, String sig) {
         validate(
                 SCOPE_ISSUER_DOC_DOWNLOAD,
+                exp,
+                sig,
+                requestId == null ? "" : requestId.toString(),
+                personDocumentId == null ? "" : personDocumentId.toString()
+        );
+    }
+
+    /**
+     * Valida firma y expiración de una URL de consulta de bloque del módulo emisor.
+     *
+     * @param requestId solicitud de acceso
+     * @param personDocumentId documento solicitado
+     * @param exp expiración UNIX epoch seconds
+     * @param sig firma recibida en query string
+     */
+    public void validateIssuerDocumentBlock(Long requestId, Long personDocumentId, Long exp, String sig) {
+        validate(
+                SCOPE_ISSUER_DOC_BLOCK,
                 exp,
                 sig,
                 requestId == null ? "" : requestId.toString(),

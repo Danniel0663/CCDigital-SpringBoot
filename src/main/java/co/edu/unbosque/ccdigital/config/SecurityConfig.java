@@ -409,7 +409,9 @@ public class SecurityConfig {
                         "/login/admin", "/login/issuer",
                         "/user", "/user/login",
                         "/favicon.ico",
-                        "/css/**", "/js/**", "/images/**", "/webjars/**"
+                        // Recursos estáticos públicos (incluye logo institucional del home).
+                        "/css/**", "/js/**", "/images/**", "/webjars/**",
+                        "/logouniversidad/**", "/LogoUniversidad/**"
                 ).permitAll()
                 .anyRequest().denyAll()
         );

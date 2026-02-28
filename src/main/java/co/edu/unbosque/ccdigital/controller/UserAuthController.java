@@ -149,7 +149,9 @@ public class UserAuthController {
     }
 
     /**
-     * Request para reenviar el código OTP por correo durante login.
+     * Request para solicitar envío/reenvío del OTP por correo durante login.
+     *
+     * <p>Si el flujo estaba en TOTP, esta solicitud activa el mecanismo de respaldo por correo.</p>
      */
     public static class OtpResendRequest {
         private String presExId;
@@ -348,6 +350,8 @@ public class UserAuthController {
             out.put("otpRequired", true);
             if (isTotpFactor(pending)) {
                 out.put("otpMethod", "totp");
+                out.put("allowEmailFallback", true);
+                out.put("maskedEmail", maskEmail(pending.getLoginEmail()));
                 out.put("message", "Ingresa el código de tu app de autenticación.");
             } else {
                 out.put("otpMethod", "email");
@@ -370,7 +374,7 @@ public class UserAuthController {
     }
 
     /**
-     * Valida el OTP enviado por correo y completa la autenticación de la sesión.
+     * Valida el segundo factor (TOTP o OTP por correo) y completa la autenticación de la sesión.
      *
      * @param req request con presExId y código OTP
      * @param request request HTTP para acceso a sesión
@@ -411,6 +415,12 @@ public class UserAuthController {
 
             int remaining = MAX_OTP_LOGIN_ATTEMPTS - failed;
             if (remaining <= 0) {
+                // Alerta de seguridad: notifica al titular de la cuenta cuando se bloquea el intento
+                // por múltiples errores en segundo factor (correo o app autenticadora).
+                userLoginOtpService.sendSuspiciousLoginAlert(
+                        pending.getLoginEmail(),
+                        displayNameFromPending(pending)
+                );
                 removeExpectedIdNumber(request, presExId);
                 removeExpectedEmail(request, presExId);
                 removePendingOtpContext(request, presExId);
@@ -459,11 +469,17 @@ public class UserAuthController {
     }
 
     /**
-     * Reenvía el OTP por correo para un flujo de login ya verificado por credencial Indy.
+     * Solicita OTP por correo para un flujo de login ya verificado por credencial Indy.
+     *
+     * <p>Comportamiento:</p>
+     * <ul>
+     *   <li>Si el usuario ya estaba en método correo: reenvía código.</li>
+     *   <li>Si el usuario estaba en TOTP: activa contingencia por correo y cambia el método temporalmente.</li>
+     * </ul>
      *
      * @param req request con presExId del flujo en curso
      * @param request request HTTP para acceder al contexto pendiente en sesión
-     * @return estado de reenvío y mensaje amigable
+     * @return estado de envío/reenvío y mensaje amigable
      */
     @PostMapping("/otp/resend")
     public ResponseEntity<Map<String, Object>> resendOtp(@RequestBody OtpResendRequest req,
@@ -480,9 +496,29 @@ public class UserAuthController {
                     .body(Map.of("error", "La sesión de validación expiró. Inicia sesión nuevamente."));
         }
         if (isTotpFactor(pending)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            // Contingencia MFA: permite pasar temporalmente de app autenticadora a OTP por correo
+            // cuando el usuario no tiene acceso al dispositivo móvil.
+            boolean sentFallback = userLoginOtpService.issueCode(
+                    presExId,
+                    pending.getLoginEmail(),
+                    displayNameFromPending(pending)
+            );
+            if (!sentFallback) {
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                        .cacheControl(CacheControl.noStore())
+                        .body(Map.of("error", "No fue posible enviar el código de respaldo al correo."));
+            }
+
+            pending.setSecondFactorMethod("email");
+            savePendingOtpContext(request, presExId, pending);
+            return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
-                    .body(Map.of("error", "Este usuario usa app autenticadora. No aplica reenvío por correo."));
+                    .body(Map.of(
+                            "ok", true,
+                            "otpMethod", "email",
+                            "maskedEmail", maskEmail(pending.getLoginEmail()),
+                            "message", "Enviamos un código de respaldo a tu correo para continuar el ingreso."
+                    ));
         }
 
         boolean sent = userLoginOtpService.issueCode(
@@ -500,6 +536,7 @@ public class UserAuthController {
                 .cacheControl(CacheControl.noStore())
                 .body(Map.of(
                         "ok", true,
+                        "otpMethod", "email",
                         "maskedEmail", maskEmail(pending.getLoginEmail()),
                         "message", "Si aplica, se reenvió un código a tu correo."
                 ));

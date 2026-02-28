@@ -25,6 +25,70 @@
       height: 100% !important;
       display: block;
     }
+
+    .trace-filter-chip .btn.active {
+      color: #fff;
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+
+    .trace-block-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .trace-block-card {
+      border: 1px solid #d9e1f2;
+      border-radius: 0.9rem;
+      padding: 0.9rem;
+      background: #f8fbff;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+    }
+
+    .trace-block-card.is-hidden {
+      display: none;
+    }
+
+    .trace-block-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .trace-block-actions {
+      margin-top: 0.75rem;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .trace-detail-list dt {
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #6c757d;
+      margin-bottom: 0.15rem;
+    }
+
+    .trace-detail-list dd {
+      margin-bottom: 0.75rem;
+      font-weight: 500;
+      color: #1f2937;
+      word-break: break-word;
+    }
+
+    .trace-detail-box {
+      border: 1px solid #d9e1f2;
+      background: #f8fbff;
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      font-size: 0.92rem;
+      color: #334155;
+    }
   </style>
 </head>
 
@@ -60,11 +124,24 @@
         <p class="text-muted mb-0">
           Monitoreo integral del uso del sistema: solicitudes, consultas de documentos, depósitos y tendencias.
         </p>
+        <div class="btn-group btn-group-sm mt-3" role="group" aria-label="Vista de reportes">
+          <a class="btn"
+             th:classappend="${reportView == 'analytics'} ? ' btn-primary' : ' btn-outline-primary'"
+             th:href="@{/admin/reports(view='analytics',from=${report.fromDate},to=${report.toDate},period=${report.period.name()})}">
+            <i class="bi bi-graph-up-arrow me-1"></i>Analítica del sistema
+          </a>
+          <a class="btn"
+             th:classappend="${reportView == 'blockchain'} ? ' btn-primary' : ' btn-outline-primary'"
+             th:href="@{/admin/reports(view='blockchain',from=${report.fromDate},to=${report.toDate},traceIdType=${report.traceIdType},traceIdNumber=${report.traceIdNumber},traceAll=${report.traceAllSelected})}">
+            <i class="bi bi-diagram-3 me-1"></i>Trazabilidad blockchain
+          </a>
+        </div>
       </div>
       <div class="d-flex gap-2">
         <!-- Exporta el reporte completo con los mismos filtros activos en la vista. -->
         <a class="btn btn-outline-secondary btn-sm"
-           th:href="@{/admin/reports/pdf(from=${report.fromDate},to=${report.toDate},period=${report.period.name()})}"
+           th:if="${reportView == 'analytics'}"
+           th:href="@{/admin/reports/pdf(from=${report.fromDate},to=${report.toDate},period=${report.period.name()},traceIdType=${report.traceIdType},traceIdNumber=${report.traceIdNumber})}"
            data-cc-loader data-cc-loader-message="Generando PDF de trazabilidad...">
           <i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF
         </a>
@@ -78,7 +155,9 @@
   <!-- Filtros del reporte -->
   <div class="cc-card p-3 p-md-4 mb-3">
     <form class="row g-2 align-items-end" method="get" th:action="@{/admin/reports}"
+          th:if="${reportView == 'analytics'}"
           data-cc-loader data-cc-loader-message="Aplicando filtros de trazabilidad...">
+      <input type="hidden" name="view" value="analytics">
       <div class="col-12 col-md-4 col-lg-3">
         <label class="form-label mb-1">Desde</label>
         <input class="form-control" type="date" name="from" th:value="${report.fromDate}" required>
@@ -100,13 +179,61 @@
         <button class="btn btn-primary flex-fill" type="submit">
           <i class="bi bi-funnel me-1"></i>Aplicar
         </button>
-        <a class="btn btn-outline-secondary flex-fill" th:href="@{/admin/reports}">
+        <a class="btn btn-outline-secondary flex-fill" th:href="@{/admin/reports(view='analytics')}">
+          Limpiar
+        </a>
+      </div>
+    </form>
+
+    <form class="row g-2 align-items-end" method="get" th:action="@{/admin/reports}"
+          th:if="${reportView == 'blockchain'}"
+          data-cc-loader data-cc-loader-message="Consultando trazabilidad blockchain...">
+      <input type="hidden" name="view" value="blockchain">
+      <div class="col-12 col-md-3 col-lg-2">
+        <label class="form-label mb-1">Desde</label>
+        <input class="form-control" type="date" name="from" th:value="${report.fromDate}" required>
+      </div>
+      <div class="col-12 col-md-3 col-lg-2">
+        <label class="form-label mb-1">Hasta</label>
+        <input class="form-control" type="date" name="to" th:value="${report.toDate}" required>
+      </div>
+      <div class="col-12 col-md-3 col-lg-3">
+        <label class="form-label mb-1">Tipo ID blockchain</label>
+        <select class="form-select" name="traceIdType">
+          <option value="">Seleccione...</option>
+          <option th:each="idType : ${idTypeOptions}"
+                  th:value="${idType.name()}"
+                  th:text="${idType.name()}"
+                  th:selected="${idType.name() == report.traceIdType}">CC</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3 col-lg-3">
+        <label class="form-label mb-1">Número ID blockchain</label>
+        <input class="form-control" type="text" name="traceIdNumber"
+               maxlength="40" placeholder="Ej. 1019983896"
+               th:value="${report.traceIdNumber}">
+      </div>
+      <div class="col-12 col-lg-4 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-funnel me-1"></i>Aplicar
+        </button>
+        <a class="btn btn-outline-primary"
+           th:href="@{/admin/reports(view='blockchain',from=${report.fromDate},to=${report.toDate},traceAll=true)}"
+           data-cc-loader
+           data-cc-loader-message="Consultando trazabilidad global...">
+          <i class="bi bi-collection me-1"></i>Ver todos
+        </a>
+        <a class="btn btn-outline-secondary"
+           th:href="@{/admin/reports(view='blockchain')}"
+           data-cc-loader
+           data-cc-loader-message="Limpiando filtros de trazabilidad...">
           Limpiar
         </a>
       </div>
     </form>
   </div>
 
+  <section th:if="${reportView == 'analytics'}">
   <!-- KPI principales -->
   <div class="row g-3 mb-3">
     <div class="col-12 col-md-6 col-xl-3">
@@ -341,6 +468,177 @@
       </div>
     </div>
   </div>
+  </section>
+
+  <!-- Trazabilidad blockchain por usuario/documento -->
+  <div class="cc-card p-3 p-md-4 mt-3" th:if="${reportView == 'blockchain'}">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+      <div>
+        <h2 class="h6 text-uppercase text-muted mb-1">Trazabilidad Blockchain (Fabric + Indy)</h2>
+        <div class="small text-muted">
+          Bloques consultados para el usuario filtrado en esta ventana de tiempo.
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge rounded-pill text-bg-light border"
+              th:text="'Fabric: ' + ${report.fabricTraceBlocks}">Fabric: 0</span>
+        <span class="badge rounded-pill text-bg-light border"
+              th:text="'Indy: ' + ${report.indyTraceBlocks}">Indy: 0</span>
+        <span class="badge rounded-pill text-bg-primary"
+              th:text="'Total: ' + ${#lists.size(report.blockchainBlocks)}">Total: 0</span>
+      </div>
+    </div>
+
+    <div class="alert alert-info py-2 mb-3"
+         th:if="${!report.traceLookupRequested}">
+      Selecciona <strong>Tipo ID blockchain</strong> y <strong>Número ID blockchain</strong> o usa
+      <strong>Ver todos</strong> para consultar trazabilidad global.
+    </div>
+    <div class="alert alert-warning py-2 mb-3"
+         th:if="${report.traceLookupRequested and report.traceWarningMessage != null and !#strings.isEmpty(report.traceWarningMessage)}"
+         th:text="${report.traceWarningMessage}">
+      No fue posible consultar una de las redes blockchain.
+    </div>
+
+    <div th:if="${report.traceLookupRequested}">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div class="small text-muted">
+          Contexto consultado:
+          <span class="fw-semibold"
+                th:text="${(report.tracePersonLabel != null and !#strings.isEmpty(report.tracePersonLabel)) ? report.tracePersonLabel : (report.traceIdType + ' ' + report.traceIdNumber)}">
+            CC 1000000000
+          </span>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
+          <a class="btn btn-sm btn-outline-secondary"
+             th:if="${report.traceLookupRequested and !report.traceAllSelected}"
+             th:href="@{/admin/reports(view='blockchain',from=${report.fromDate},to=${report.toDate},traceAll=true)}"
+             data-cc-loader
+             data-cc-loader-message="Quitando filtro y consultando todos los bloques...">
+            <i class="bi bi-x-circle me-1"></i>Quitar filtro y ver todos
+          </a>
+          <input id="traceSearchInput" class="form-control form-control-sm"
+                 type="search" style="width: 240px;"
+                 placeholder="Buscar bloque, documento o detalle">
+          <div class="btn-group btn-group-sm trace-filter-chip" role="group" aria-label="Filtrar red">
+            <button type="button" class="btn btn-outline-primary active" data-trace-network="all">Todos</button>
+            <button type="button" class="btn btn-outline-primary" data-trace-network="fabric">Fabric</button>
+            <button type="button" class="btn btn-outline-primary" data-trace-network="indy">Indy</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="traceVisibleCounter" class="small text-muted mb-2"></div>
+
+      <div id="traceBlockList" class="trace-block-list">
+        <article class="trace-block-card"
+                 th:each="block : ${report.blockchainBlocks}"
+                 th:attr="data-network=${#strings.toLowerCase(block.network)}">
+          <div class="trace-block-meta">
+            <span class="badge rounded-pill"
+                  th:classappend="${block.network == 'Fabric'} ? ' text-bg-primary' : ' text-bg-success'"
+                  th:text="${block.network}">Fabric</span>
+            <span class="badge text-bg-light border"
+                  th:text="${block.status}">CONFIRMADO</span>
+            <span class="badge text-bg-light border"
+                  th:text="${block.eventAtLabel}">2026-02-27 12:00</span>
+          </div>
+
+          <div class="fw-semibold mb-1" th:text="${block.operation}">Registro de documento</div>
+          <div class="small mb-1">
+            <span class="text-muted">Bloque/ref:</span>
+            <span class="fw-semibold" th:text="${block.blockRef}">doc-001</span>
+          </div>
+          <div class="small mb-1">
+            <span class="text-muted">Documento:</span>
+            <span th:text="${block.documentTitle}">Copia de cédula</span>
+          </div>
+          <div class="small mb-1">
+            <span class="text-muted">Emisor/origen:</span>
+            <span th:text="${block.issuer}">Entidad X</span>
+          </div>
+          <div class="small mb-1">
+            <span class="text-muted">Usuario:</span>
+            <span th:text="${block.personLabel}">Nombre Apellido (CC 1000)</span>
+          </div>
+          <div class="small text-muted" th:text="${block.detail}">
+            Documento anclado en ledger.
+          </div>
+          <div class="trace-block-actions">
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary trace-block-view-btn"
+                    th:attr="data-trace-network=${block.network},
+                             data-trace-status=${block.status},
+                             data-trace-event=${block.eventAtLabel},
+                             data-trace-operation=${block.operation},
+                             data-trace-block-ref=${block.blockRef},
+                             data-trace-document=${block.documentTitle},
+                             data-trace-issuer=${block.issuer},
+                             data-trace-person=${block.personLabel},
+                             data-trace-id-type=${block.idType},
+                             data-trace-id-number=${block.idNumber},
+                             data-trace-detail=${block.detail}">
+              <i class="bi bi-eye me-1"></i>Ver bloque completo
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <div id="traceNoDataMessage" class="text-muted text-center py-3 border rounded mt-2"
+           th:if="${#lists.isEmpty(report.blockchainBlocks)}">
+        No se encontraron bloques para el usuario y rango seleccionado.
+      </div>
+      <div id="traceNoDataMessageByFilter" class="text-muted text-center py-3 border rounded mt-2 d-none">
+        No hay bloques que coincidan con el filtro interactivo.
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de detalle ampliado para inspeccionar metadatos del bloque seleccionado. -->
+  <div class="modal fade" id="traceBlockDetailModal" tabindex="-1" aria-hidden="true"
+       data-bs-backdrop="false" data-bs-keyboard="true"
+       th:if="${reportView == 'blockchain'}">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h3 class="h6 mb-1">Detalle completo del bloque</h3>
+            <div class="d-flex align-items-center gap-2">
+              <span id="traceDetailNetworkBadge" class="badge rounded-pill text-bg-primary">Fabric</span>
+              <span id="traceDetailStatusBadge" class="badge text-bg-light border">CONFIRMADO</span>
+            </div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <dl class="trace-detail-list mb-3">
+            <dt>Operación</dt>
+            <dd id="traceDetailOperation">Registro de documento</dd>
+            <dt>Fecha / hora</dt>
+            <dd id="traceDetailEvent">2026-02-27 12:00</dd>
+            <dt>Bloque / referencia</dt>
+            <dd id="traceDetailBlockRef">doc-001</dd>
+            <dt>Documento</dt>
+            <dd id="traceDetailDocument">Documento X</dd>
+            <dt>Emisor / origen</dt>
+            <dd id="traceDetailIssuer">Entidad X</dd>
+            <dt>Usuario</dt>
+            <dd id="traceDetailPerson">Persona X</dd>
+            <dt>Identificación blockchain</dt>
+            <dd id="traceDetailIdentity">CC 1000000000</dd>
+          </dl>
+          <div class="mb-2 text-muted small fw-semibold text-uppercase">Detalle técnico del intercambio</div>
+          <pre id="traceDetailNotes" class="trace-detail-box">Documento anclado en ledger.</pre>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="traceDetailCopyRefBtn">
+            <i class="bi bi-copy me-1"></i>Copiar referencia
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Dataset para graficas (renderizado server-side y consumido por JS). -->
   <div id="reportChartData" class="d-none"
@@ -365,6 +663,153 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
   (() => {
+    // Filtro interactivo para la sección de bloques blockchain (Fabric/Indy).
+    const traceBlockList = document.getElementById('traceBlockList');
+    const traceSearchInput = document.getElementById('traceSearchInput');
+    const traceNoDataMessageByFilter = document.getElementById('traceNoDataMessageByFilter');
+    const traceVisibleCounter = document.getElementById('traceVisibleCounter');
+    const traceFilterButtons = Array.from(document.querySelectorAll('[data-trace-network]'));
+    let resetTraceCardFilters = null;
+    if (traceBlockList && traceFilterButtons.length > 0) {
+      const traceCards = Array.from(traceBlockList.querySelectorAll('.trace-block-card'));
+      let activeNetwork = 'all';
+
+      const applyTraceFilter = () => {
+        const query = (traceSearchInput?.value || '').trim().toLowerCase();
+        let visibleCount = 0;
+
+        traceCards.forEach((card) => {
+          const network = card.getAttribute('data-network') || '';
+          const text = card.textContent ? card.textContent.toLowerCase() : '';
+          const matchesNetwork = activeNetwork === 'all' || network === activeNetwork;
+          const matchesQuery = query === '' || text.includes(query);
+          const isVisible = matchesNetwork && matchesQuery;
+          card.classList.toggle('is-hidden', !isVisible);
+          if (isVisible) visibleCount += 1;
+        });
+
+        if (traceNoDataMessageByFilter) {
+          traceNoDataMessageByFilter.classList.toggle('d-none', visibleCount > 0 || traceCards.length === 0);
+        }
+        if (traceVisibleCounter) {
+          traceVisibleCounter.textContent = `Bloques visibles: ${visibleCount}`;
+        }
+      };
+
+      traceFilterButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          activeNetwork = button.getAttribute('data-trace-network') || 'all';
+          traceFilterButtons.forEach((other) => other.classList.remove('active'));
+          button.classList.add('active');
+          applyTraceFilter();
+        });
+      });
+
+      if (traceSearchInput) {
+        traceSearchInput.addEventListener('input', applyTraceFilter);
+      }
+
+      // Permite limpiar rápidamente filtros visuales cuando se abre el detalle de un bloque.
+      resetTraceCardFilters = () => {
+        activeNetwork = 'all';
+        if (traceSearchInput) {
+          traceSearchInput.value = '';
+        }
+        traceFilterButtons.forEach((other) => {
+          other.classList.toggle('active', (other.getAttribute('data-trace-network') || 'all') === 'all');
+        });
+        applyTraceFilter();
+      };
+
+      applyTraceFilter();
+    }
+
+    // Modal de detalle por tarjeta: permite inspeccionar un bloque sin salir del tablero.
+    const traceBlockDetailModalEl = document.getElementById('traceBlockDetailModal');
+    if (traceBlockDetailModalEl && window.bootstrap) {
+      // Se reubica en <body> para evitar problemas de posicionamiento cuando el contenedor padre
+      // tiene transformaciones CSS (por ejemplo, animaciones en main).
+      if (traceBlockDetailModalEl.parentElement !== document.body) {
+        document.body.appendChild(traceBlockDetailModalEl);
+      }
+      // Se abre sin backdrop para evitar el efecto de "pantalla gris" que bloquea la vista.
+      const traceBlockDetailModal = new bootstrap.Modal(traceBlockDetailModalEl, {
+        backdrop: false,
+        keyboard: true,
+        focus: true
+      });
+      const traceViewButtons = Array.from(document.querySelectorAll('.trace-block-view-btn'));
+      const traceDetailNetworkBadge = document.getElementById('traceDetailNetworkBadge');
+      const traceDetailStatusBadge = document.getElementById('traceDetailStatusBadge');
+      const traceDetailOperation = document.getElementById('traceDetailOperation');
+      const traceDetailEvent = document.getElementById('traceDetailEvent');
+      const traceDetailBlockRef = document.getElementById('traceDetailBlockRef');
+      const traceDetailDocument = document.getElementById('traceDetailDocument');
+      const traceDetailIssuer = document.getElementById('traceDetailIssuer');
+      const traceDetailPerson = document.getElementById('traceDetailPerson');
+      const traceDetailIdentity = document.getElementById('traceDetailIdentity');
+      const traceDetailNotes = document.getElementById('traceDetailNotes');
+      const traceDetailCopyRefBtn = document.getElementById('traceDetailCopyRefBtn');
+
+      const setText = (el, value, fallback = 'Sin dato') => {
+        if (!el) return;
+        const text = typeof value === 'string' ? value.trim() : '';
+        el.textContent = text !== '' ? text : fallback;
+      };
+
+      traceViewButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          if (typeof resetTraceCardFilters === 'function') {
+            resetTraceCardFilters();
+          }
+          const network = button.dataset.traceNetwork || '';
+          const status = button.dataset.traceStatus || '';
+          const idType = button.dataset.traceIdType || '';
+          const idNumber = button.dataset.traceIdNumber || '';
+          const identity = [idType, idNumber].join(' ').trim();
+
+          if (traceDetailNetworkBadge) {
+            traceDetailNetworkBadge.textContent = network || 'Sin red';
+            traceDetailNetworkBadge.className = 'badge rounded-pill';
+            if (network.toLowerCase() === 'fabric') {
+              traceDetailNetworkBadge.classList.add('text-bg-primary');
+            } else if (network.toLowerCase() === 'indy') {
+              traceDetailNetworkBadge.classList.add('text-bg-success');
+            } else {
+              traceDetailNetworkBadge.classList.add('text-bg-secondary');
+            }
+          }
+
+          setText(traceDetailStatusBadge, status);
+          setText(traceDetailOperation, button.dataset.traceOperation);
+          setText(traceDetailEvent, button.dataset.traceEvent);
+          setText(traceDetailBlockRef, button.dataset.traceBlockRef);
+          setText(traceDetailDocument, button.dataset.traceDocument);
+          setText(traceDetailIssuer, button.dataset.traceIssuer);
+          setText(traceDetailPerson, button.dataset.tracePerson);
+          setText(traceDetailIdentity, identity);
+          setText(traceDetailNotes, button.dataset.traceDetail);
+          traceBlockDetailModal.show();
+        });
+      });
+
+      if (traceDetailCopyRefBtn && traceDetailBlockRef) {
+        traceDetailCopyRefBtn.addEventListener('click', async () => {
+          const blockRef = (traceDetailBlockRef.textContent || '').trim();
+          if (!blockRef || blockRef === 'Sin dato' || !navigator.clipboard) return;
+          try {
+            await navigator.clipboard.writeText(blockRef);
+            traceDetailCopyRefBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Referencia copiada';
+            window.setTimeout(() => {
+              traceDetailCopyRefBtn.innerHTML = '<i class="bi bi-copy me-1"></i>Copiar referencia';
+            }, 1600);
+          } catch (_) {
+            // Si el navegador bloquea clipboard, se conserva comportamiento sin romper flujo.
+          }
+        });
+      }
+    }
+
     // Inicializa las gráficas solo si Chart.js está cargado y existe dataset embebido.
     if (!window.Chart) return;
     const dataHost = document.getElementById('reportChartData');
@@ -563,6 +1008,7 @@
         }
       });
     }
+
   })();
 </script>
 </body>

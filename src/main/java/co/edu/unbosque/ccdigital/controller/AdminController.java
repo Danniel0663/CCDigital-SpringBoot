@@ -97,6 +97,10 @@ public class AdminController {
      * @param from fecha inicial (incluyente), opcional
      * @param to fecha final (incluyente), opcional
      * @param period granularidad de tendencia (DAY/WEEK/MONTH), opcional
+     * @param traceIdType tipo de identificación para trazabilidad blockchain (opcional)
+     * @param traceIdNumber número de identificación para trazabilidad blockchain (opcional)
+     * @param traceAll si es true, habilita consulta de trazabilidad global sin identificación
+     * @param view vista activa del dashboard de reportes (analytics/blockchain), opcional
      * @param model modelo de Spring MVC
      * @return vista de reportes administrativos
      */
@@ -106,10 +110,18 @@ public class AdminController {
                           @RequestParam(value = "to", required = false)
                           @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                           @RequestParam(value = "period", required = false, defaultValue = "DAY") String period,
+                          @RequestParam(value = "traceIdType", required = false) String traceIdType,
+                          @RequestParam(value = "traceIdNumber", required = false) String traceIdNumber,
+                          @RequestParam(value = "traceAll", required = false, defaultValue = "false") boolean traceAll,
+                          @RequestParam(value = "view", required = false, defaultValue = "analytics") String view,
                           Model model) {
-        AdminReportService.DashboardReport report = adminReportService.buildDashboard(from, to, period);
+        AdminReportService.DashboardReport report =
+                adminReportService.buildDashboard(from, to, period, traceIdType, traceIdNumber, traceAll);
+        String reportView = "blockchain".equalsIgnoreCase(view) ? "blockchain" : "analytics";
         model.addAttribute("report", report);
+        model.addAttribute("reportView", reportView);
         model.addAttribute("periodOptions", AdminReportService.TrendPeriod.values());
+        model.addAttribute("idTypeOptions", IdType.values());
         return "admin/reports";
     }
 
