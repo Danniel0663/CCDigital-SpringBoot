@@ -44,8 +44,14 @@
 
         <div class="mb-3">
           <label for="password" class="form-label">Clave</label>
-          <input id="password" class="form-control" type="password" autocomplete="current-password"
-                 placeholder="Tu clave" />
+          <div class="input-group">
+            <input id="password" class="form-control" type="password" autocomplete="current-password"
+                   placeholder="Tu clave" />
+            <button id="btnToggleUserLoginPassword" type="button" class="btn btn-outline-secondary"
+                    aria-label="Mostrar u ocultar clave">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
         </div>
 
         <div id="otpSection" class="cc-form-section d-none mb-3">
@@ -145,11 +151,19 @@
   const statusTextEl = document.getElementById('statusText');
   const emailEl = document.getElementById('email');
   const passwordEl = document.getElementById('password');
+  const btnToggleUserLoginPassword = document.getElementById('btnToggleUserLoginPassword');
   const otpSectionEl = document.getElementById('otpSection');
   const otpHelpEl = document.getElementById('otpHelp');
   const otpCodeEl = document.getElementById('otpCode');
   const btnOtpVerify = document.getElementById('btnOtpVerify');
   const btnOtpResend = document.getElementById('btnOtpResend');
+
+  // Ayuda visual para confirmar la clave escrita antes de iniciar validación.
+  btnToggleUserLoginPassword?.addEventListener('click', () => {
+    const show = passwordEl.type === 'password';
+    passwordEl.type = show ? 'text' : 'password';
+    btnToggleUserLoginPassword.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+  });
 
   function setStatus(msg, tone = 'info') {
     statusTextEl.textContent = msg;

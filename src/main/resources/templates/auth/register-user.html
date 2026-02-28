@@ -221,18 +221,30 @@
             <div class="row g-3">
               <div class="col-12">
                 <label for="password" class="form-label">Contraseña</label>
-                <input id="password" class="form-control" type="password" autocomplete="new-password"
-                       th:field="*{password}"
-                       minlength="8"
-                       pattern="(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}"
-                       title="Mínimo 8 caracteres, con letras, números y al menos un carácter especial."
-                       placeholder="Ingresa una contraseña segura" required />
+                <div class="input-group">
+                  <input id="password" class="form-control" type="password" autocomplete="new-password"
+                         th:field="*{password}"
+                         minlength="8"
+                         pattern="(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}"
+                         title="Mínimo 8 caracteres, con letras, números y al menos un carácter especial."
+                         placeholder="Ingresa una contraseña segura" required />
+                  <button id="btnToggleRegisterPassword" type="button" class="btn btn-outline-secondary"
+                          aria-label="Mostrar u ocultar contraseña">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                </div>
                 <div class="form-text">Mínimo 8 caracteres, con letras, números y un carácter especial.</div>
               </div>
               <div class="col-12">
                 <label for="confirmPassword" class="form-label">Confirmar contraseña</label>
-                <input id="confirmPassword" class="form-control" type="password" autocomplete="new-password"
-                       th:field="*{confirmPassword}" placeholder="Repite la contraseña" required />
+                <div class="input-group">
+                  <input id="confirmPassword" class="form-control" type="password" autocomplete="new-password"
+                         th:field="*{confirmPassword}" placeholder="Repite la contraseña" required />
+                  <button id="btnToggleRegisterConfirmPassword" type="button" class="btn btn-outline-secondary"
+                          aria-label="Mostrar u ocultar confirmación de contraseña">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                </div>
               </div>
               <div class="col-12">
                 <div class="form-check mt-1">
@@ -267,6 +279,22 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/js/ccdigital-loader.js"></script>
 <script>
+  (function () {
+    // Permite confirmar visualmente la contraseña/confirmación durante el registro.
+    const bindToggle = (inputId, buttonId) => {
+      const input = document.getElementById(inputId);
+      const button = document.getElementById(buttonId);
+      if (!input || !button) return;
+      button.addEventListener('click', () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        button.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+      });
+    };
+    bindToggle('password', 'btnToggleRegisterPassword');
+    bindToggle('confirmPassword', 'btnToggleRegisterConfirmPassword');
+  })();
+
   (function () {
     const btnResend = document.getElementById('btnRegisterEmailResend');
     if (!btnResend) return;

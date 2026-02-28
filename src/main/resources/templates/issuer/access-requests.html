@@ -8,48 +8,6 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
-  <style>
-    .cc-block-ref-value {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 0.88rem;
-      background: #f5f7ff;
-      border: 1px solid #d6def8;
-      border-radius: 0.5rem;
-      padding: 0.6rem 0.7rem;
-      line-height: 1.35;
-      word-break: break-all;
-    }
-
-    .cc-block-kv-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-      gap: 0.6rem;
-    }
-
-    .cc-block-kv-item {
-      border: 1px solid #e0e6f5;
-      border-radius: 0.6rem;
-      background: #f8faff;
-      padding: 0.6rem 0.75rem;
-    }
-
-    .cc-block-kv-label {
-      font-size: 0.74rem;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-bottom: 0.25rem;
-      display: block;
-    }
-
-    .cc-block-kv-value {
-      color: #0f172a;
-      font-size: 0.92rem;
-      font-weight: 500;
-      line-height: 1.35;
-      word-break: break-word;
-    }
-  </style>
 </head>
 
 <body class="bg-body-tertiary">
@@ -271,12 +229,6 @@
                               th:attr="data-doc-view-url=${@signedUrlService.issuerDocumentViewUrl(r.id, i.personDocument.id)},data-doc-title=${i.personDocument.documentDefinition.title}">
                         <i class="bi bi-eye me-1"></i>Ver
                       </button>
-                      <button type="button"
-                              class="btn btn-sm btn-outline-info"
-                              data-issuer-doc-block
-                              th:attr="data-doc-block-url=${@signedUrlService.issuerDocumentBlockUrl(r.id, i.personDocument.id)},data-doc-title=${i.personDocument.documentDefinition.title}">
-                        <i class="bi bi-diagram-3 me-1"></i>Bloque
-                      </button>
                       <a class="btn btn-sm btn-outline-secondary"
                          data-issuer-doc-download
                          th:href="${@signedUrlService.issuerDocumentDownloadUrl(r.id, i.personDocument.id)}">
@@ -313,66 +265,6 @@
             loading="lazy"></iframe>
   </section>
 
-  <div class="modal fade" id="issuerBlockModal" tabindex="-1" aria-labelledby="issuerBlockModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="modal-title fs-5" id="issuerBlockModalLabel">
-            <i class="bi bi-diagram-3 me-2"></i>Referencia blockchain del documento
-          </h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-        </div>
-        <div class="modal-body">
-          <div id="issuerBlockModalLoading" class="d-none text-muted small py-1">
-            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            Consultando referencia de bloque...
-          </div>
-          <div id="issuerBlockModalError" class="alert alert-warning d-none mb-0" role="alert"></div>
-          <div id="issuerBlockModalContent" class="d-none">
-            <div class="mb-3">
-              <span class="badge text-bg-primary me-2" id="issuerBlockNetwork">Hyperledger Fabric</span>
-              <span class="badge text-bg-light border" id="issuerBlockStatus">Registrado</span>
-            </div>
-
-            <div class="mb-2 text-muted small">Bloque / referencia on-chain</div>
-            <div class="cc-block-ref-value mb-2" id="issuerBlockRef">—</div>
-            <div class="d-flex justify-content-end mb-3">
-              <button type="button" class="btn btn-sm btn-outline-secondary" id="btnIssuerCopyBlockRef">
-                <i class="bi bi-clipboard me-1"></i>Copiar referencia
-              </button>
-            </div>
-
-            <div class="cc-block-kv-grid">
-              <div class="cc-block-kv-item">
-                <span class="cc-block-kv-label">Documento</span>
-                <span class="cc-block-kv-value" id="issuerBlockDocTitle">—</span>
-              </div>
-              <div class="cc-block-kv-item">
-                <span class="cc-block-kv-label">Entidad origen</span>
-                <span class="cc-block-kv-value" id="issuerBlockIssuer">—</span>
-              </div>
-              <div class="cc-block-kv-item">
-                <span class="cc-block-kv-label">Fecha registro</span>
-                <span class="cc-block-kv-value" id="issuerBlockCreatedAt">—</span>
-              </div>
-              <div class="cc-block-kv-item">
-                <span class="cc-block-kv-label">Tamaño</span>
-                <span class="cc-block-kv-value" id="issuerBlockSize">—</span>
-              </div>
-              <div class="cc-block-kv-item">
-                <span class="cc-block-kv-label">Archivo</span>
-                <span class="cc-block-kv-value" id="issuerBlockFileName">—</span>
-              </div>
-              <div class="cc-block-kv-item">
-                <span class="cc-block-kv-label">Ruta técnica</span>
-                <span class="cc-block-kv-value" id="issuerBlockFilePath">—</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 </main>
 
 <script src="/js/ccdigital-loader.js"></script>
@@ -386,25 +278,9 @@
     const closeBtn = document.getElementById('btnCloseIssuerDocPreview');
     const clientAlertEl = document.getElementById('issuerDocClientAlert');
     const clientAlertTextEl = document.getElementById('issuerDocClientAlertText');
-    const blockModalEl = document.getElementById('issuerBlockModal');
-    const blockModalLoadingEl = document.getElementById('issuerBlockModalLoading');
-    const blockModalErrorEl = document.getElementById('issuerBlockModalError');
-    const blockModalContentEl = document.getElementById('issuerBlockModalContent');
-    const blockNetworkEl = document.getElementById('issuerBlockNetwork');
-    const blockStatusEl = document.getElementById('issuerBlockStatus');
-    const blockRefEl = document.getElementById('issuerBlockRef');
-    const blockDocTitleEl = document.getElementById('issuerBlockDocTitle');
-    const blockIssuerEl = document.getElementById('issuerBlockIssuer');
-    const blockCreatedAtEl = document.getElementById('issuerBlockCreatedAt');
-    const blockSizeEl = document.getElementById('issuerBlockSize');
-    const blockFileNameEl = document.getElementById('issuerBlockFileName');
-    const blockFilePathEl = document.getElementById('issuerBlockFilePath');
-    const copyBlockRefBtn = document.getElementById('btnIssuerCopyBlockRef');
-    const blockModal = blockModalEl ? new bootstrap.Modal(blockModalEl) : null;
     if (!panelEl || !frameEl || !titleEl) return;
 
     let activeViewBtn = null;
-    let activeBlockBtn = null;
     let safetyHideTimer = null;
     let openToken = 0;
 
@@ -415,16 +291,6 @@
         busy,
         '<span class="spinner-border spinner-border-sm me-1"></span>Abriendo...',
         '<i class="bi bi-eye me-1"></i>Ver'
-      );
-    }
-
-    function setBlockButtonBusy(btn, busy) {
-      if (!btn) return;
-      window.CCDigitalLoader?.setButtonBusy(
-        btn,
-        busy,
-        '<span class="spinner-border spinner-border-sm me-1"></span>Consultando...',
-        '<i class="bi bi-diagram-3 me-1"></i>Bloque'
       );
     }
 
@@ -502,74 +368,10 @@
       }
     }
 
-    function resetBlockModal() {
-      if (!blockModalLoadingEl || !blockModalErrorEl || !blockModalContentEl) return;
-      blockModalLoadingEl.classList.add('d-none');
-      blockModalErrorEl.classList.add('d-none');
-      blockModalErrorEl.textContent = '';
-      blockModalContentEl.classList.add('d-none');
-      if (blockRefEl) blockRefEl.textContent = '—';
-      if (blockNetworkEl) blockNetworkEl.textContent = 'Hyperledger Fabric';
-      if (blockStatusEl) blockStatusEl.textContent = 'Registrado';
-      if (blockDocTitleEl) blockDocTitleEl.textContent = '—';
-      if (blockIssuerEl) blockIssuerEl.textContent = '—';
-      if (blockCreatedAtEl) blockCreatedAtEl.textContent = '—';
-      if (blockSizeEl) blockSizeEl.textContent = '—';
-      if (blockFileNameEl) blockFileNameEl.textContent = '—';
-      if (blockFilePathEl) blockFilePathEl.textContent = '—';
-    }
-
-    function showBlockModalLoading(isLoading) {
-      if (!blockModalLoadingEl || !blockModalContentEl) return;
-      blockModalLoadingEl.classList.toggle('d-none', !isLoading);
-      blockModalContentEl.classList.toggle('d-none', isLoading);
-    }
-
-    function showBlockModalError(message) {
-      if (!blockModalErrorEl) return;
-      blockModalErrorEl.textContent = message || 'No fue posible consultar la referencia de bloque.';
-      blockModalErrorEl.classList.remove('d-none');
-    }
-
-    function renderBlockModal(payload) {
-      if (!blockModalContentEl) return;
-      if (blockNetworkEl) blockNetworkEl.textContent = payload.network || 'Hyperledger Fabric';
-      if (blockStatusEl) blockStatusEl.textContent = payload.status || 'Registrado';
-      if (blockRefEl) blockRefEl.textContent = payload.blockReference || 'Sin referencia';
-      if (blockDocTitleEl) blockDocTitleEl.textContent = payload.documentTitle || 'Documento';
-      if (blockIssuerEl) blockIssuerEl.textContent = payload.issuingEntity || 'Entidad no identificada';
-      if (blockCreatedAtEl) blockCreatedAtEl.textContent = payload.createdAtHuman || 'No disponible';
-      if (blockSizeEl) blockSizeEl.textContent = payload.sizeHuman || 'No disponible';
-      if (blockFileNameEl) blockFileNameEl.textContent = payload.fileName || 'No disponible';
-      if (blockFilePathEl) blockFilePathEl.textContent = payload.filePath || 'No disponible';
-      blockModalContentEl.classList.remove('d-none');
-    }
-
     closeBtn?.addEventListener('click', () => {
       // Invalida cualquier apertura previa en curso.
       openToken++;
       closePreview(true);
-    });
-
-    copyBlockRefBtn?.addEventListener('click', async () => {
-      const value = (blockRefEl?.textContent || '').trim();
-      if (!value || value === '—') return;
-      const originalHtml = copyBlockRefBtn.innerHTML;
-      try {
-        await navigator.clipboard.writeText(value);
-        copyBlockRefBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copiado';
-      } catch (_) {
-        copyBlockRefBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>No se pudo copiar';
-      }
-      setTimeout(() => {
-        copyBlockRefBtn.innerHTML = originalHtml;
-      }, 1300);
-    });
-
-    blockModalEl?.addEventListener('hidden.bs.modal', () => {
-      setBlockButtonBusy(activeBlockBtn, false);
-      activeBlockBtn = null;
-      resetBlockModal();
     });
 
     attachFrameListeners(frameEl);
@@ -631,40 +433,6 @@
           setInlineLoading(false);
           finishOpenFlow();
         }, 5000);
-      });
-    });
-
-    document.querySelectorAll('[data-issuer-doc-block]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const url = btn.getAttribute('data-doc-block-url') || '';
-        if (!url || !blockModal) return;
-
-        setBlockButtonBusy(activeBlockBtn, false);
-        activeBlockBtn = btn;
-        setBlockButtonBusy(activeBlockBtn, true);
-        resetBlockModal();
-        showBlockModalLoading(true);
-        blockModal.show();
-
-        try {
-          const resp = await fetch(url, {
-            method: 'GET',
-            credentials: 'same-origin',
-            headers: { 'Accept': 'application/json' }
-          });
-          const payload = await resp.json().catch(() => ({}));
-          showBlockModalLoading(false);
-
-          if (!resp.ok || payload.error) {
-            showBlockModalError(payload.error || 'No fue posible consultar la referencia de bloque.');
-            return;
-          }
-
-          renderBlockModal(payload);
-        } catch (_) {
-          showBlockModalLoading(false);
-          showBlockModalError('No fue posible consultar la referencia de bloque en este momento.');
-        }
       });
     });
 
