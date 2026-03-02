@@ -1,31 +1,18 @@
 package co.edu.unbosque.ccdigital.service;
 
-import co.edu.unbosque.ccdigital.dto.FabricAuditEventView;
-import co.edu.unbosque.ccdigital.dto.FabricDocView;
 import co.edu.unbosque.ccdigital.entity.AccessRequest;
-import co.edu.unbosque.ccdigital.entity.AccessRequestItem;
-import co.edu.unbosque.ccdigital.entity.AccessRequestStatus;
-import co.edu.unbosque.ccdigital.entity.IdType;
-import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
 import co.edu.unbosque.ccdigital.repository.AccessRequestRepository;
-import co.edu.unbosque.ccdigital.repository.PersonRepository;
 import co.edu.unbosque.ccdigital.repository.PersonDocumentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 /**
  * Servicio de trazabilidad para el módulo Admin > Reportes.
@@ -43,37 +30,32 @@ public class AdminReportService {
     private static final Locale LOCALE_ES_CO = Locale.forLanguageTag("es-CO");
     private static final DateTimeFormatter DAY_LABEL_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATE_TIME_LABEL_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-    private static final ZoneId UI_ZONE = ZoneId.of("America/Bogota");
 
     private final AccessRequestRepository accessRequestRepository;
     private final PersonDocumentRepository personDocumentRepository;
-    private final PersonRepository personRepository;
-    private final FabricLedgerCliService fabricLedgerCliService;
-    private final FabricAuditCliService fabricAuditCliService;
-    private final IndyProofLoginService indyProofLoginService;
+    private final AdminReportTrendCalculator trendCalculator;
+    private final AdminReportTopTableCalculator topTableCalculator;
+    private final AdminBlockchainTraceAggregator blockchainTraceAggregator;
 
     /**
      * Constructor del servicio de reportes administrativos.
      *
      * @param accessRequestRepository repositorio de solicitudes de acceso
      * @param personDocumentRepository repositorio de documentos de persona
-     * @param personRepository repositorio de personas para resolver trazabilidad por usuario
-     * @param fabricLedgerCliService servicio de consulta de documentos en ledger Fabric
-     * @param fabricAuditCliService servicio de consulta de eventos de auditoría en ledger Fabric
-     * @param indyProofLoginService servicio de consulta de records de verificación Indy
+     * @param trendCalculator componente de cálculo de KPIs y tendencia temporal
+     * @param topTableCalculator componente de cálculo de tablas Top
+     * @param blockchainTraceAggregator componente de agregación blockchain (Fabric + Indy)
      */
     public AdminReportService(AccessRequestRepository accessRequestRepository,
                               PersonDocumentRepository personDocumentRepository,
-                              PersonRepository personRepository,
-                              FabricLedgerCliService fabricLedgerCliService,
-                              FabricAuditCliService fabricAuditCliService,
-                              IndyProofLoginService indyProofLoginService) {
+                              AdminReportTrendCalculator trendCalculator,
+                              AdminReportTopTableCalculator topTableCalculator,
+                              AdminBlockchainTraceAggregator blockchainTraceAggregator) {
         this.accessRequestRepository = accessRequestRepository;
         this.personDocumentRepository = personDocumentRepository;
-        this.personRepository = personRepository;
-        this.fabricLedgerCliService = fabricLedgerCliService;
-        this.fabricAuditCliService = fabricAuditCliService;
-        this.indyProofLoginService = indyProofLoginService;
+        this.trendCalculator = trendCalculator;
+        this.topTableCalculator = topTableCalculator;
+        this.blockchainTraceAggregator = blockchainTraceAggregator;
     }
 
     /**
@@ -109,12 +91,12 @@ public class AdminReportService {
             }
             try {
                 return TrendPeriod.valueOf(raw.trim().toUpperCase(Locale.ROOT));
-            } catch (Exception ignored) {
+            } catch (IllegalArgumentException ignored) {
                 return DAY;
             }
         }
 
-        private LocalDate bucketStart(LocalDate date) {
+        LocalDate bucketStart(LocalDate date) {
             if (this == WEEK) {
                 return date.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
             }
@@ -124,7 +106,7 @@ public class AdminReportService {
             return date;
         }
 
-        private LocalDate nextBucket(LocalDate bucketStart) {
+        LocalDate nextBucket(LocalDate bucketStart) {
             if (this == WEEK) {
                 return bucketStart.plusWeeks(1);
             }
@@ -134,7 +116,7 @@ public class AdminReportService {
             return bucketStart.plusDays(1);
         }
 
-        private String formatBucketLabel(LocalDate bucketStart) {
+        String formatBucketLabel(LocalDate bucketStart) {
             if (this == WEEK) {
                 LocalDate bucketEnd = bucketStart.plusDays(6);
                 return DAY_LABEL_FORMATTER.format(bucketStart) + " - " + DAY_LABEL_FORMATTER.format(bucketEnd);
@@ -548,60 +530,43 @@ public class AdminReportService {
         List<AccessRequest> allRequests = accessRequestRepository.findAllWithDetailsForReport();
         List<PersonDocument> allPersonDocuments = personDocumentRepository.findAll();
 
-        List<AccessRequest> requestsInRange = allRequests.stream()
-                .filter(r -> isInDateTimeRange(r.getRequestedAt(), fromStart, toEndExclusive))
-                .toList();
+        AdminReportTrendCalculator.TrendMetrics trendMetrics = trendCalculator.compute(
+                allRequests,
+                allPersonDocuments,
+                from,
+                to,
+                period,
+                fromStart,
+                toEndExclusive
+        );
 
-        long totalRequests = requestsInRange.size();
-        long successfulRequests = requestsInRange.stream()
-                .filter(r -> r.getStatus() == AccessRequestStatus.APROBADA)
-                .count();
-        long unsuccessfulRequests = totalRequests - successfulRequests;
-        long documentsConsulted = requestsInRange.stream()
-                .filter(r -> r.getStatus() == AccessRequestStatus.APROBADA)
-                .mapToLong(this::safeItemsCount)
-                .sum();
-        long documentsDeposited = allPersonDocuments.stream()
-                .filter(pd -> isInDateTimeRange(pd.getCreatedAt(), fromStart, toEndExclusive))
-                .count();
+        AdminReportTopTableCalculator.TopTables topTables = topTableCalculator.compute(
+                trendMetrics.requestsInRange(),
+                TOP_LIMIT
+        );
 
-        LinkedHashMap<LocalDate, BucketAccumulator> buckets = initBuckets(from, to, period);
-        aggregateRequestTrends(requestsInRange, buckets, period);
-        aggregateDepositTrends(allPersonDocuments, fromStart, toEndExclusive, buckets, period);
-
-        List<TrendRow> trendRows = buckets.values().stream()
-                .map(acc -> new TrendRow(
-                        acc.label,
-                        acc.totalRequests,
-                        acc.successfulRequests,
-                        acc.unsuccessfulRequests,
-                        acc.documentsConsulted,
-                        acc.documentsDeposited
-                ))
-                .toList();
-
-        Map<String, Long> topDocuments = new LinkedHashMap<>();
-        Map<String, Long> topPeople = new LinkedHashMap<>();
-        Map<String, Long> topIssuers = new LinkedHashMap<>();
-        Map<String, Long> topErrors = new LinkedHashMap<>();
-        aggregateTopTables(requestsInRange, topDocuments, topPeople, topIssuers, topErrors);
-
-        TraceAggregation trace = buildBlockchainTrace(from, to, traceIdType, traceIdNumber, traceAllRequested);
+        AdminBlockchainTraceAggregator.TraceResult trace = blockchainTraceAggregator.build(
+                from,
+                to,
+                traceIdType,
+                traceIdNumber,
+                traceAllRequested
+        );
 
         return new DashboardReport(
                 from,
                 to,
                 period,
-                totalRequests,
-                successfulRequests,
-                unsuccessfulRequests,
-                documentsConsulted,
-                documentsDeposited,
-                trendRows,
-                toTopRows(topDocuments, TOP_LIMIT),
-                toTopRows(topPeople, TOP_LIMIT),
-                toTopRows(topIssuers, TOP_LIMIT),
-                toTopRows(topErrors, TOP_LIMIT),
+                trendMetrics.totalRequests(),
+                trendMetrics.successfulRequests(),
+                trendMetrics.unsuccessfulRequests(),
+                trendMetrics.documentsConsulted(),
+                trendMetrics.documentsDeposited(),
+                trendMetrics.trendRows(),
+                topTables.topDocuments(),
+                topTables.topPeople(),
+                topTables.topIssuers(),
+                topTables.topErrors(),
                 trace.traceIdType(),
                 trace.traceIdNumber(),
                 trace.allSelected(),
@@ -614,740 +579,4 @@ public class AdminReportService {
         );
     }
 
-    /**
-     * Agrega la porción de tendencia asociada a solicitudes de acceso.
-     */
-    private void aggregateRequestTrends(List<AccessRequest> requests,
-                                        Map<LocalDate, BucketAccumulator> buckets,
-                                        TrendPeriod period) {
-        for (AccessRequest request : requests) {
-            LocalDateTime requestedAt = request.getRequestedAt();
-            if (requestedAt == null) {
-                continue;
-            }
-            LocalDate bucketKey = period.bucketStart(requestedAt.toLocalDate());
-            BucketAccumulator bucket = buckets.get(bucketKey);
-            if (bucket == null) {
-                continue;
-            }
-
-            bucket.totalRequests++;
-            if (request.getStatus() == AccessRequestStatus.APROBADA) {
-                bucket.successfulRequests++;
-                bucket.documentsConsulted += safeItemsCount(request);
-            } else {
-                bucket.unsuccessfulRequests++;
-            }
-        }
-    }
-
-    /**
-     * Agrega la porción de tendencia asociada a documentos depositados en el rango.
-     */
-    private void aggregateDepositTrends(List<PersonDocument> personDocuments,
-                                        LocalDateTime fromStart,
-                                        LocalDateTime toEndExclusive,
-                                        Map<LocalDate, BucketAccumulator> buckets,
-                                        TrendPeriod period) {
-        for (PersonDocument pd : personDocuments) {
-            LocalDateTime createdAt = pd.getCreatedAt();
-            if (!isInDateTimeRange(createdAt, fromStart, toEndExclusive)) {
-                continue;
-            }
-            LocalDate bucketKey = period.bucketStart(createdAt.toLocalDate());
-            BucketAccumulator bucket = buckets.get(bucketKey);
-            if (bucket != null) {
-                bucket.documentsDeposited++;
-            }
-        }
-    }
-
-    /**
-     * Consolida tablas "Top" para documentos, personas, emisores y fallos normalizados.
-     */
-    private void aggregateTopTables(List<AccessRequest> requests,
-                                    Map<String, Long> topDocuments,
-                                    Map<String, Long> topPeople,
-                                    Map<String, Long> topIssuers,
-                                    Map<String, Long> topErrors) {
-        for (AccessRequest request : requests) {
-            add(topIssuers, resolveIssuerLabel(request), 1L);
-
-            if (request.getStatus() == AccessRequestStatus.APROBADA) {
-                long consultedDocsForPerson = 0L;
-                for (AccessRequestItem item : safeItems(request)) {
-                    add(topDocuments, resolveDocumentLabel(item), 1L);
-                    consultedDocsForPerson++;
-                }
-                add(topPeople, resolvePersonLabel(request.getPerson()), Math.max(consultedDocsForPerson, 1L));
-                continue;
-            }
-
-            if (request.getStatus() == AccessRequestStatus.RECHAZADA
-                    || request.getStatus() == AccessRequestStatus.EXPIRADA) {
-                add(topErrors, resolveFailureLabel(request), 1L);
-            }
-        }
-    }
-
-    /**
-     * Inicializa buckets vacíos para garantizar continuidad visual de la tendencia.
-     */
-    private LinkedHashMap<LocalDate, BucketAccumulator> initBuckets(LocalDate from,
-                                                                     LocalDate to,
-                                                                     TrendPeriod period) {
-        LinkedHashMap<LocalDate, BucketAccumulator> buckets = new LinkedHashMap<>();
-        LocalDate cursor = period.bucketStart(from);
-        LocalDate end = period.bucketStart(to);
-
-        while (!cursor.isAfter(end)) {
-            buckets.put(cursor, new BucketAccumulator(period.formatBucketLabel(cursor)));
-            cursor = period.nextBucket(cursor);
-        }
-
-        return buckets;
-    }
-
-    /**
-     * Evalúa rango temporal incluyente/excluyente: [fromInclusive, toExclusive).
-     */
-    private boolean isInDateTimeRange(LocalDateTime value, LocalDateTime fromInclusive, LocalDateTime toExclusive) {
-        return value != null && !value.isBefore(fromInclusive) && value.isBefore(toExclusive);
-    }
-
-    /**
-     * Cuenta ítems de forma segura para solicitudes con relaciones nulas.
-     */
-    private long safeItemsCount(AccessRequest request) {
-        return safeItems(request).size();
-    }
-
-    /**
-     * Retorna colección de ítems nunca nula para simplificar agregaciones.
-     */
-    private List<AccessRequestItem> safeItems(AccessRequest request) {
-        if (request == null || request.getItems() == null) {
-            return List.of();
-        }
-        return request.getItems();
-    }
-
-    /**
-     * Resuelve etiqueta amigable del documento para rankings.
-     */
-    private String resolveDocumentLabel(AccessRequestItem item) {
-        if (item == null || item.getPersonDocument() == null || item.getPersonDocument().getDocumentDefinition() == null) {
-            return "Documento no identificado";
-        }
-        String title = item.getPersonDocument().getDocumentDefinition().getTitle();
-        if (title == null || title.isBlank()) {
-            Long id = item.getPersonDocument().getId();
-            return id == null ? "Documento sin título" : "Documento #" + id;
-        }
-        return title.trim();
-    }
-
-    /**
-     * Resuelve etiqueta de persona conservando nombre y documento cuando existan.
-     */
-    private String resolvePersonLabel(Person person) {
-        if (person == null) {
-            return "Persona no identificada";
-        }
-        String fullName = person.getFullName() == null || person.getFullName().isBlank()
-                ? "Persona sin nombre"
-                : person.getFullName().trim();
-        String idType = person.getIdType() == null ? "" : person.getIdType().name();
-        String idNumber = person.getIdNumber() == null ? "" : person.getIdNumber().trim();
-        String idPart = (idType + " " + idNumber).trim();
-        return idPart.isBlank() ? fullName : fullName + " (" + idPart + ")";
-    }
-
-    /**
-     * Resuelve nombre de emisor con fallback estable para datos incompletos.
-     */
-    private String resolveIssuerLabel(AccessRequest request) {
-        if (request == null || request.getEntity() == null || request.getEntity().getName() == null
-                || request.getEntity().getName().isBlank()) {
-            return "Emisor no identificado";
-        }
-        return request.getEntity().getName().trim();
-    }
-
-    /**
-     * Normaliza el motivo de fallo para facilitar ranking de errores.
-     */
-    private String resolveFailureLabel(AccessRequest request) {
-        if (request == null || request.getStatus() == null) {
-            return "Fallo no clasificado";
-        }
-        if (request.getStatus() == AccessRequestStatus.EXPIRADA) {
-            return "Solicitud expirada";
-        }
-        if (request.getStatus() == AccessRequestStatus.RECHAZADA) {
-            String note = request.getDecisionNote();
-            if (note == null || note.isBlank()) {
-                return "Rechazada por el usuario";
-            }
-            String normalized = note.trim().replaceAll("\\s+", " ");
-            if (normalized.length() > 90) {
-                normalized = normalized.substring(0, 90) + "...";
-            }
-            return "Rechazada: " + normalized;
-        }
-        return "No exitosa (" + request.getStatus().name() + ")";
-    }
-
-    /**
-     * Acumula contador por etiqueta normalizada.
-     */
-    private void add(Map<String, Long> map, String label, long value) {
-        String key = (label == null || label.isBlank()) ? "No identificado" : label.trim();
-        map.merge(key, value, (left, right) -> (left == null ? 0L : left) + (right == null ? 0L : right));
-    }
-
-    /**
-     * Ordena descendente y limita resultados para visualización Top N.
-     */
-    private List<TopRow> toTopRows(Map<String, Long> source, int limit) {
-        List<Map.Entry<String, Long>> ordered = new ArrayList<>(source.entrySet());
-        ordered.sort(Comparator
-                .<Map.Entry<String, Long>>comparingLong(Map.Entry::getValue)
-                .reversed()
-                .thenComparing(Map.Entry::getKey));
-
-        List<TopRow> out = new ArrayList<>();
-        int max = Math.max(1, limit);
-        for (Map.Entry<String, Long> entry : ordered) {
-            if (entry.getValue() == null || entry.getValue() <= 0L) {
-                continue;
-            }
-            out.add(new TopRow(entry.getKey(), entry.getValue()));
-            if (out.size() >= max) {
-                break;
-            }
-        }
-        return out;
-    }
-
-    /**
-     * Consolida trazabilidad blockchain para un usuario específico, consultando Fabric e Indy.
-     */
-    private TraceAggregation buildBlockchainTrace(LocalDate from,
-                                                  LocalDate to,
-                                                  String traceIdTypeRaw,
-                                                  String traceIdNumberRaw,
-                                                  boolean traceAllRequested) {
-        String traceIdType = normalize(traceIdTypeRaw).toUpperCase(Locale.ROOT);
-        String traceIdNumber = normalize(traceIdNumberRaw);
-        boolean allSelected = traceAllRequested;
-        if (allSelected) {
-            traceIdType = "";
-            traceIdNumber = "";
-        }
-        boolean lookupRequested = allSelected || !traceIdType.isBlank() || !traceIdNumber.isBlank();
-
-        if (!lookupRequested) {
-            return TraceAggregation.empty(traceIdType, traceIdNumber);
-        }
-        if (allSelected) {
-            return buildAllUsersBlockchainTrace(from, to);
-        }
-        if (traceIdType.isBlank() || traceIdNumber.isBlank()) {
-            return TraceAggregation.withWarning(
-                    traceIdType,
-                    traceIdNumber,
-                    "Para consultar trazabilidad blockchain debe ingresar tipo y número de identificación."
-            );
-        }
-
-        IdType idType = parseIdType(traceIdType);
-        if (idType == null) {
-            return TraceAggregation.withWarning(
-                    traceIdType,
-                    traceIdNumber,
-                    "El tipo de identificación indicado no es válido para la consulta de trazabilidad."
-            );
-        }
-
-        String personLabel = personRepository.findByIdTypeAndIdNumber(idType, traceIdNumber)
-                .map(this::resolvePersonLabel)
-                .orElse(idType.name() + " " + traceIdNumber);
-
-        List<BlockchainTraceBlock> blocks = new ArrayList<>();
-        String warningMessage = null;
-        long fabricBlocks = 0L;
-        long indyBlocks = 0L;
-
-        try {
-            List<FabricDocView> fabricDocs = fabricLedgerCliService.listDocsView(idType.name(), traceIdNumber);
-            for (FabricDocView doc : fabricDocs) {
-                LocalDateTime eventAt = parseFabricDate(doc.createdAt());
-                if (!isInDateRange(eventAt, from, to)) {
-                    continue;
-                }
-                blocks.add(new BlockchainTraceBlock(
-                        "Fabric",
-                        normalizeOrFallback(doc.docId(), "Sin referencia"),
-                        "Registro de documento",
-                        "CONFIRMADO",
-                        eventAt,
-                        personLabel,
-                        idType.name(),
-                        traceIdNumber,
-                        normalizeOrFallback(doc.title(), "Documento sin título"),
-                        normalizeOrFallback(doc.issuingEntity(), "Entidad no identificada"),
-                        "Documento anclado en ledger con hash y metadatos de integridad."
-                ));
-                fabricBlocks++;
-            }
-
-            // Además del anclaje documental, se incluyen eventos de auditoría de consulta/verificación.
-            List<FabricAuditEventView> auditEvents = fabricAuditCliService.listEventsForPerson(idType.name(), traceIdNumber);
-            for (FabricAuditEventView event : auditEvents) {
-                LocalDateTime eventAt = parseFabricDate(event.createdAt());
-                if (!isInDateRange(eventAt, from, to)) {
-                    continue;
-                }
-                blocks.add(new BlockchainTraceBlock(
-                        "Fabric",
-                        normalizeOrFallback(event.txId(), "Sin referencia"),
-                        resolveFabricAuditOperation(event),
-                        resolveFabricAuditStatus(event),
-                        eventAt,
-                        personLabel,
-                        normalizeOrFallback(event.idType(), idType.name()),
-                        normalizeOrFallback(event.idNumber(), traceIdNumber),
-                        normalizeOrFallback(event.documentTitle(), "Documento trazado"),
-                        normalizeOrFallback(event.issuerName(), "Entidad no identificada"),
-                        resolveFabricAuditDetail(event)
-                ));
-                fabricBlocks++;
-            }
-        } catch (Exception ex) {
-            warningMessage = appendWarning(
-                    warningMessage,
-                    "No fue posible consultar trazabilidad en Fabric: " + rootMessage(ex)
-            );
-        }
-
-        try {
-            List<IndyProofLoginService.ProofTraceEvent> proofEvents = indyProofLoginService.listProofTraceEvents();
-            for (IndyProofLoginService.ProofTraceEvent event : proofEvents) {
-                if (!traceIdNumber.equals(normalize(event.idNumber()))) {
-                    continue;
-                }
-                String eventIdType = normalize(event.idType()).toUpperCase(Locale.ROOT);
-                if (!eventIdType.isBlank() && !idType.name().equals(eventIdType)) {
-                    continue;
-                }
-                if (!isInDateRange(event.eventAt(), from, to)) {
-                    continue;
-                }
-                String state = normalizeOrFallback(event.state(), "unknown");
-                String status = Boolean.TRUE.equals(event.verified())
-                        ? "VERIFICADO"
-                        : ("done".equalsIgnoreCase(state) || "presentation-received".equalsIgnoreCase(state)
-                        ? "NO VERIFICADO"
-                        : state.toUpperCase(Locale.ROOT));
-
-                blocks.add(new BlockchainTraceBlock(
-                        "Indy",
-                        normalizeOrFallback(event.presExId(), "Sin referencia"),
-                        "Verificación de credencial",
-                        status,
-                        event.eventAt(),
-                        personLabel,
-                        normalizeOrFallback(event.idType(), idType.name()),
-                        traceIdNumber,
-                        "Prueba de identidad",
-                        "ACA-Py",
-                        "Estado del intercambio: " + state
-                ));
-                indyBlocks++;
-            }
-        } catch (Exception ex) {
-            warningMessage = appendWarning(
-                    warningMessage,
-                    "No fue posible consultar trazabilidad en Indy: " + rootMessage(ex)
-            );
-        }
-
-        blocks.sort(Comparator
-                .comparing(BlockchainTraceBlock::getEventAt,
-                        Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(BlockchainTraceBlock::getNetwork)
-                .thenComparing(BlockchainTraceBlock::getBlockRef));
-
-        return new TraceAggregation(
-                traceIdType,
-                traceIdNumber,
-                false,
-                true,
-                personLabel,
-                warningMessage,
-                fabricBlocks,
-                indyBlocks,
-                blocks
-        );
-    }
-
-    /**
-     * Consolida trazabilidad blockchain global para todas las personas registradas (sin filtro por cédula).
-     */
-    private TraceAggregation buildAllUsersBlockchainTrace(LocalDate from, LocalDate to) {
-        List<BlockchainTraceBlock> blocks = new ArrayList<>();
-        String warningMessage = null;
-        long fabricBlocks = 0L;
-        long indyBlocks = 0L;
-
-        List<Person> people = personRepository.findAll();
-        for (Person person : people) {
-            if (person == null || person.getIdType() == null) {
-                continue;
-            }
-            String idNumber = normalize(person.getIdNumber());
-            if (idNumber.isBlank()) {
-                continue;
-            }
-            String idType = person.getIdType().name();
-            String personLabel = resolvePersonLabel(person);
-            try {
-                List<FabricDocView> fabricDocs = fabricLedgerCliService.listDocsView(idType, idNumber);
-                for (FabricDocView doc : fabricDocs) {
-                    LocalDateTime eventAt = parseFabricDate(doc.createdAt());
-                    if (!isInDateRange(eventAt, from, to)) {
-                        continue;
-                    }
-                    blocks.add(new BlockchainTraceBlock(
-                            "Fabric",
-                            normalizeOrFallback(doc.docId(), "Sin referencia"),
-                            "Registro de documento",
-                            "CONFIRMADO",
-                            eventAt,
-                            personLabel,
-                            idType,
-                            idNumber,
-                            normalizeOrFallback(doc.title(), "Documento sin título"),
-                            normalizeOrFallback(doc.issuingEntity(), "Entidad no identificada"),
-                            "Documento anclado en ledger con hash y metadatos de integridad."
-                    ));
-                    fabricBlocks++;
-                }
-            } catch (Exception ex) {
-                warningMessage = appendWarning(
-                        warningMessage,
-                        "Algunos registros Fabric no pudieron consultarse: " + rootMessage(ex)
-                );
-            }
-        }
-
-        try {
-            List<FabricAuditEventView> auditEvents = fabricAuditCliService.listAllEvents();
-            for (FabricAuditEventView event : auditEvents) {
-                LocalDateTime eventAt = parseFabricDate(event.createdAt());
-                if (!isInDateRange(eventAt, from, to)) {
-                    continue;
-                }
-
-                String idType = normalizeOrFallback(event.idType(), "N/A");
-                String idNumber = normalizeOrFallback(event.idNumber(), "N/A");
-                String personLabel = resolvePersonLabelById(idType, idNumber);
-
-                blocks.add(new BlockchainTraceBlock(
-                        "Fabric",
-                        normalizeOrFallback(event.txId(), "Sin referencia"),
-                        resolveFabricAuditOperation(event),
-                        resolveFabricAuditStatus(event),
-                        eventAt,
-                        personLabel,
-                        idType,
-                        idNumber,
-                        normalizeOrFallback(event.documentTitle(), "Documento trazado"),
-                        normalizeOrFallback(event.issuerName(), "Entidad no identificada"),
-                        resolveFabricAuditDetail(event)
-                ));
-                fabricBlocks++;
-            }
-        } catch (Exception ex) {
-            warningMessage = appendWarning(
-                    warningMessage,
-                    "No fue posible consultar auditoría Fabric global: " + rootMessage(ex)
-            );
-        }
-
-        try {
-            List<IndyProofLoginService.ProofTraceEvent> proofEvents = indyProofLoginService.listProofTraceEvents();
-            for (IndyProofLoginService.ProofTraceEvent event : proofEvents) {
-                if (!isInDateRange(event.eventAt(), from, to)) {
-                    continue;
-                }
-                String state = normalizeOrFallback(event.state(), "unknown");
-                String status = Boolean.TRUE.equals(event.verified())
-                        ? "VERIFICADO"
-                        : ("done".equalsIgnoreCase(state) || "presentation-received".equalsIgnoreCase(state)
-                        ? "NO VERIFICADO"
-                        : state.toUpperCase(Locale.ROOT));
-
-                String idType = normalizeOrFallback(event.idType(), "N/A");
-                String idNumber = normalizeOrFallback(event.idNumber(), "N/A");
-                String personLabel = resolveProofPersonLabel(event, idType, idNumber);
-
-                blocks.add(new BlockchainTraceBlock(
-                        "Indy",
-                        normalizeOrFallback(event.presExId(), "Sin referencia"),
-                        "Verificación de credencial",
-                        status,
-                        event.eventAt(),
-                        personLabel,
-                        idType,
-                        idNumber,
-                        "Prueba de identidad",
-                        "ACA-Py",
-                        "Estado del intercambio: " + state
-                ));
-                indyBlocks++;
-            }
-        } catch (Exception ex) {
-            warningMessage = appendWarning(
-                    warningMessage,
-                    "No fue posible consultar trazabilidad en Indy: " + rootMessage(ex)
-            );
-        }
-
-        blocks.sort(Comparator
-                .comparing(BlockchainTraceBlock::getEventAt,
-                        Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(BlockchainTraceBlock::getNetwork)
-                .thenComparing(BlockchainTraceBlock::getBlockRef));
-
-        return new TraceAggregation(
-                "",
-                "",
-                true,
-                true,
-                "Todos los usuarios registrados",
-                warningMessage,
-                fabricBlocks,
-                indyBlocks,
-                blocks
-        );
-    }
-
-    /**
-     * Resuelve etiqueta de persona para eventos de Indy usando atributos revelados y fallback por identificación.
-     */
-    private String resolveProofPersonLabel(IndyProofLoginService.ProofTraceEvent event, String idType, String idNumber) {
-        String firstName = normalize(event.firstName());
-        String lastName = normalize(event.lastName());
-        String fullName = (firstName + " " + lastName).trim();
-        String idPart = (idType + " " + idNumber).trim();
-        if (!fullName.isBlank() && !idPart.isBlank()) {
-            return fullName + " (" + idPart + ")";
-        }
-        if (!fullName.isBlank()) {
-            return fullName;
-        }
-        IdType parsedIdType = parseIdType(idType);
-        if (parsedIdType != null && idNumber != null && !idNumber.isBlank() && !"N/A".equalsIgnoreCase(idNumber)) {
-            return personRepository.findByIdTypeAndIdNumber(parsedIdType, idNumber)
-                    .map(this::resolvePersonLabel)
-                    .orElse(idPart.isBlank() ? "Usuario no identificado" : idPart);
-        }
-        return idPart.isBlank() ? "Usuario no identificado" : idPart;
-    }
-
-    /**
-     * Resuelve etiqueta de persona a partir de identificación para eventos Fabric de auditoría.
-     */
-    private String resolvePersonLabelById(String idType, String idNumber) {
-        String normalizedType = normalize(idType).toUpperCase(Locale.ROOT);
-        String normalizedNumber = normalize(idNumber);
-        if (normalizedType.isBlank() || normalizedNumber.isBlank() || "N/A".equalsIgnoreCase(normalizedNumber)) {
-            return "Usuario no identificado";
-        }
-
-        IdType parsedIdType = parseIdType(normalizedType);
-        if (parsedIdType == null) {
-            return normalizedType + " " + normalizedNumber;
-        }
-        return personRepository.findByIdTypeAndIdNumber(parsedIdType, normalizedNumber)
-                .map(this::resolvePersonLabel)
-                .orElse(normalizedType + " " + normalizedNumber);
-    }
-
-    /**
-     * Traduce eventType de auditoría Fabric a etiqueta funcional para tarjetas de reportes.
-     */
-    private String resolveFabricAuditOperation(FabricAuditEventView event) {
-        String eventType = normalize(event.eventType()).toUpperCase(Locale.ROOT);
-        return switch (eventType) {
-            case "REQUEST_CREATED" -> "Solicitud de acceso creada";
-            case "DOC_VERIFY_ON_REQUEST" -> "Verificación de documento en solicitud";
-            case "DOC_VIEW_GRANTED" -> "Visualización de documento autorizada";
-            case "DOC_DOWNLOAD_GRANTED" -> "Descarga de documento autorizada";
-            case "DOC_ACCESS_CHECK" -> "Verificación de acceso a documento";
-            case "DOC_BLOCK_TRACE_QUERY" -> "Consulta de trazabilidad de bloque";
-            default -> eventType.isBlank() ? "Evento de auditoría Fabric" : eventType;
-        };
-    }
-
-    /**
-     * Normaliza resultado de auditoría Fabric a badge de estado homogéneo.
-     */
-    private String resolveFabricAuditStatus(FabricAuditEventView event) {
-        String result = normalize(event.result()).toUpperCase(Locale.ROOT);
-        if (result.isBlank()) {
-            return "REGISTRADO";
-        }
-        return switch (result) {
-            case "OK", "SUCCESS" -> "CONFIRMADO";
-            case "FAIL", "ERROR", "DENIED" -> "FALLIDO";
-            default -> result;
-        };
-    }
-
-    /**
-     * Construye detalle legible para eventos de auditoría Fabric.
-     */
-    private String resolveFabricAuditDetail(FabricAuditEventView event) {
-        String action = normalize(event.action());
-        String reason = normalize(event.reason());
-        String requestId = normalize(event.requestId());
-        String personDocumentId = normalize(event.personDocumentId());
-
-        List<String> parts = new ArrayList<>();
-        if (!action.isBlank()) {
-            parts.add("Acción: " + action);
-        }
-        if (!requestId.isBlank()) {
-            parts.add("Solicitud: " + requestId);
-        }
-        if (!personDocumentId.isBlank()) {
-            parts.add("Documento local: " + personDocumentId);
-        }
-        if (!reason.isBlank()) {
-            parts.add(reason);
-        }
-        return parts.isEmpty() ? "Evento de auditoría de acceso registrado en Fabric." : String.join(" · ", parts);
-    }
-
-    /**
-     * Normaliza fechas ISO provenientes de Fabric.
-     */
-    private LocalDateTime parseFabricDate(String createdAtRaw) {
-        if (createdAtRaw == null || createdAtRaw.isBlank()) {
-            return null;
-        }
-        try {
-            return Instant.parse(createdAtRaw).atZone(UI_ZONE).toLocalDateTime();
-        } catch (Exception ignored) {
-            // Se intenta parseo local.
-        }
-        try {
-            return LocalDateTime.parse(createdAtRaw);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    /**
-     * Evalúa rango temporal incluyente por día para bloques trazables.
-     */
-    private boolean isInDateRange(LocalDateTime value, LocalDate from, LocalDate to) {
-        if (value == null) {
-            return false;
-        }
-        LocalDate day = value.toLocalDate();
-        return !day.isBefore(from) && !day.isAfter(to);
-    }
-
-    /**
-     * Convierte texto en valor normalizado sin nulls.
-     */
-    private String normalize(String value) {
-        return value == null ? "" : value.trim();
-    }
-
-    /**
-     * Devuelve el valor normalizado o una etiqueta fallback si viene vacío.
-     */
-    private String normalizeOrFallback(String value, String fallback) {
-        String normalized = normalize(value);
-        return normalized.isBlank() ? fallback : normalized;
-    }
-
-    /**
-     * Parsea {@link IdType} de forma segura para filtros de UI.
-     */
-    private IdType parseIdType(String value) {
-        try {
-            return IdType.valueOf(value);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    /**
-     * Concatena advertencias preservando el contenido anterior.
-     */
-    private String appendWarning(String current, String incoming) {
-        if (incoming == null || incoming.isBlank()) {
-            return current;
-        }
-        if (current == null || current.isBlank()) {
-            return incoming;
-        }
-        return current + " " + incoming;
-    }
-
-    /**
-     * Extrae un mensaje raíz para mostrar advertencias no fatales en la UI.
-     */
-    private String rootMessage(Throwable throwable) {
-        Throwable cursor = throwable;
-        while (cursor.getCause() != null && cursor.getCause() != cursor) {
-            cursor = cursor.getCause();
-        }
-        return normalizeOrFallback(cursor.getMessage(), "Error no detallado.");
-    }
-
-    /**
-     * Resultado interno de agregación para la sección blockchain del dashboard.
-     */
-    private record TraceAggregation(
-            String traceIdType,
-            String traceIdNumber,
-            boolean allSelected,
-            boolean lookupRequested,
-            String personLabel,
-            String warningMessage,
-            long fabricBlocks,
-            long indyBlocks,
-            List<BlockchainTraceBlock> blocks
-    ) {
-        private static TraceAggregation empty(String traceIdType, String traceIdNumber) {
-            return new TraceAggregation(traceIdType, traceIdNumber, false, false, "", null, 0L, 0L, List.of());
-        }
-
-        private static TraceAggregation withWarning(String traceIdType, String traceIdNumber, String warning) {
-            return new TraceAggregation(traceIdType, traceIdNumber, false, true, "", warning, 0L, 0L, List.of());
-        }
-    }
-
-    /**
-     * Acumulador interno de métricas por bucket temporal.
-     */
-    private static final class BucketAccumulator {
-        private final String label;
-        private long totalRequests;
-        private long successfulRequests;
-        private long unsuccessfulRequests;
-        private long documentsConsulted;
-        private long documentsDeposited;
-
-        private BucketAccumulator(String label) {
-            this.label = label;
-        }
-    }
 }

@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,16 +106,7 @@ public class IndyProofLoginService {
 
         HttpHeaders adminHeaders = buildAdminHeaders();
         HttpEntity<Map<String, Object>> req = new HttpEntity<>(payload, Objects.requireNonNull(adminHeaders));
-        HttpMethod postMethod = Objects.requireNonNull(HttpMethod.POST);
-        ResponseEntity<Map<String, Object>> resp = rest.exchange(
-                url,
-                postMethod,
-                req,
-                new ParameterizedTypeReference<>() {}
-        );
-
-        Map<String, Object> body = resp.getBody();
-        if (body == null) body = new LinkedHashMap<>();
+        Map<String, Object> body = exchangeForMap(url, HttpMethod.POST, req);
 
         Object id = body.get("pres_ex_id");
         if (id == null) id = body.get("presentation_exchange_id");
@@ -210,15 +202,7 @@ public class IndyProofLoginService {
 
         HttpHeaders adminHeaders = buildAdminHeaders();
         HttpEntity<Void> req = new HttpEntity<>(Objects.requireNonNull(adminHeaders));
-        HttpMethod getMethod = Objects.requireNonNull(HttpMethod.GET);
-        ResponseEntity<Map<String, Object>> resp = rest.exchange(
-                url,
-                getMethod,
-                req,
-                new ParameterizedTypeReference<>() {}
-        );
-
-        Map<String, Object> body = castMap(resp.getBody());
+        Map<String, Object> body = exchangeForMap(url, HttpMethod.GET, req);
         List<Object> results = castList(body.get("results"));
         return results.stream()
                 .map(IndyProofLoginService::castMap)
@@ -330,17 +314,7 @@ public class IndyProofLoginService {
 
         HttpHeaders adminHeaders = buildAdminHeaders();
         HttpEntity<Void> req = new HttpEntity<>(Objects.requireNonNull(adminHeaders));
-        HttpMethod getMethod = Objects.requireNonNull(HttpMethod.GET);
-        ResponseEntity<Map<String, Object>> resp = rest.exchange(
-                url,
-                getMethod,
-                req,
-                new ParameterizedTypeReference<>() {}
-        );
-
-        Map<String, Object> body = resp.getBody();
-        if (body == null) body = new LinkedHashMap<>();
-        return body;
+        return exchangeForMap(url, HttpMethod.GET, req);
     }
 
     /**
@@ -411,15 +385,7 @@ public class IndyProofLoginService {
         String url = issuerAdmin + "/connections?state=active";
         HttpHeaders adminHeaders = buildAdminHeaders();
         HttpEntity<Void> req = new HttpEntity<>(Objects.requireNonNull(adminHeaders));
-        HttpMethod getMethod = Objects.requireNonNull(HttpMethod.GET);
-        ResponseEntity<Map<String, Object>> resp = rest.exchange(
-                url,
-                getMethod,
-                req,
-                new ParameterizedTypeReference<>() {}
-        );
-
-        Map<String, Object> body = castMap(resp.getBody());
+        Map<String, Object> body = exchangeForMap(url, HttpMethod.GET, req);
         List<Object> results = castList(body.get("results"));
 
         for (Object o : results) {
@@ -450,6 +416,19 @@ public class IndyProofLoginService {
             h.set("X-API-KEY", apiKey.trim());
         }
         return h;
+    }
+
+    /**
+     * Ejecuta una llamada HTTP a ACA-Py y garantiza un body Map no nulo para el flujo de negocio.
+     */
+    private Map<String, Object> exchangeForMap(String url, HttpMethod method, HttpEntity<?> request) {
+        ResponseEntity<Map<String, Object>> response = rest.exchange(
+                url,
+                Objects.requireNonNull(method),
+                request,
+                new ParameterizedTypeReference<>() {}
+        );
+        return castMap(response.getBody());
     }
 
     /**
@@ -606,17 +585,17 @@ public class IndyProofLoginService {
         }
         try {
             return OffsetDateTime.parse(value).atZoneSameInstant(UI_ZONE).toLocalDateTime();
-        } catch (Exception ignored) {
+        } catch (DateTimeParseException ignored) {
             // Se intenta siguiente formato.
         }
         try {
             return Instant.parse(value).atZone(UI_ZONE).toLocalDateTime();
-        } catch (Exception ignored) {
+        } catch (DateTimeParseException ignored) {
             // Se intenta siguiente formato.
         }
         try {
             return LocalDateTime.parse(value);
-        } catch (Exception ignored) {
+        } catch (DateTimeParseException ignored) {
             return null;
         }
     }

@@ -55,7 +55,7 @@
         <i class="bi bi-plus-circle me-1"></i>Nueva solicitud
       </a>
 
-      <form th:action="@{/issuer/logout}" method="post" style="margin:0;"
+      <form th:action="@{/issuer/logout}" method="post" class="cc-nav-inline-form"
             data-cc-loader data-cc-loader-message="Cerrando sesión...">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <button class="btn btn-outline-dark btn-sm" type="submit">
@@ -214,10 +214,10 @@
           <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th style="width: 110px;">Seleccionar</th>
+                <th class="cc-col-w-110">Seleccionar</th>
                 <th>Título</th>
                 <th>Entidad emisora</th>
-                <th style="width: 260px;">Vigencia</th>
+                <th class="cc-col-w-260">Vigencia</th>
               </tr>
             </thead>
 
