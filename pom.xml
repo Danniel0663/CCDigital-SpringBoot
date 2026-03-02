@@ -91,6 +91,13 @@
       <artifactId>openhtmltopdf-pdfbox</artifactId>
       <version>1.0.10</version>
     </dependency>
+
+    <!-- Graficas server-side para incrustar imagenes en PDF (sin depender de JavaScript) -->
+    <dependency>
+      <groupId>org.knowm.xchart</groupId>
+      <artifactId>xchart</artifactId>
+      <version>3.8.8</version>
+    </dependency>
   </dependencies>
 
   <build>
