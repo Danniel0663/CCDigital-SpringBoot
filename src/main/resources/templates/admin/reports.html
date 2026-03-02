@@ -63,6 +63,24 @@
       justify-content: flex-end;
     }
 
+    /* Fuerza que referencias largas (hash/txId) nunca desborden la tarjeta. */
+    .trace-block-ref {
+      display: block;
+      max-width: 100%;
+      margin-top: 0.1rem;
+      padding: 0.15rem 0.35rem;
+      border-radius: 0.4rem;
+      background: #eef4ff;
+      color: #1f2937;
+      border: 1px solid #d9e1f2;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.84rem;
+      line-height: 1.3;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+    }
+
     .trace-detail-list dt {
       font-size: 0.78rem;
       letter-spacing: 0.02em;
@@ -88,6 +106,67 @@
       margin: 0;
       font-size: 0.92rem;
       color: #334155;
+    }
+
+    /* Resumen en lenguaje simple para lectura rápida del evento blockchain. */
+    .trace-human-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.6rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .trace-human-card {
+      border: 1px solid #d9e1f2;
+      border-radius: 0.7rem;
+      background: #f8fbff;
+      padding: 0.55rem 0.65rem;
+    }
+
+    .trace-human-label {
+      font-size: 0.74rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 0.1rem;
+      font-weight: 600;
+    }
+
+    .trace-human-value {
+      font-size: 0.92rem;
+      color: #1f2937;
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    /* Tabla legible para exponer cada campo del bloque sin perder precisión técnica. */
+    .trace-detail-table th {
+      width: 220px;
+      color: #475569;
+      font-weight: 600;
+      font-size: 0.83rem;
+      background: #f8fafc;
+    }
+
+    /* Mantiene alineación consistente cuando hay texto multilinea en valores técnicos. */
+    .trace-detail-table td {
+      vertical-align: middle;
+    }
+
+    /* Campo técnico largo (hash/txId/docId) para conservar todo el valor sin recortes. */
+    .trace-kv-value {
+      display: block;
+      width: 100%;
+      border: 1px solid #d9e1f2;
+      border-radius: 0.5rem;
+      background: #f8fbff;
+      padding: 0.35rem 0.45rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.84rem;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      color: #1f2937;
     }
   </style>
 </head>
@@ -546,8 +625,11 @@
 
           <div class="fw-semibold mb-1" th:text="${block.operation}">Registro de documento</div>
           <div class="small mb-1">
-            <span class="text-muted">Bloque/ref:</span>
-            <span class="fw-semibold" th:text="${block.blockRef}">doc-001</span>
+            <span class="text-muted d-block">Bloque/ref:</span>
+            <!-- title conserva el valor completo para inspección rápida al pasar el mouse. -->
+            <span class="fw-semibold trace-block-ref"
+                  th:title="${block.blockRef}"
+                  th:text="${block.blockRef}">doc-001</span>
           </div>
           <div class="small mb-1">
             <span class="text-muted">Documento:</span>
@@ -619,26 +701,94 @@
           </div>
           <div id="traceDetailError" class="alert alert-warning d-none" role="alert"></div>
           <div id="traceDetailContent" class="d-none">
-            <dl class="trace-detail-list mb-3">
-              <dt>Operación</dt>
-              <dd id="traceDetailOperation">Registro de documento</dd>
-              <dt>Fecha / hora</dt>
-              <dd id="traceDetailEvent">2026-02-27 12:00</dd>
-              <dt>Bloque / referencia</dt>
-              <dd id="traceDetailBlockRef">doc-001</dd>
-              <dt>Documento</dt>
-              <dd id="traceDetailDocument">Documento X</dd>
-              <dt>Emisor / origen</dt>
-              <dd id="traceDetailIssuer">Entidad X</dd>
-              <dt>Usuario</dt>
-              <dd id="traceDetailPerson">Persona X</dd>
-              <dt>Identificación blockchain</dt>
-              <dd id="traceDetailIdentity">CC 1000000000</dd>
-            </dl>
+            <!-- Capa 1: vista comprensible para usuarios no técnicos. -->
+            <div class="mb-2 text-muted small fw-semibold text-uppercase">Resumen del evento</div>
+            <div class="trace-human-grid">
+              <section class="trace-human-card">
+                <div class="trace-human-label">Qué pasó</div>
+                <div class="trace-human-value" id="traceSummaryWhat">Registro de documento</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Cuándo</div>
+                <div class="trace-human-value" id="traceSummaryWhen">2026-02-27 12:00</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Usuario afectado</div>
+                <div class="trace-human-value" id="traceSummaryWho">Persona X</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Documento</div>
+                <div class="trace-human-value" id="traceSummaryDocument">Documento X</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Emisor / origen</div>
+                <div class="trace-human-value" id="traceSummaryIssuer">Entidad X</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Red y estado</div>
+                <div class="trace-human-value" id="traceSummaryStatus">Fabric · CONFIRMADO</div>
+              </section>
+            </div>
+
+            <!-- Capa 2: detalle completo campo a campo, sin ocultar información. -->
+            <div class="mb-2 text-muted small fw-semibold text-uppercase">Detalle estructurado completo</div>
+            <div class="table-responsive mb-3">
+              <table class="table table-sm table-bordered trace-detail-table mb-0">
+                <tbody>
+                <tr>
+                  <th>Operación</th>
+                  <td id="traceDetailOperation">Registro de documento</td>
+                </tr>
+                <tr>
+                  <th>Fecha / hora</th>
+                  <td id="traceDetailEvent">2026-02-27 12:00</td>
+                </tr>
+                <tr>
+                  <th>Bloque / referencia</th>
+                  <td>
+                    <code id="traceDetailBlockRef" class="trace-kv-value">doc-001</code>
+                  </td>
+                </tr>
+                <tr>
+                  <th>Documento</th>
+                  <td id="traceDetailDocument">Documento X</td>
+                </tr>
+                <tr>
+                  <th>Emisor / origen</th>
+                  <td id="traceDetailIssuer">Entidad X</td>
+                </tr>
+                <tr>
+                  <th>Usuario</th>
+                  <td id="traceDetailPerson">Persona X</td>
+                </tr>
+                <tr>
+                  <th>Identificación blockchain</th>
+                  <td id="traceDetailIdentity">CC 1000000000</td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
+
             <div class="mb-2 text-muted small fw-semibold text-uppercase">Resumen técnico</div>
             <pre id="traceDetailNotes" class="trace-detail-box mb-3">Documento anclado en ledger.</pre>
-            <div class="mb-2 text-muted small fw-semibold text-uppercase">Contenido completo</div>
-            <pre id="traceDetailRawJson" class="trace-detail-box">{}</pre>
+
+            <!-- Respaldo técnico: JSON completo en acordeón para no saturar la lectura principal. -->
+            <div class="accordion" id="traceRawAccordion">
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="traceRawHeading">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
+                          data-bs-target="#traceRawCollapse" aria-expanded="false" aria-controls="traceRawCollapse">
+                    Contenido técnico completo (JSON)
+                  </button>
+                </h2>
+                <div id="traceRawCollapse" class="accordion-collapse collapse" aria-labelledby="traceRawHeading"
+                     data-bs-parent="#traceRawAccordion">
+                  <div class="accordion-body p-0">
+                    <pre id="traceDetailRawJson" class="trace-detail-box mb-0">{}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -765,6 +915,15 @@
       const traceDetailNotes = document.getElementById('traceDetailNotes');
       const traceDetailRawJson = document.getElementById('traceDetailRawJson');
       const traceDetailCopyRefBtn = document.getElementById('traceDetailCopyRefBtn');
+      // Selectores del resumen humano (capa de lectura rápida en el modal).
+      const traceSummaryWhat = document.getElementById('traceSummaryWhat');
+      const traceSummaryWhen = document.getElementById('traceSummaryWhen');
+      const traceSummaryWho = document.getElementById('traceSummaryWho');
+      const traceSummaryDocument = document.getElementById('traceSummaryDocument');
+      const traceSummaryIssuer = document.getElementById('traceSummaryIssuer');
+      const traceSummaryStatus = document.getElementById('traceSummaryStatus');
+      // Acordeón del JSON técnico completo (se abre solo cuando el usuario lo requiere).
+      const traceRawCollapseEl = document.getElementById('traceRawCollapse');
 
       const setText = (el, value, fallback = 'Sin dato') => {
         if (!el) return;
@@ -811,18 +970,39 @@
         const resolved = payload && payload.resolved ? payload.resolved : {};
         const fallbackIdentity = [fallback.idType, fallback.idNumber].join(' ').trim();
         const resolvedIdentity = [resolved.idType, resolved.idNumber].join(' ').trim();
+        // Se consolidan valores efectivos (backend o fallback) para pintar una sola fuente de verdad.
+        const resolvedNetwork = payload.network || fallback.network || 'Sin red';
+        const resolvedStatus = payload.status || fallback.status || 'Sin estado';
+        const resolvedOperation = payload.operation || fallback.operation || 'Registro de documento';
+        const resolvedEvent = payload.eventAt || fallback.event || 'Sin fecha';
+        const resolvedReference = payload.reference || fallback.reference;
+        const resolvedDocument = payload.documentTitle || fallback.documentTitle;
+        const resolvedIssuer = payload.issuer || fallback.issuer;
+        const resolvedPerson = payload.personLabel || fallback.person;
 
-        normalizeNetworkBadge(payload.network || fallback.network);
-        setText(traceDetailStatusBadge, payload.status || fallback.status || 'CONFIRMADO');
-        setText(traceDetailOperation, payload.operation || fallback.operation || 'Registro de documento');
-        setText(traceDetailEvent, payload.eventAt || fallback.event || 'Sin fecha');
-        setText(traceDetailBlockRef, payload.reference || fallback.reference);
-        setText(traceDetailDocument, payload.documentTitle || fallback.documentTitle);
-        setText(traceDetailIssuer, payload.issuer || fallback.issuer);
-        setText(traceDetailPerson, payload.personLabel || fallback.person);
+        normalizeNetworkBadge(resolvedNetwork);
+        setText(traceDetailStatusBadge, resolvedStatus);
+        setText(traceDetailOperation, resolvedOperation);
+        setText(traceDetailEvent, resolvedEvent);
+        setText(traceDetailBlockRef, resolvedReference);
+        setText(traceDetailDocument, resolvedDocument);
+        setText(traceDetailIssuer, resolvedIssuer);
+        setText(traceDetailPerson, resolvedPerson);
         setText(traceDetailIdentity, resolvedIdentity || fallbackIdentity);
         setText(traceDetailNotes, payload.summary || fallback.detail || 'Sin resumen técnico');
         setText(traceDetailRawJson, toPrettyJson(payload.raw || payload), '{}');
+
+        // Bloque de resumen "humano" para lectura rápida.
+        setText(traceSummaryWhat, resolvedOperation);
+        setText(traceSummaryWhen, resolvedEvent);
+        setText(traceSummaryWho, resolvedPerson);
+        setText(traceSummaryDocument, resolvedDocument);
+        setText(traceSummaryIssuer, resolvedIssuer);
+        setText(traceSummaryStatus, `${resolvedNetwork} · ${resolvedStatus}`);
+
+        if (traceDetailBlockRef) {
+          traceDetailBlockRef.title = (traceDetailBlockRef.textContent || '').trim();
+        }
       };
 
       traceViewButtons.forEach((button) => {
@@ -858,6 +1038,11 @@
             summary: fallback.detail,
             raw: { loading: 'Consultando detalle técnico...' }
           }, fallback);
+
+          // Siempre inicia con JSON contraído para no sobrecargar visualmente el modal.
+          if (traceRawCollapseEl && traceRawCollapseEl.classList.contains('show')) {
+            bootstrap.Collapse.getOrCreateInstance(traceRawCollapseEl, { toggle: false }).hide();
+          }
 
           traceBlockDetailModal.show();
 
