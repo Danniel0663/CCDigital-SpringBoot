@@ -84,4 +84,7 @@
     <factorypathentry kind="VARJAR" id="M2_REPO/org/apache/pdfbox/xmpbox/2.0.24/xmpbox-2.0.24.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/com/openhtmltopdf/openhtmltopdf-core/1.0.10/openhtmltopdf-core-1.0.10.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/de/rototor/pdfbox/graphics2d/0.32/graphics2d-0.32.jar" enabled="true" runInBatchMode="false"/>
+    <factorypathentry kind="VARJAR" id="M2_REPO/org/knowm/xchart/xchart/3.8.8/xchart-3.8.8.jar" enabled="true" runInBatchMode="false"/>
+    <factorypathentry kind="VARJAR" id="M2_REPO/de/erichseifert/vectorgraphics2d/VectorGraphics2D/0.13/VectorGraphics2D-0.13.jar" enabled="true" runInBatchMode="false"/>
+    <factorypathentry kind="VARJAR" id="M2_REPO/com/madgag/animated-gif-lib/1.4/animated-gif-lib-1.4.jar" enabled="true" runInBatchMode="false"/>
 </factorypath>

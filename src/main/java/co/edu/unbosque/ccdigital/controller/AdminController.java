@@ -193,8 +193,16 @@ public class AdminController {
                                              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                              @RequestParam(value = "to", required = false)
                                              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-                                             @RequestParam(value = "period", required = false, defaultValue = "DAY") String period) {
-        AdminReportService.DashboardReport report = adminReportService.buildDashboard(from, to, period);
+                                             @RequestParam(value = "period", required = false, defaultValue = "DAY") String period,
+                                             @RequestParam(value = "traceIdType", required = false) String traceIdType,
+                                             @RequestParam(value = "traceIdNumber", required = false) String traceIdNumber,
+                                             @RequestParam(value = "traceAll", required = false, defaultValue = "false") boolean traceAll,
+                                             @RequestParam(value = "view", required = false, defaultValue = "analytics") String view) {
+        // El PDF se arma con los mismos filtros del dashboard para mantener consistencia visual y funcional.
+        boolean includeBlockchainFilters = "blockchain".equalsIgnoreCase(view);
+        AdminReportService.DashboardReport report = includeBlockchainFilters
+                ? adminReportService.buildDashboard(from, to, period, traceIdType, traceIdNumber, traceAll)
+                : adminReportService.buildDashboard(from, to, period);
         byte[] pdf = adminReportPdfService.generateReportPdf(report);
 
         String fromLabel = report.getFromDate().format(DateTimeFormatter.BASIC_ISO_DATE);

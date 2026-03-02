@@ -2,106 +2,210 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <title>Reporte de trazabilidad - CCDigital</title>
+  <title>CCDigital - Reporte administrativo</title>
   <style>
     @page {
       size: A4;
-      margin: 18mm 14mm;
+      margin: 14mm 12mm 16mm 12mm;
+      @bottom-right {
+        content: "Pagina " counter(page) " de " counter(pages);
+        color: #64748b;
+        font-size: 9px;
+      }
     }
 
     body {
       font-family: "DejaVu Sans", Arial, sans-serif;
-      font-size: 11px;
       color: #1f2937;
-      line-height: 1.4;
+      font-size: 10.5px;
+      line-height: 1.35;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
     }
 
     .header {
-      border-bottom: 2px solid #2563eb;
-      padding-bottom: 8px;
-      margin-bottom: 12px;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #1d4ed8;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: #f8fbff;
     }
 
     .title {
+      margin: 0 0 3px 0;
       font-size: 18px;
       font-weight: 700;
-      margin: 0 0 4px 0;
       color: #0f172a;
     }
 
     .subtitle {
-      font-size: 11px;
-      color: #475569;
-      margin: 0;
+      margin: 0 0 6px 0;
+      font-size: 10.5px;
+      color: #334155;
     }
 
     .meta {
-      margin-top: 8px;
-      font-size: 10px;
+      margin: 0;
       color: #475569;
+      font-size: 9.7px;
     }
 
     .kpi-grid {
       width: 100%;
       border-collapse: separate;
-      border-spacing: 8px;
-      margin: 8px 0 12px 0;
+      border-spacing: 6px;
+      margin: 0 0 8px 0;
     }
 
-    .kpi-card {
+    .kpi-cell {
       border: 1px solid #cbd5e1;
       border-radius: 6px;
-      padding: 8px 10px;
-      vertical-align: top;
+      padding: 7px 8px;
+      background: #f8fafc;
       width: 25%;
+      vertical-align: top;
     }
 
     .kpi-label {
-      font-size: 9px;
       color: #64748b;
+      font-size: 8.6px;
       text-transform: uppercase;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
+      letter-spacing: 0.02em;
     }
 
     .kpi-value {
-      font-size: 20px;
-      font-weight: 700;
       color: #0f172a;
+      font-size: 16px;
+      font-weight: 700;
       margin: 0;
     }
 
     .section {
-      margin-top: 14px;
+      margin-top: 8px;
+      page-break-inside: auto;
+    }
+
+    /* Bloques que no deben partirse entre páginas. */
+    .no-split {
       page-break-inside: avoid;
     }
 
     .section-title {
-      margin: 0 0 6px 0;
-      font-size: 12px;
+      margin: 0 0 5px 0;
+      padding: 4px 6px;
+      font-size: 11px;
+      font-weight: 700;
       text-transform: uppercase;
-      color: #1e40af;
+      color: #1e3a8a;
+      background: #eff6ff;
       border-left: 3px solid #2563eb;
-      padding-left: 6px;
+    }
+
+    .insights-box {
+      border: 1px solid #dbeafe;
+      background: #f8fbff;
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+
+    .insights-box ul {
+      margin: 0;
+      padding-left: 16px;
+    }
+
+    .insights-box li {
+      margin-bottom: 3px;
+    }
+
+    .grid-two {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 8px;
+    }
+
+    .grid-two tr,
+    .grid-two td {
+      page-break-inside: avoid;
+    }
+
+    .panel {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 7px;
+      background: #ffffff;
+      vertical-align: top;
+    }
+
+    .panel-title {
+      margin: 0 0 5px 0;
+      color: #0f172a;
+      font-size: 10.2px;
+      font-weight: 700;
+    }
+
+    .chart-image {
+      display: block;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      background: #ffffff;
+      margin: 0 auto;
+    }
+
+    /* Dimensiones explícitas para mejorar compatibilidad de render en OpenHTMLtoPDF. */
+    .chart-image-wide {
+      width: 640px;
+      height: 230px;
+    }
+
+    .chart-image-half {
+      width: 260px;
+      height: 200px;
+    }
+
+    .chart-empty {
+      border: 1px dashed #cbd5e1;
+      border-radius: 4px;
+      color: #64748b;
+      font-size: 9px;
+      padding: 14px 8px;
+      text-align: center;
     }
 
     table.data {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 4px;
+      margin-top: 3px;
+      /* Permite que tablas largas se distribuyan en varias páginas. */
+      page-break-inside: auto;
+    }
+
+    /* Repite encabezado de tabla cuando la tabla continúa en la siguiente página. */
+    table.data thead {
+      display: table-header-group;
+    }
+
+    /* Reserva soporte para pie de tabla en caso de agregarse totales al final. */
+    table.data tfoot {
+      display: table-footer-group;
     }
 
     table.data th,
     table.data td {
       border: 1px solid #cbd5e1;
-      padding: 5px 6px;
+      padding: 4px 5px;
       vertical-align: top;
+      /* Evita partir celdas individuales a mitad de página. */
+      page-break-inside: avoid;
     }
 
     table.data th {
       background: #f1f5f9;
       color: #0f172a;
-      font-weight: 700;
-      font-size: 10px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.01em;
       text-align: left;
     }
 
@@ -109,77 +213,118 @@
       text-align: right;
     }
 
-    .muted {
+    .small-muted {
       color: #64748b;
-      font-size: 10px;
+      font-size: 9px;
     }
 
-    .half {
-      width: 49%;
-      display: inline-block;
-      vertical-align: top;
-    }
-
-    .spacer {
-      width: 2%;
-      display: inline-block;
+    .mono {
+      font-family: "DejaVu Sans Mono", "Courier New", monospace;
+      word-wrap: break-word;
     }
 
     .footer-note {
-      margin-top: 12px;
-      font-size: 9px;
-      color: #64748b;
+      margin-top: 9px;
       border-top: 1px solid #e2e8f0;
-      padding-top: 6px;
+      padding-top: 5px;
+      color: #64748b;
+      font-size: 8.8px;
     }
   </style>
 </head>
 <body>
-  <!-- Encabezado institucional con metadatos del reporte exportado. -->
-  <div class="header">
-    <h1 class="title">CCDigital - Reporte de trazabilidad del sistema</h1>
-    <p class="subtitle">
-      Modulo Admin > Reportes. Consolidado de uso y operacion para seguimiento de seguridad y gestion.
-    </p>
-    <div class="meta">
+  <!-- Encabezado ejecutivo del documento exportado. -->
+  <div class="header no-split">
+    <h1 class="title">CCDigital - Reporte de trazabilidad administrativa</h1>
+    <p class="subtitle">Consolidado de analitica de sistema y actividad blockchain para seguimiento operacional.</p>
+    <p class="meta">
       <b>Rango:</b>
-      <span th:text="${#temporals.format(report.fromDate, 'dd/MM/yyyy')}">01/01/2026</span>
+      <span th:text="${#temporals.format(report.fromDate, 'dd/MM/yyyy')}">01/02/2026</span>
       -
-      <span th:text="${#temporals.format(report.toDate, 'dd/MM/yyyy')}">31/01/2026</span>
+      <span th:text="${#temporals.format(report.toDate, 'dd/MM/yyyy')}">27/02/2026</span>
       &#160;|&#160;
       <b>Granularidad:</b> <span th:text="${report.period.label}">Dia</span>
       &#160;|&#160;
-      <b>Generado:</b> <span th:text="${generatedAt}">26/02/2026 18:20</span>
-    </div>
+      <b>Generado:</b> <span th:text="${generatedAt}">02/03/2026 11:00</span>
+    </p>
   </div>
 
-  <!-- Tarjetas KPI de resumen ejecutivo. -->
-  <table class="kpi-grid">
+  <!-- KPIs principales para lectura inmediata de desempeño del periodo. -->
+  <table class="kpi-grid no-split">
     <tr>
-      <td class="kpi-card">
+      <td class="kpi-cell">
         <div class="kpi-label">Solicitudes totales</div>
         <p class="kpi-value" th:text="${report.totalRequests}">0</p>
       </td>
-      <td class="kpi-card">
+      <td class="kpi-cell">
         <div class="kpi-label">Solicitudes exitosas</div>
-        <p class="kpi-value" th:text="${report.successfulRequests}">0</p>
-      </td>
-      <td class="kpi-card">
-        <div class="kpi-label">Solicitudes no exitosas</div>
-        <p class="kpi-value" th:text="${report.unsuccessfulRequests}">0</p>
-      </td>
-      <td class="kpi-card">
-        <div class="kpi-label">Documentos consultados / depositados</div>
         <p class="kpi-value">
-          <span th:text="${report.documentsConsulted}">0</span>
-          /
+          <span th:text="${report.successfulRequests}">0</span>
+          <span class="small-muted" th:text="${' (' + successRate + ')'}">(0.0%)</span>
+        </p>
+      </td>
+      <td class="kpi-cell">
+        <div class="kpi-label">Solicitudes no exitosas</div>
+        <p class="kpi-value">
+          <span th:text="${report.unsuccessfulRequests}">0</span>
+          <span class="small-muted" th:text="${' (' + unsuccessRate + ')'}">(0.0%)</span>
+        </p>
+      </td>
+      <td class="kpi-cell">
+        <div class="kpi-label">Consultados / depositados</div>
+        <p class="kpi-value">
+          <span th:text="${report.documentsConsulted}">0</span> /
           <span th:text="${report.documentsDeposited}">0</span>
         </p>
       </td>
     </tr>
   </table>
 
-  <!-- Tabla de tendencia temporal según granularidad seleccionada. -->
+  <div class="section no-split">
+    <h2 class="section-title">Resumen ejecutivo</h2>
+    <div class="insights-box">
+      <ul>
+        <li th:each="insight : ${executiveInsights}" th:text="${insight}">
+          Se registraron 0 solicitudes en el periodo.
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Graficas embebidas como imagen para asegurar compatibilidad con OpenHTMLtoPDF. -->
+  <div class="section">
+    <h2 class="section-title">Visualizaciones analiticas</h2>
+    <table class="grid-two">
+      <!-- Cada fila de visualización se mueve completa a la página siguiente si no cabe. -->
+      <tr class="no-split">
+        <td class="panel" colspan="2">
+          <p class="panel-title">Tendencia de solicitudes</p>
+          <img class="chart-image chart-image-wide" th:if="${trendRequestsChart != null}" th:src="${trendRequestsChart}" alt="Tendencia solicitudes"/>
+          <div class="chart-empty" th:if="${trendRequestsChart == null}">No fue posible generar esta grafica.</div>
+        </td>
+      </tr>
+      <tr class="no-split">
+        <td class="panel" style="width:50%;">
+          <p class="panel-title">Distribucion exitosas/no exitosas</p>
+          <img class="chart-image chart-image-half" th:if="${successDistributionChart != null}" th:src="${successDistributionChart}" alt="Distribucion solicitudes"/>
+          <div class="chart-empty" th:if="${successDistributionChart == null}">No fue posible generar esta grafica.</div>
+        </td>
+        <td class="panel" style="width:50%;">
+          <p class="panel-title">Top documentos consultados</p>
+          <img class="chart-image chart-image-half" th:if="${topDocumentsChart != null}" th:src="${topDocumentsChart}" alt="Top documentos"/>
+          <div class="chart-empty" th:if="${topDocumentsChart == null}">No fue posible generar esta grafica.</div>
+        </td>
+      </tr>
+      <tr class="no-split">
+        <td class="panel" colspan="2">
+          <p class="panel-title">Tendencia de documentos consultados/depositados</p>
+          <img class="chart-image chart-image-wide" th:if="${trendDocumentsChart != null}" th:src="${trendDocumentsChart}" alt="Tendencia documentos"/>
+          <div class="chart-empty" th:if="${trendDocumentsChart == null}">No fue posible generar esta grafica.</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
   <div class="section">
     <h2 class="section-title">Tendencia por tiempo</h2>
     <table class="data">
@@ -195,10 +340,10 @@
       </thead>
       <tbody>
       <tr th:if="${#lists.isEmpty(report.trendRows)}">
-        <td colspan="6" class="muted">Sin datos para el rango seleccionado.</td>
+        <td colspan="6" class="small-muted">Sin datos en el rango seleccionado.</td>
       </tr>
       <tr th:each="row : ${report.trendRows}">
-        <td th:text="${row.periodLabel}">01/01/2026</td>
+        <td th:text="${row.periodLabel}">01/02/2026</td>
         <td class="text-right" th:text="${row.totalRequests}">0</td>
         <td class="text-right" th:text="${row.successfulRequests}">0</td>
         <td class="text-right" th:text="${row.unsuccessfulRequests}">0</td>
@@ -209,106 +354,110 @@
     </table>
   </div>
 
-  <!-- Primera fila de rankings Top (documentos y personas consultadas). -->
   <div class="section">
     <h2 class="section-title">Rankings Top</h2>
-
-    <div class="half">
-      <div class="muted"><b>Documentos mas consultados</b></div>
-      <table class="data">
-        <thead>
-        <tr>
-          <th>Documento</th>
-          <th class="text-right">Consultas</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:if="${#lists.isEmpty(report.topDocuments)}">
-          <td colspan="2" class="muted">No hay datos.</td>
-        </tr>
-        <tr th:each="t : ${report.topDocuments}">
-          <td th:text="${t.label}">Documento</td>
-          <td class="text-right" th:text="${t.total}">0</td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="spacer"></div>
-
-    <div class="half">
-      <div class="muted"><b>Usuarios/datos mas consultados</b></div>
-      <table class="data">
-        <thead>
-        <tr>
-          <th>Usuario / identificacion</th>
-          <th class="text-right">Consultas</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:if="${#lists.isEmpty(report.topPeople)}">
-          <td colspan="2" class="muted">No hay datos.</td>
-        </tr>
-        <tr th:each="t : ${report.topPeople}">
-          <td th:text="${t.label}">Persona</td>
-          <td class="text-right" th:text="${t.total}">0</td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
+    <table class="grid-two">
+      <tr class="no-split">
+        <td class="panel" style="width:50%;">
+          <p class="panel-title">Top emisores solicitados</p>
+          <img class="chart-image chart-image-half" th:if="${topIssuersChart != null}" th:src="${topIssuersChart}" alt="Top emisores"/>
+          <div class="chart-empty" th:if="${topIssuersChart == null}">No fue posible generar esta grafica.</div>
+          <table class="data">
+            <thead>
+            <tr><th>Emisor</th><th class="text-right">Solicitudes</th></tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topIssuers)}"><td colspan="2" class="small-muted">Sin datos.</td></tr>
+            <tr th:each="t : ${report.topIssuers}">
+              <td th:text="${t.label}">Emisor</td>
+              <td class="text-right" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </td>
+        <td class="panel" style="width:50%;">
+          <p class="panel-title">Errores mas frecuentes</p>
+          <table class="data">
+            <thead>
+            <tr><th>Error normalizado</th><th class="text-right">Frecuencia</th></tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topErrors)}"><td colspan="2" class="small-muted">Sin datos.</td></tr>
+            <tr th:each="t : ${report.topErrors}">
+              <td th:text="${t.label}">Solicitud expirada</td>
+              <td class="text-right" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+          <p class="panel-title" style="margin-top:8px;">Usuarios/datos mas consultados</p>
+          <table class="data">
+            <thead>
+            <tr><th>Usuario / identificacion</th><th class="text-right">Consultas</th></tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topPeople)}"><td colspan="2" class="small-muted">Sin datos.</td></tr>
+            <tr th:each="t : ${report.topPeople}">
+              <td th:text="${t.label}">Persona</td>
+              <td class="text-right" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </td>
+      </tr>
+    </table>
   </div>
 
-  <!-- Segunda fila de rankings Top (emisores y errores). -->
+  <!-- Seccion resumida de blockchain para mantener relacion entre analitica y trazabilidad. -->
   <div class="section">
-    <div class="half">
-      <div class="muted"><b>Emisores mas solicitados</b></div>
-      <table class="data">
-        <thead>
-        <tr>
-          <th>Emisor</th>
-          <th class="text-right">Solicitudes</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:if="${#lists.isEmpty(report.topIssuers)}">
-          <td colspan="2" class="muted">No hay datos.</td>
-        </tr>
-        <tr th:each="t : ${report.topIssuers}">
-          <td th:text="${t.label}">Emisor</td>
-          <td class="text-right" th:text="${t.total}">0</td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
+    <h2 class="section-title">Resumen de trazabilidad blockchain</h2>
+    <table class="kpi-grid no-split">
+      <tr>
+        <td class="kpi-cell">
+          <div class="kpi-label">Bloques Fabric</div>
+          <p class="kpi-value" th:text="${report.fabricTraceBlocks}">0</p>
+        </td>
+        <td class="kpi-cell">
+          <div class="kpi-label">Bloques Indy</div>
+          <p class="kpi-value" th:text="${report.indyTraceBlocks}">0</p>
+        </td>
+        <td class="kpi-cell" colspan="2">
+          <div class="kpi-label">Filtro blockchain aplicado</div>
+          <p class="kpi-value" style="font-size:12px;">
+            <span th:text="${report.traceLookupRequested ? (report.tracePersonLabel != null ? report.tracePersonLabel : 'Consulta puntual') : 'Sin filtro especifico'}">Sin filtro especifico</span>
+          </p>
+        </td>
+      </tr>
+    </table>
 
-    <div class="spacer"></div>
-
-    <div class="half">
-      <div class="muted"><b>Errores mas frecuentes</b></div>
-      <table class="data">
-        <thead>
-        <tr>
-          <th>Error / motivo normalizado</th>
-          <th class="text-right">Frecuencia</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:if="${#lists.isEmpty(report.topErrors)}">
-          <td colspan="2" class="muted">No hay datos para normalizar errores.</td>
-        </tr>
-        <tr th:each="t : ${report.topErrors}">
-          <td th:text="${t.label}">Solicitud expirada</td>
-          <td class="text-right" th:text="${t.total}">0</td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
+    <table class="data">
+      <thead>
+      <tr>
+        <th>Red</th>
+        <th>Operacion</th>
+        <th>Fecha</th>
+        <th>Documento</th>
+        <th>Usuario</th>
+        <th>Bloque/ref</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr th:if="${#lists.isEmpty(report.blockchainBlocks)}">
+        <td colspan="6" class="small-muted">No hay registros blockchain para el rango/filtro seleccionado.</td>
+      </tr>
+      <tr th:each="b,iter : ${report.blockchainBlocks}" th:if="${iter.index &lt; 20}">
+        <td th:text="${b.network}">Fabric</td>
+        <td th:text="${b.operation}">Registro de documento</td>
+        <td th:text="${b.eventAtLabel}">2026-02-27 12:00</td>
+        <td th:text="${b.documentTitle}">Documento</td>
+        <td th:text="${b.personLabel}">Persona</td>
+        <td class="mono" th:text="${b.blockRef}">abcdef123</td>
+      </tr>
+      </tbody>
+    </table>
   </div>
 
-  <!-- Nota de alcance para contexto de auditoría administrativa. -->
   <div class="footer-note">
-    Reporte generado automaticamente por CCDigital. Este documento resume trazabilidad operativa
-    en el rango indicado y no sustituye auditorias forenses de infraestructura o de red.
+    Reporte generado automaticamente por CCDigital. Documento de soporte para seguimiento operativo y auditoria administrativa.
   </div>
 </body>
 </html>
