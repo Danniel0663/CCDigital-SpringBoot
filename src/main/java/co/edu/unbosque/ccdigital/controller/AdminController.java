@@ -6,15 +6,32 @@ import co.edu.unbosque.ccdigital.dto.SyncPersonForm;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
+import co.edu.unbosque.ccdigital.entity.UserAccessState;
+import co.edu.unbosque.ccdigital.service.AdminReportPdfService;
+import co.edu.unbosque.ccdigital.service.AdminReportService;
+import co.edu.unbosque.ccdigital.service.BlockchainTraceDetailService;
 import co.edu.unbosque.ccdigital.service.ExternalToolsService;
 import co.edu.unbosque.ccdigital.service.PersonDocumentService;
 import co.edu.unbosque.ccdigital.service.PersonService;
+import co.edu.unbosque.ccdigital.service.UserAccessGovernanceService;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Controlador web del módulo administrativo (Gobierno) de CCDigital.
@@ -39,6 +56,10 @@ public class AdminController {
     private final PersonService personService;
     private final PersonDocumentService personDocumentService;
     private final ExternalToolsService externalToolsService;
+    private final AdminReportService adminReportService;
+    private final AdminReportPdfService adminReportPdfService;
+    private final BlockchainTraceDetailService blockchainTraceDetailService;
+    private final UserAccessGovernanceService userAccessGovernanceService;
 
     /**
      * Constructor del controlador administrativo.
@@ -46,13 +67,24 @@ public class AdminController {
      * @param personService servicio para operaciones sobre {@link Person}
      * @param personDocumentService servicio para operaciones sobre {@link PersonDocument}
      * @param externalToolsService servicio de ejecución de herramientas externas
+     * @param adminReportService servicio de consolidación de trazabilidad administrativa
+     * @param adminReportPdfService servicio de exportación PDF del dashboard de reportes
+     * @param blockchainTraceDetailService servicio de lectura de detalle técnico por referencia blockchain
      */
     public AdminController(PersonService personService,
                            PersonDocumentService personDocumentService,
-                           ExternalToolsService externalToolsService) {
+                           ExternalToolsService externalToolsService,
+                           AdminReportService adminReportService,
+                           AdminReportPdfService adminReportPdfService,
+                           BlockchainTraceDetailService blockchainTraceDetailService,
+                           UserAccessGovernanceService userAccessGovernanceService) {
         this.personService = personService;
         this.personDocumentService = personDocumentService;
         this.externalToolsService = externalToolsService;
+        this.adminReportService = adminReportService;
+        this.adminReportPdfService = adminReportPdfService;
+        this.blockchainTraceDetailService = blockchainTraceDetailService;
+        this.userAccessGovernanceService = userAccessGovernanceService;
     }
 
     /**
@@ -70,6 +102,124 @@ public class AdminController {
     @GetMapping({"", "/", "/dashboard"})
     public String dashboard() {
         return "admin/dashboard";
+    }
+
+    /**
+     * Muestra el dashboard de trazabilidad (Admin > Reportes) con filtros por rango y granularidad.
+     *
+     * <p>Si no se envía rango temporal, se calcula sobre los últimos 30 días.</p>
+     *
+     * @param from fecha inicial (incluyente), opcional
+     * @param to fecha final (incluyente), opcional
+     * @param period granularidad de tendencia (DAY/WEEK/MONTH), opcional
+     * @param traceIdType tipo de identificación para trazabilidad blockchain (opcional)
+     * @param traceIdNumber número de identificación para trazabilidad blockchain (opcional)
+     * @param traceAll si es true, habilita consulta de trazabilidad global sin identificación
+     * @param view vista activa del dashboard de reportes (analytics/blockchain), opcional
+     * @param model modelo de Spring MVC
+     * @return vista de reportes administrativos
+     */
+    @GetMapping("/reports")
+    public String reports(@RequestParam(value = "from", required = false)
+                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                          @RequestParam(value = "to", required = false)
+                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                          @RequestParam(value = "period", required = false, defaultValue = "DAY") String period,
+                          @RequestParam(value = "traceIdType", required = false) String traceIdType,
+                          @RequestParam(value = "traceIdNumber", required = false) String traceIdNumber,
+                          @RequestParam(value = "traceAll", required = false, defaultValue = "false") boolean traceAll,
+                          @RequestParam(value = "view", required = false, defaultValue = "analytics") String view,
+                          Model model) {
+        AdminReportService.DashboardReport report =
+                adminReportService.buildDashboard(from, to, period, traceIdType, traceIdNumber, traceAll);
+        String reportView = "blockchain".equalsIgnoreCase(view) ? "blockchain" : "analytics";
+        model.addAttribute("report", report);
+        model.addAttribute("reportView", reportView);
+        model.addAttribute("periodOptions", AdminReportService.TrendPeriod.values());
+        model.addAttribute("idTypeOptions", IdType.values());
+        return "admin/reports";
+    }
+
+    /**
+     * Resuelve el detalle técnico completo de una referencia blockchain del dashboard Admin.
+     *
+     * <p>El botón "Ver bloque completo" envía la red y la referencia visible en la tarjeta.
+     * Para Fabric también se envían tipo/número de identificación para resolver el bloque real
+     * asociado al docId.</p>
+     *
+     * @param network red seleccionada (Fabric/Indy)
+     * @param reference referencia funcional (docId o pres_ex_id)
+     * @param idType tipo de identificación (solo Fabric)
+     * @param idNumber número de identificación (solo Fabric)
+     * @return payload JSON con detalle técnico, o error de validación
+     */
+    @GetMapping("/reports/block-detail")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> reportBlockDetail(
+            @RequestParam("network") String network,
+            @RequestParam("reference") String reference,
+            @RequestParam(value = "idType", required = false) String idType,
+            @RequestParam(value = "idNumber", required = false) String idNumber
+    ) {
+        try {
+            Map<String, Object> payload = blockchainTraceDetailService.readDetail(network, reference, idType, idNumber);
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(payload);
+        } catch (IllegalArgumentException ex) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", ex.getMessage());
+            error.put("network", network);
+            error.put("reference", reference);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .cacheControl(CacheControl.noStore())
+                    .body(error);
+        } catch (Exception ex) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "No fue posible consultar el detalle del bloque en este momento.");
+            error.put("detail", ex.getMessage());
+            error.put("network", network);
+            error.put("reference", reference);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .cacheControl(CacheControl.noStore())
+                    .body(error);
+        }
+    }
+
+    /**
+     * Exporta en PDF el reporte de trazabilidad administrativo con los filtros actuales.
+     *
+     * @param from fecha inicial (incluyente), opcional
+     * @param to fecha final (incluyente), opcional
+     * @param period granularidad de tendencia (DAY/WEEK/MONTH), opcional
+     * @return archivo PDF en modo descarga
+     */
+    @GetMapping("/reports/pdf")
+    public ResponseEntity<byte[]> reportsPdf(@RequestParam(value = "from", required = false)
+                                             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                             @RequestParam(value = "to", required = false)
+                                             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                             @RequestParam(value = "period", required = false, defaultValue = "DAY") String period,
+                                             @RequestParam(value = "traceIdType", required = false) String traceIdType,
+                                             @RequestParam(value = "traceIdNumber", required = false) String traceIdNumber,
+                                             @RequestParam(value = "traceAll", required = false, defaultValue = "false") boolean traceAll,
+                                             @RequestParam(value = "view", required = false, defaultValue = "analytics") String view) {
+        // El PDF se arma con los mismos filtros del dashboard para mantener consistencia visual y funcional.
+        boolean includeBlockchainFilters = "blockchain".equalsIgnoreCase(view);
+        AdminReportService.DashboardReport report = includeBlockchainFilters
+                ? adminReportService.buildDashboard(from, to, period, traceIdType, traceIdNumber, traceAll)
+                : adminReportService.buildDashboard(from, to, period);
+        byte[] pdf = adminReportPdfService.generateReportPdf(report);
+
+        String fromLabel = report.getFromDate().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String toLabel = report.getToDate().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String filename = "ccdigital-reporte-trazabilidad-" + fromLabel + "-" + toLabel + ".pdf";
+        MediaType pdfMediaType = Objects.requireNonNull(MediaType.APPLICATION_PDF);
+
+        return ResponseEntity.ok()
+                .contentType(pdfMediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(pdf);
     }
 
     /**
@@ -145,7 +295,47 @@ public class AdminController {
 
         model.addAttribute("person", person);
         model.addAttribute("docs", docs);
+        model.addAttribute("userAccess", userAccessGovernanceService.findByPersonId(id).orElse(null));
+        model.addAttribute("accessStateOptions", UserAccessState.values());
         return "admin/person-detail";
+    }
+
+    /**
+     * Actualiza estado de acceso del usuario final asociado a la persona.
+     *
+     * <p>Estados soportados: ENABLED, SUSPENDED, DISABLED.</p>
+     */
+    @PostMapping("/persons/{id}/access-state")
+    public String updatePersonAccessState(@PathVariable("id") Long id,
+                                          @RequestParam("state") String state,
+                                          @RequestParam(value = "reason", required = false) String reason,
+                                          RedirectAttributes redirectAttributes) {
+        try {
+            UserAccessState target = UserAccessState.valueOf(state == null ? "" : state.trim().toUpperCase());
+            UserAccessGovernanceService.AccessUpdateResult result =
+                    userAccessGovernanceService.updateState(id, target, reason);
+
+            String syncNote;
+            if (result.indyCallAttempted()) {
+                syncNote = result.indyCallSucceeded()
+                        ? " Sincronización Indy: OK."
+                        : " Sincronización Indy: FALLÓ (" + result.indyMessage() + ").";
+            } else {
+                syncNote = " Sincronización Indy no ejecutada (" + result.indyMessage() + ").";
+            }
+            redirectAttributes.addFlashAttribute(
+                    "accessSuccess",
+                    "Estado de acceso actualizado a " + result.access().accessState() + "." + syncNote
+            );
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("accessError", ex.getMessage());
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute(
+                    "accessError",
+                    "No fue posible actualizar el estado de acceso: " + ex.getMessage()
+            );
+        }
+        return "redirect:/admin/persons/" + id;
     }
 
     /**

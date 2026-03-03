@@ -88,9 +88,10 @@ public class UserController {
         }
 
         Person person = personRepository.findByIdNumber(principal.getIdNumber().trim()).orElse(null);
-        if (person == null || person.getId() == null) {
+        Long personId = person == null ? null : person.getId();
+        if (personId == null) {
             return null;
         }
-        return appUserRepository.findById(person.getId()).orElse(null);
+        return appUserRepository.findById(personId).orElse(null);
     }
 }

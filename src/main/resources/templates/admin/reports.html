@@ -1,0 +1,1393 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Reportes · CCDigital</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
+  <style>
+    /* Alturas fijas por tipo de grafica para evitar auto-expansiones de Chart.js. */
+    .cc-chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 280px;
+    }
+
+    .cc-chart-wrap--short {
+      height: 240px;
+    }
+
+    .cc-chart-wrap > canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    .trace-filter-chip .btn.active {
+      color: #fff;
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+
+    .trace-block-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .trace-block-card {
+      border: 1px solid #d9e1f2;
+      border-radius: 0.9rem;
+      padding: 0.9rem;
+      background: #f8fbff;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+    }
+
+    .trace-block-card.is-hidden {
+      display: none;
+    }
+
+    .trace-block-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .trace-block-actions {
+      margin-top: 0.75rem;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    /* Fuerza que referencias largas (hash/txId) nunca desborden la tarjeta. */
+    .trace-block-ref {
+      display: block;
+      max-width: 100%;
+      margin-top: 0.1rem;
+      padding: 0.15rem 0.35rem;
+      border-radius: 0.4rem;
+      background: #eef4ff;
+      color: #1f2937;
+      border: 1px solid #d9e1f2;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.84rem;
+      line-height: 1.3;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+    }
+
+    .trace-detail-list dt {
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #6c757d;
+      margin-bottom: 0.15rem;
+    }
+
+    .trace-detail-list dd {
+      margin-bottom: 0.75rem;
+      font-weight: 500;
+      color: #1f2937;
+      word-break: break-word;
+    }
+
+    .trace-detail-box {
+      border: 1px solid #d9e1f2;
+      background: #f8fbff;
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      font-size: 0.92rem;
+      color: #334155;
+    }
+
+    /* Resumen en lenguaje simple para lectura rápida del evento blockchain. */
+    .trace-human-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.6rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .trace-human-card {
+      border: 1px solid #d9e1f2;
+      border-radius: 0.7rem;
+      background: #f8fbff;
+      padding: 0.55rem 0.65rem;
+    }
+
+    .trace-human-label {
+      font-size: 0.74rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 0.1rem;
+      font-weight: 600;
+    }
+
+    .trace-human-value {
+      font-size: 0.92rem;
+      color: #1f2937;
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    /* Tabla legible para exponer cada campo del bloque sin perder precisión técnica. */
+    .trace-detail-table th {
+      width: 220px;
+      color: #475569;
+      font-weight: 600;
+      font-size: 0.83rem;
+      background: #f8fafc;
+    }
+
+    /* Mantiene alineación consistente cuando hay texto multilinea en valores técnicos. */
+    .trace-detail-table td {
+      vertical-align: middle;
+    }
+
+    /* Campo técnico largo (hash/txId/docId) para conservar todo el valor sin recortes. */
+    .trace-kv-value {
+      display: block;
+      width: 100%;
+      border: 1px solid #d9e1f2;
+      border-radius: 0.5rem;
+      background: #f8fbff;
+      padding: 0.35rem 0.45rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.84rem;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      color: #1f2937;
+    }
+  </style>
+</head>
+
+<body class="bg-body-tertiary">
+<nav class="navbar cc-navbar">
+  <div class="container d-flex justify-content-between align-items-center">
+    <a class="navbar-brand fw-semibold text-decoration-none cc-brand" th:href="@{/admin/dashboard}">
+      <i class="bi bi-shield-lock me-2"></i>CCDigital · Admin
+    </a>
+    <div class="d-flex align-items-center gap-2">
+      <div class="cc-profile-chip"
+           th:if="${ccActiveProfileDisplay != null and !#strings.isEmpty(ccActiveProfileDisplay)}">
+        <span class="cc-profile-icon">
+          <i class="bi" th:classappend="${(ccActiveProfileIcon != null and !#strings.isEmpty(ccActiveProfileIcon)) ? ' ' + ccActiveProfileIcon : ' bi-shield-lock'}"></i>
+        </span>
+        <span>
+          <span class="cc-profile-label" th:text="${ccActiveProfileLabel}">Perfil</span>
+          <span class="cc-profile-value" th:text="${ccActiveProfileDisplay}">admin@dominio.com</span>
+        </span>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}">
+        <i class="bi bi-house me-1"></i>Dashboard
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main class="container py-4">
+  <div class="cc-card p-4 mb-3">
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+      <div>
+        <h1 class="h4 mb-1">Reportes de trazabilidad</h1>
+        <p class="text-muted mb-0">
+          Monitoreo integral del uso del sistema: solicitudes, consultas de documentos, depósitos y tendencias.
+        </p>
+        <div class="btn-group btn-group-sm mt-3" role="group" aria-label="Vista de reportes">
+          <a class="btn"
+             th:classappend="${reportView == 'analytics'} ? ' btn-primary' : ' btn-outline-primary'"
+             th:href="@{/admin/reports(view='analytics',from=${report.fromDate},to=${report.toDate},period=${report.period.name()})}">
+            <i class="bi bi-graph-up-arrow me-1"></i>Analítica del sistema
+          </a>
+          <a class="btn"
+             th:classappend="${reportView == 'blockchain'} ? ' btn-primary' : ' btn-outline-primary'"
+             th:href="@{/admin/reports(view='blockchain',from=${report.fromDate},to=${report.toDate},traceIdType=${report.traceIdType},traceIdNumber=${report.traceIdNumber},traceAll=${report.traceAllSelected})}">
+            <i class="bi bi-diagram-3 me-1"></i>Trazabilidad blockchain
+          </a>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <!-- Exporta el reporte completo con los mismos filtros activos en la vista. -->
+        <!-- data-cc-pdf-export habilita descarga por fetch+blob para poder mostrar loader
+             mientras el backend genera el archivo PDF. -->
+        <a class="btn btn-outline-secondary btn-sm"
+           th:if="${reportView == 'analytics'}"
+           th:href="@{/admin/reports/pdf(view='analytics',from=${report.fromDate},to=${report.toDate},period=${report.period.name()})}"
+           data-cc-pdf-export="true"
+           >
+          <i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF
+        </a>
+        <a class="btn btn-outline-secondary btn-sm"
+           th:if="${reportView == 'blockchain'}"
+           th:href="@{/admin/reports/pdf(view='blockchain',from=${report.fromDate},to=${report.toDate},period=${report.period.name()},traceIdType=${report.traceIdType},traceIdNumber=${report.traceIdNumber},traceAll=${report.traceAllSelected})}"
+           data-cc-pdf-export="true"
+           >
+          <i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF
+        </a>
+        <a class="btn btn-outline-primary btn-sm" th:href="@{/admin/sync}">
+          <i class="bi bi-arrow-repeat me-1"></i>Ir a sincronización
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros del reporte -->
+  <div class="cc-card p-3 p-md-4 mb-3">
+    <form class="row g-2 align-items-end" method="get" th:action="@{/admin/reports}"
+          th:if="${reportView == 'analytics'}"
+          data-cc-loader data-cc-loader-message="Aplicando filtros de trazabilidad...">
+      <input type="hidden" name="view" value="analytics">
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label mb-1">Desde</label>
+        <input class="form-control" type="date" name="from" th:value="${report.fromDate}" required>
+      </div>
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label mb-1">Hasta</label>
+        <input class="form-control" type="date" name="to" th:value="${report.toDate}" required>
+      </div>
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label mb-1">Tendencia</label>
+        <select class="form-select" name="period">
+          <option th:each="p : ${periodOptions}"
+                  th:value="${p.name()}"
+                  th:text="${p.label}"
+                  th:selected="${p.name() == report.period.name()}">Día</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-3 d-flex gap-2">
+        <button class="btn btn-primary flex-fill" type="submit">
+          <i class="bi bi-funnel me-1"></i>Aplicar
+        </button>
+        <a class="btn btn-outline-secondary flex-fill" th:href="@{/admin/reports(view='analytics')}">
+          Limpiar
+        </a>
+      </div>
+    </form>
+
+    <form class="row g-2 align-items-end" method="get" th:action="@{/admin/reports}"
+          th:if="${reportView == 'blockchain'}"
+          data-cc-loader data-cc-loader-message="Consultando trazabilidad blockchain...">
+      <input type="hidden" name="view" value="blockchain">
+      <div class="col-12 col-md-3 col-lg-2">
+        <label class="form-label mb-1">Desde</label>
+        <input class="form-control" type="date" name="from" th:value="${report.fromDate}" required>
+      </div>
+      <div class="col-12 col-md-3 col-lg-2">
+        <label class="form-label mb-1">Hasta</label>
+        <input class="form-control" type="date" name="to" th:value="${report.toDate}" required>
+      </div>
+      <div class="col-12 col-md-3 col-lg-3">
+        <label class="form-label mb-1">Tipo ID blockchain</label>
+        <select class="form-select" name="traceIdType">
+          <option value="">Seleccione...</option>
+          <option th:each="idType : ${idTypeOptions}"
+                  th:value="${idType.name()}"
+                  th:text="${idType.name()}"
+                  th:selected="${idType.name() == report.traceIdType}">CC</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3 col-lg-3">
+        <label class="form-label mb-1">Número ID blockchain</label>
+        <input class="form-control" type="text" name="traceIdNumber"
+               maxlength="40" placeholder="Ej. 1234567890"
+               th:value="${report.traceIdNumber}">
+      </div>
+      <div class="col-12 col-lg-4 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-funnel me-1"></i>Aplicar
+        </button>
+        <a class="btn btn-outline-primary"
+           th:href="@{/admin/reports(view='blockchain',from=${report.fromDate},to=${report.toDate},traceAll=true)}"
+           data-cc-loader
+           data-cc-loader-message="Consultando trazabilidad global...">
+          <i class="bi bi-collection me-1"></i>Ver todos
+        </a>
+        <a class="btn btn-outline-secondary"
+           th:href="@{/admin/reports(view='blockchain')}"
+           data-cc-loader
+           data-cc-loader-message="Limpiando filtros de trazabilidad...">
+          Limpiar
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <section th:if="${reportView == 'analytics'}">
+  <!-- KPI principales -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="cc-card p-3 h-100">
+        <div class="text-muted small text-uppercase">Solicitudes (total)</div>
+        <div class="display-6 fw-semibold" th:text="${report.totalRequests}">0</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="cc-card p-3 h-100">
+        <div class="text-muted small text-uppercase">Exitosas vs no exitosas</div>
+        <div class="h5 mb-1">
+          <span class="text-success fw-semibold" th:text="${report.successfulRequests}">0</span>
+          <span class="text-muted"> / </span>
+          <span class="text-danger fw-semibold" th:text="${report.unsuccessfulRequests}">0</span>
+        </div>
+        <small class="text-muted"
+               th:text="${report.totalRequests > 0 ? #numbers.formatDecimal((report.successfulRequests * 100.0) / report.totalRequests, 1, 1) + '% éxito' : '0.0% éxito'}">
+          0.0% éxito
+        </small>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="cc-card p-3 h-100">
+        <div class="text-muted small text-uppercase">Documentos consultados / vistos</div>
+        <div class="display-6 fw-semibold text-primary" th:text="${report.documentsConsulted}">0</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="cc-card p-3 h-100">
+        <div class="text-muted small text-uppercase">Documentos depositados / registrados</div>
+        <div class="display-6 fw-semibold text-success" th:text="${report.documentsDeposited}">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graficas interactivas -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xl-8">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+          <h2 class="h6 text-uppercase text-muted mb-0">Tendencia interactiva</h2>
+          <div class="btn-group btn-group-sm" role="group" aria-label="Metrica tendencia">
+            <button type="button" class="btn btn-outline-primary active" data-trend-metric="consulted">
+              Consultados
+            </button>
+            <button type="button" class="btn btn-outline-primary" data-trend-metric="deposited">
+              Depositados
+            </button>
+            <button type="button" class="btn btn-outline-primary" data-trend-metric="successful">
+              Exitosas
+            </button>
+          </div>
+        </div>
+        <div class="small text-muted mb-2">
+          Barra: solicitudes totales. Linea: metrica seleccionada.
+        </div>
+        <div class="cc-chart-wrap">
+          <canvas id="adminTrendChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-4">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Exito de solicitudes</h2>
+        <div class="cc-chart-wrap cc-chart-wrap--short">
+          <canvas id="adminSuccessChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top documentos consultados</h2>
+        <div class="cc-chart-wrap cc-chart-wrap--short">
+          <canvas id="adminTopDocsChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top emisores solicitantes</h2>
+        <div class="cc-chart-wrap cc-chart-wrap--short">
+          <canvas id="adminTopIssuersChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tendencia temporal -->
+  <div class="cc-card p-3 p-md-4 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 text-uppercase text-muted mb-0">Tendencia por tiempo</h2>
+      <span class="badge text-bg-light border"
+            th:text="${report.period.name() == 'DAY' ? 'Por día' : (report.period.name() == 'WEEK' ? 'Por semana' : 'Por mes')}">
+        Por día
+      </span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+        <tr>
+          <th>Periodo</th>
+          <th class="text-end">Solicitudes</th>
+          <th class="text-end">Exitosas</th>
+          <th class="text-end">No exitosas</th>
+          <th class="text-end">Consultados</th>
+          <th class="text-end">Depositados</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:if="${#lists.isEmpty(report.trendRows)}">
+          <td colspan="6" class="text-center text-muted py-4">Sin datos para el rango seleccionado.</td>
+        </tr>
+        <tr th:each="row : ${report.trendRows}">
+          <td class="fw-semibold" th:text="${row.periodLabel}">26/02/2026</td>
+          <td class="text-end" th:text="${row.totalRequests}">0</td>
+          <td class="text-end text-success fw-semibold" th:text="${row.successfulRequests}">0</td>
+          <td class="text-end text-danger fw-semibold" th:text="${row.unsuccessfulRequests}">0</td>
+          <td class="text-end" th:text="${row.documentsConsulted}">0</td>
+          <td class="text-end" th:text="${row.documentsDeposited}">0</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tablas Top -->
+  <div class="row g-3">
+    <div class="col-12 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top documentos más consultados</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th>Documento</th>
+              <th class="text-end">Consultas</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topDocuments)}">
+              <td colspan="2" class="text-center text-muted py-3">No hay datos.</td>
+            </tr>
+            <tr th:each="t : ${report.topDocuments}">
+              <td th:text="${t.label}">Documento X</td>
+              <td class="text-end fw-semibold" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top usuarios / datos más consultados</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th>Usuario / identificación</th>
+              <th class="text-end">Consultas</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topPeople)}">
+              <td colspan="2" class="text-center text-muted py-3">No hay datos.</td>
+            </tr>
+            <tr th:each="t : ${report.topPeople}">
+              <td th:text="${t.label}">Persona X</td>
+              <td class="text-end fw-semibold" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Top emisores más solicitados</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th>Emisor</th>
+              <th class="text-end">Solicitudes</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topIssuers)}">
+              <td colspan="2" class="text-center text-muted py-3">No hay datos.</td>
+            </tr>
+            <tr th:each="t : ${report.topIssuers}">
+              <td th:text="${t.label}">Entidad X</td>
+              <td class="text-end fw-semibold" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="cc-card p-3 p-md-4 h-100">
+        <h2 class="h6 text-uppercase text-muted mb-2">Errores más frecuentes</h2>
+        <p class="text-muted small mb-2">
+          Basado en solicitudes no exitosas (rechazadas o expiradas) y notas de decisión disponibles.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th>Error / motivo normalizado</th>
+              <th class="text-end">Frecuencia</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(report.topErrors)}">
+              <td colspan="2" class="text-center text-muted py-3">No hay datos para normalizar errores.</td>
+            </tr>
+            <tr th:each="t : ${report.topErrors}">
+              <td th:text="${t.label}">Solicitud expirada</td>
+              <td class="text-end fw-semibold" th:text="${t.total}">0</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- Trazabilidad blockchain por usuario/documento -->
+  <div class="cc-card p-3 p-md-4 mt-3" th:if="${reportView == 'blockchain'}">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+      <div>
+        <h2 class="h6 text-uppercase text-muted mb-1">Trazabilidad Blockchain (Fabric + Indy)</h2>
+        <div class="small text-muted">
+          Bloques consultados para el usuario filtrado en esta ventana de tiempo.
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge rounded-pill text-bg-light border"
+              th:text="'Fabric: ' + ${report.fabricTraceBlocks}">Fabric: 0</span>
+        <span class="badge rounded-pill text-bg-light border"
+              th:text="'Indy: ' + ${report.indyTraceBlocks}">Indy: 0</span>
+        <span class="badge rounded-pill text-bg-primary"
+              th:text="'Total: ' + ${#lists.size(report.blockchainBlocks)}">Total: 0</span>
+      </div>
+    </div>
+
+    <div class="alert alert-info py-2 mb-3"
+         th:if="${!report.traceLookupRequested}">
+      Selecciona <strong>Tipo ID blockchain</strong> y <strong>Número ID blockchain</strong> o usa
+      <strong>Ver todos</strong> para consultar trazabilidad global.
+    </div>
+    <div class="alert alert-warning py-2 mb-3"
+         th:if="${report.traceLookupRequested and report.traceWarningMessage != null and !#strings.isEmpty(report.traceWarningMessage)}"
+         th:text="${report.traceWarningMessage}">
+      No fue posible consultar una de las redes blockchain.
+    </div>
+
+    <div th:if="${report.traceLookupRequested}">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div class="small text-muted">
+          Contexto consultado:
+          <span class="fw-semibold"
+                th:text="${(report.tracePersonLabel != null and !#strings.isEmpty(report.tracePersonLabel)) ? report.tracePersonLabel : (report.traceIdType + ' ' + report.traceIdNumber)}">
+            CC 1000000000
+          </span>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
+          <a class="btn btn-sm btn-outline-secondary"
+             th:if="${report.traceLookupRequested and !report.traceAllSelected}"
+             th:href="@{/admin/reports(view='blockchain',from=${report.fromDate},to=${report.toDate},traceAll=true)}"
+             data-cc-loader
+             data-cc-loader-message="Quitando filtro y consultando todos los bloques...">
+            <i class="bi bi-x-circle me-1"></i>Quitar filtro y ver todos
+          </a>
+          <input id="traceSearchInput" class="form-control form-control-sm cc-report-search-input"
+                 type="search"
+                 placeholder="Buscar bloque, documento o detalle">
+          <div class="btn-group btn-group-sm trace-filter-chip" role="group" aria-label="Filtrar red">
+            <button type="button" class="btn btn-outline-primary active" data-trace-network="all">Todos</button>
+            <button type="button" class="btn btn-outline-primary" data-trace-network="fabric">Fabric</button>
+            <button type="button" class="btn btn-outline-primary" data-trace-network="indy">Indy</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="traceVisibleCounter" class="small text-muted mb-2"></div>
+
+      <div id="traceBlockList" class="trace-block-list">
+        <article class="trace-block-card"
+                 th:each="block : ${report.blockchainBlocks}"
+                 th:with="isAccessGovernanceEvent=${block.network == 'Fabric'
+                           and block.operation == 'Cambio de estado de acceso de usuario'
+                           and block.detail != null
+                           and #strings.contains(block.detail, 'SYNC_INDY_')},
+                          isIndySyncOk=${isAccessGovernanceEvent and #strings.contains(block.detail, 'SYNC_INDY_OK')},
+                          isIndySyncFail=${isAccessGovernanceEvent and #strings.contains(block.detail, 'SYNC_INDY_FAIL')},
+                          isIndySyncSkipped=${isAccessGovernanceEvent and #strings.contains(block.detail, 'SYNC_INDY_SKIPPED')}"
+                 th:attr="data-network=${#strings.toLowerCase(block.network)}">
+          <div class="trace-block-meta">
+            <span class="badge rounded-pill"
+                  th:classappend="${block.network == 'Fabric'} ? ' text-bg-primary' : ' text-bg-success'"
+                  th:text="${isAccessGovernanceEvent ? 'Fabric (auditado)' : block.network}">Fabric</span>
+            <span class="badge rounded-pill"
+                  th:if="${isAccessGovernanceEvent}"
+                  th:classappend="${isIndySyncOk} ? ' text-bg-success' : (${isIndySyncFail} ? ' text-bg-danger' : ' text-bg-secondary')"
+                  th:text="${isIndySyncOk} ? 'Indy sincronizado'
+                           : (${isIndySyncFail} ? 'Indy sync falló' : 'Indy sync no ejecutado')">Indy sincronizado</span>
+            <span class="badge text-bg-light border"
+                  th:text="${block.status}">CONFIRMADO</span>
+            <span class="badge text-bg-light border"
+                  th:text="${block.eventAtLabel}">2026-02-27 12:00</span>
+          </div>
+
+          <div class="fw-semibold mb-1" th:text="${block.operation}">Registro de documento</div>
+          <div class="small mb-1">
+            <span class="text-muted d-block">Bloque/ref:</span>
+            <!-- title conserva el valor completo para inspección rápida al pasar el mouse. -->
+            <span class="fw-semibold trace-block-ref"
+                  th:title="${block.blockRef}"
+                  th:text="${block.blockRef}">doc-001</span>
+          </div>
+          <div class="small mb-1">
+            <span class="text-muted">Documento:</span>
+            <span th:text="${block.documentTitle}">Copia de cédula</span>
+          </div>
+          <div class="small mb-1">
+            <span class="text-muted">Emisor/origen:</span>
+            <span th:text="${block.issuer}">Entidad X</span>
+          </div>
+          <div class="small mb-1">
+            <span class="text-muted">Usuario:</span>
+            <span th:text="${block.personLabel}">Nombre Apellido (CC 1000)</span>
+          </div>
+          <div class="small text-muted" th:text="${block.detail}">
+            Documento anclado en ledger.
+          </div>
+          <div class="trace-block-actions">
+            <!-- Se embeben metadatos del bloque para que el modal consulte detalle real
+                 sin pedir parámetros manuales al usuario. -->
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary trace-block-view-btn"
+                    th:attr="data-trace-network=${block.network},
+                             data-trace-status=${block.status},
+                             data-trace-event=${block.eventAtLabel},
+                             data-trace-operation=${block.operation},
+                             data-trace-block-ref=${block.blockRef},
+                             data-trace-document=${block.documentTitle},
+                             data-trace-issuer=${block.issuer},
+                             data-trace-person=${block.personLabel},
+                             data-trace-id-type=${block.idType},
+                             data-trace-id-number=${block.idNumber},
+                             data-trace-detail=${block.detail}">
+              <i class="bi bi-eye me-1"></i>Ver bloque completo
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <div id="traceNoDataMessage" class="text-muted text-center py-3 border rounded mt-2"
+           th:if="${#lists.isEmpty(report.blockchainBlocks)}">
+        No se encontraron bloques para el usuario y rango seleccionado.
+      </div>
+      <div id="traceNoDataMessageByFilter" class="text-muted text-center py-3 border rounded mt-2 d-none">
+        No hay bloques que coincidan con el filtro interactivo.
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de detalle ampliado para inspeccionar metadatos del bloque seleccionado. -->
+  <div class="modal fade" id="traceBlockDetailModal" tabindex="-1" aria-hidden="true"
+       data-bs-backdrop="false" data-bs-keyboard="true"
+       th:if="${reportView == 'blockchain'}">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+          <div>
+            <h3 class="h6 mb-1">Detalle completo del bloque</h3>
+            <div class="d-flex align-items-center gap-2">
+              <span id="traceDetailNetworkBadge" class="badge rounded-pill text-bg-primary">Fabric</span>
+              <span id="traceDetailStatusBadge" class="badge text-bg-light border">CONFIRMADO</span>
+            </div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div id="traceDetailLoading" class="d-none text-muted small py-1">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            Consultando detalle técnico completo...
+          </div>
+          <div id="traceDetailError" class="alert alert-warning d-none" role="alert"></div>
+          <div id="traceDetailContent" class="d-none">
+            <!-- Capa 1: vista comprensible para usuarios no técnicos. -->
+            <div class="mb-2 text-muted small fw-semibold text-uppercase">Resumen del evento</div>
+            <div class="trace-human-grid">
+              <section class="trace-human-card">
+                <div class="trace-human-label">Qué pasó</div>
+                <div class="trace-human-value" id="traceSummaryWhat">Registro de documento</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Cuándo</div>
+                <div class="trace-human-value" id="traceSummaryWhen">2026-02-27 12:00</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Usuario afectado</div>
+                <div class="trace-human-value" id="traceSummaryWho">Persona X</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Documento</div>
+                <div class="trace-human-value" id="traceSummaryDocument">Documento X</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Emisor / origen</div>
+                <div class="trace-human-value" id="traceSummaryIssuer">Entidad X</div>
+              </section>
+              <section class="trace-human-card">
+                <div class="trace-human-label">Red y estado</div>
+                <div class="trace-human-value" id="traceSummaryStatus">Fabric · CONFIRMADO</div>
+              </section>
+            </div>
+
+            <!-- Capa 2: detalle completo campo a campo, sin ocultar información. -->
+            <div class="mb-2 text-muted small fw-semibold text-uppercase">Detalle estructurado completo</div>
+            <div class="table-responsive mb-3">
+              <table class="table table-sm table-bordered trace-detail-table mb-0">
+                <tbody>
+                <tr>
+                  <th>Operación</th>
+                  <td id="traceDetailOperation">Registro de documento</td>
+                </tr>
+                <tr>
+                  <th>Fecha / hora</th>
+                  <td id="traceDetailEvent">2026-02-27 12:00</td>
+                </tr>
+                <tr>
+                  <th>Bloque / referencia</th>
+                  <td>
+                    <code id="traceDetailBlockRef" class="trace-kv-value">doc-001</code>
+                  </td>
+                </tr>
+                <tr>
+                  <th>Documento</th>
+                  <td id="traceDetailDocument">Documento X</td>
+                </tr>
+                <tr>
+                  <th>Emisor / origen</th>
+                  <td id="traceDetailIssuer">Entidad X</td>
+                </tr>
+                <tr>
+                  <th>Usuario</th>
+                  <td id="traceDetailPerson">Persona X</td>
+                </tr>
+                <tr>
+                  <th>Identificación blockchain</th>
+                  <td id="traceDetailIdentity">CC 1000000000</td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mb-2 text-muted small fw-semibold text-uppercase">Resumen técnico</div>
+            <pre id="traceDetailNotes" class="trace-detail-box mb-3">Documento anclado en ledger.</pre>
+
+            <!-- Respaldo técnico: JSON completo en acordeón para no saturar la lectura principal. -->
+            <div class="accordion" id="traceRawAccordion">
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="traceRawHeading">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
+                          data-bs-target="#traceRawCollapse" aria-expanded="false" aria-controls="traceRawCollapse">
+                    Contenido técnico completo (JSON)
+                  </button>
+                </h2>
+                <div id="traceRawCollapse" class="accordion-collapse collapse" aria-labelledby="traceRawHeading"
+                     data-bs-parent="#traceRawAccordion">
+                  <div class="accordion-body p-0">
+                    <pre id="traceDetailRawJson" class="trace-detail-box mb-0">{}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="traceDetailCopyRefBtn">
+            <i class="bi bi-copy me-1"></i>Copiar referencia
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dataset para graficas (renderizado server-side y consumido por JS). -->
+  <div id="reportChartData" class="d-none"
+       th:attr="data-success-total=${report.successfulRequests},
+                data-unsuccess-total=${report.unsuccessfulRequests}">
+    <span th:each="row : ${report.trendRows}" class="trend-point"
+          th:attr="data-label=${row.periodLabel},
+                   data-total=${row.totalRequests},
+                   data-success=${row.successfulRequests},
+                   data-unsuccess=${row.unsuccessfulRequests},
+                   data-consulted=${row.documentsConsulted},
+                   data-deposited=${row.documentsDeposited}"></span>
+    <span th:each="t : ${report.topDocuments}" class="top-doc-point"
+          th:attr="data-label=${t.label},data-value=${t.total}"></span>
+    <span th:each="t : ${report.topIssuers}" class="top-issuer-point"
+          th:attr="data-label=${t.label},data-value=${t.total}"></span>
+  </div>
+</main>
+
+<script src="/js/ccdigital-loader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  (() => {
+    // Filtro interactivo para la sección de bloques blockchain (Fabric/Indy).
+    const traceBlockList = document.getElementById('traceBlockList');
+    const traceSearchInput = document.getElementById('traceSearchInput');
+    const traceNoDataMessageByFilter = document.getElementById('traceNoDataMessageByFilter');
+    const traceVisibleCounter = document.getElementById('traceVisibleCounter');
+    const traceFilterButtons = Array.from(document.querySelectorAll('[data-trace-network]'));
+    let resetTraceCardFilters = null;
+    if (traceBlockList && traceFilterButtons.length > 0) {
+      const traceCards = Array.from(traceBlockList.querySelectorAll('.trace-block-card'));
+      let activeNetwork = 'all';
+
+      const applyTraceFilter = () => {
+        const query = (traceSearchInput?.value || '').trim().toLowerCase();
+        let visibleCount = 0;
+
+        traceCards.forEach((card) => {
+          const network = card.getAttribute('data-network') || '';
+          const text = card.textContent ? card.textContent.toLowerCase() : '';
+          const matchesNetwork = activeNetwork === 'all' || network === activeNetwork;
+          const matchesQuery = query === '' || text.includes(query);
+          const isVisible = matchesNetwork && matchesQuery;
+          card.classList.toggle('is-hidden', !isVisible);
+          if (isVisible) visibleCount += 1;
+        });
+
+        if (traceNoDataMessageByFilter) {
+          traceNoDataMessageByFilter.classList.toggle('d-none', visibleCount > 0 || traceCards.length === 0);
+        }
+        if (traceVisibleCounter) {
+          traceVisibleCounter.textContent = `Bloques visibles: ${visibleCount}`;
+        }
+      };
+
+      traceFilterButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          activeNetwork = button.getAttribute('data-trace-network') || 'all';
+          traceFilterButtons.forEach((other) => other.classList.remove('active'));
+          button.classList.add('active');
+          applyTraceFilter();
+        });
+      });
+
+      if (traceSearchInput) {
+        traceSearchInput.addEventListener('input', applyTraceFilter);
+      }
+
+      // Permite limpiar rápidamente filtros visuales cuando se abre el detalle de un bloque.
+      resetTraceCardFilters = () => {
+        activeNetwork = 'all';
+        if (traceSearchInput) {
+          traceSearchInput.value = '';
+        }
+        traceFilterButtons.forEach((other) => {
+          other.classList.toggle('active', (other.getAttribute('data-trace-network') || 'all') === 'all');
+        });
+        applyTraceFilter();
+      };
+
+      applyTraceFilter();
+    }
+
+    // Modal de detalle por tarjeta: permite inspeccionar un bloque sin salir del tablero.
+    const traceBlockDetailModalEl = document.getElementById('traceBlockDetailModal');
+    if (traceBlockDetailModalEl && window.bootstrap) {
+      // Se reubica en <body> para evitar problemas de posicionamiento cuando el contenedor padre
+      // tiene transformaciones CSS (por ejemplo, animaciones en main).
+      if (traceBlockDetailModalEl.parentElement !== document.body) {
+        document.body.appendChild(traceBlockDetailModalEl);
+      }
+      // Se abre sin backdrop para evitar el efecto de "pantalla gris" que bloquea la vista.
+      const traceBlockDetailModal = new bootstrap.Modal(traceBlockDetailModalEl, {
+        backdrop: false,
+        keyboard: true,
+        focus: true
+      });
+      const traceViewButtons = Array.from(document.querySelectorAll('.trace-block-view-btn'));
+      const traceDetailNetworkBadge = document.getElementById('traceDetailNetworkBadge');
+      const traceDetailStatusBadge = document.getElementById('traceDetailStatusBadge');
+      const traceDetailLoading = document.getElementById('traceDetailLoading');
+      const traceDetailError = document.getElementById('traceDetailError');
+      const traceDetailContent = document.getElementById('traceDetailContent');
+      const traceDetailOperation = document.getElementById('traceDetailOperation');
+      const traceDetailEvent = document.getElementById('traceDetailEvent');
+      const traceDetailBlockRef = document.getElementById('traceDetailBlockRef');
+      const traceDetailDocument = document.getElementById('traceDetailDocument');
+      const traceDetailIssuer = document.getElementById('traceDetailIssuer');
+      const traceDetailPerson = document.getElementById('traceDetailPerson');
+      const traceDetailIdentity = document.getElementById('traceDetailIdentity');
+      const traceDetailNotes = document.getElementById('traceDetailNotes');
+      const traceDetailRawJson = document.getElementById('traceDetailRawJson');
+      const traceDetailCopyRefBtn = document.getElementById('traceDetailCopyRefBtn');
+      // Selectores del resumen humano (capa de lectura rápida en el modal).
+      const traceSummaryWhat = document.getElementById('traceSummaryWhat');
+      const traceSummaryWhen = document.getElementById('traceSummaryWhen');
+      const traceSummaryWho = document.getElementById('traceSummaryWho');
+      const traceSummaryDocument = document.getElementById('traceSummaryDocument');
+      const traceSummaryIssuer = document.getElementById('traceSummaryIssuer');
+      const traceSummaryStatus = document.getElementById('traceSummaryStatus');
+      // Acordeón del JSON técnico completo (se abre solo cuando el usuario lo requiere).
+      const traceRawCollapseEl = document.getElementById('traceRawCollapse');
+
+      const setText = (el, value, fallback = 'Sin dato') => {
+        if (!el) return;
+        const text = typeof value === 'string' ? value.trim() : '';
+        el.textContent = text !== '' ? text : fallback;
+      };
+
+      // Formatea payload técnico para mostrar JSON legible en modal.
+      const toPrettyJson = (value) => {
+        try {
+          return JSON.stringify(value ?? {}, null, 2);
+        } catch (_) {
+          return String(value ?? '');
+        }
+      };
+
+      // Actualiza color/estilo del badge de red según origen del bloque.
+      const normalizeNetworkBadge = (network) => {
+        if (!traceDetailNetworkBadge) return;
+        const networkText = typeof network === 'string' ? network.trim() : '';
+        traceDetailNetworkBadge.textContent = networkText || 'Sin red';
+        traceDetailNetworkBadge.className = 'badge rounded-pill';
+        if (networkText.toLowerCase() === 'fabric') {
+          traceDetailNetworkBadge.classList.add('text-bg-primary');
+        } else if (networkText.toLowerCase() === 'indy') {
+          traceDetailNetworkBadge.classList.add('text-bg-success');
+        } else {
+          traceDetailNetworkBadge.classList.add('text-bg-secondary');
+        }
+      };
+
+      // Máquina de estado simple del modal: loading / content / error.
+      const setModalState = (state, message) => {
+        if (traceDetailLoading) traceDetailLoading.classList.toggle('d-none', state !== 'loading');
+        if (traceDetailContent) traceDetailContent.classList.toggle('d-none', state !== 'content');
+        if (traceDetailError) {
+          traceDetailError.classList.toggle('d-none', state !== 'error');
+          traceDetailError.textContent = state === 'error' ? (message || 'No fue posible consultar el bloque.') : '';
+        }
+      };
+
+      // Pinta UI del modal combinando datos de backend y fallback de la tarjeta.
+      const applyDetailPayload = (payload, fallback) => {
+        const resolved = payload && payload.resolved ? payload.resolved : {};
+        const fallbackIdentity = [fallback.idType, fallback.idNumber].join(' ').trim();
+        const resolvedIdentity = [resolved.idType, resolved.idNumber].join(' ').trim();
+        // Se consolidan valores efectivos (backend o fallback) para pintar una sola fuente de verdad.
+        const resolvedNetwork = payload.network || fallback.network || 'Sin red';
+        const resolvedStatus = payload.status || fallback.status || 'Sin estado';
+        const resolvedOperation = payload.operation || fallback.operation || 'Registro de documento';
+        const resolvedEvent = payload.eventAt || fallback.event || 'Sin fecha';
+        const resolvedReference = payload.reference || fallback.reference;
+        const resolvedDocument = payload.documentTitle || fallback.documentTitle;
+        const resolvedIssuer = payload.issuer || fallback.issuer;
+        const resolvedPerson = payload.personLabel || fallback.person;
+
+        normalizeNetworkBadge(resolvedNetwork);
+        setText(traceDetailStatusBadge, resolvedStatus);
+        setText(traceDetailOperation, resolvedOperation);
+        setText(traceDetailEvent, resolvedEvent);
+        setText(traceDetailBlockRef, resolvedReference);
+        setText(traceDetailDocument, resolvedDocument);
+        setText(traceDetailIssuer, resolvedIssuer);
+        setText(traceDetailPerson, resolvedPerson);
+        setText(traceDetailIdentity, resolvedIdentity || fallbackIdentity);
+        setText(traceDetailNotes, payload.summary || fallback.detail || 'Sin resumen técnico');
+        setText(traceDetailRawJson, toPrettyJson(payload.raw || payload), '{}');
+
+        // Bloque de resumen "humano" para lectura rápida.
+        setText(traceSummaryWhat, resolvedOperation);
+        setText(traceSummaryWhen, resolvedEvent);
+        setText(traceSummaryWho, resolvedPerson);
+        setText(traceSummaryDocument, resolvedDocument);
+        setText(traceSummaryIssuer, resolvedIssuer);
+        setText(traceSummaryStatus, `${resolvedNetwork} · ${resolvedStatus}`);
+
+        if (traceDetailBlockRef) {
+          traceDetailBlockRef.title = (traceDetailBlockRef.textContent || '').trim();
+        }
+      };
+
+      traceViewButtons.forEach((button) => {
+        button.addEventListener('click', async () => {
+          if (typeof resetTraceCardFilters === 'function') {
+            resetTraceCardFilters();
+          }
+
+          // Snapshot local: permite abrir modal de inmediato mientras llega detalle completo.
+          const fallback = {
+            network: button.dataset.traceNetwork || '',
+            status: button.dataset.traceStatus || '',
+            event: button.dataset.traceEvent || '',
+            operation: button.dataset.traceOperation || '',
+            reference: button.dataset.traceBlockRef || '',
+            documentTitle: button.dataset.traceDocument || '',
+            issuer: button.dataset.traceIssuer || '',
+            person: button.dataset.tracePerson || '',
+            idType: button.dataset.traceIdType || '',
+            idNumber: button.dataset.traceIdNumber || '',
+            detail: button.dataset.traceDetail || ''
+          };
+
+          applyDetailPayload({
+            network: fallback.network,
+            status: fallback.status,
+            eventAt: fallback.event,
+            operation: fallback.operation,
+            reference: fallback.reference,
+            documentTitle: fallback.documentTitle,
+            issuer: fallback.issuer,
+            personLabel: fallback.person,
+            summary: fallback.detail,
+            raw: { loading: 'Consultando detalle técnico...' }
+          }, fallback);
+
+          // Siempre inicia con JSON contraído para no sobrecargar visualmente el modal.
+          if (traceRawCollapseEl && traceRawCollapseEl.classList.contains('show')) {
+            bootstrap.Collapse.getOrCreateInstance(traceRawCollapseEl, { toggle: false }).hide();
+          }
+
+          traceBlockDetailModal.show();
+
+          const params = new URLSearchParams();
+          params.set('network', fallback.network);
+          params.set('reference', fallback.reference);
+          if (fallback.idType && fallback.idType.toUpperCase() !== 'N/A') {
+            params.set('idType', fallback.idType);
+          }
+          if (fallback.idNumber && fallback.idNumber.toUpperCase() !== 'N/A') {
+            params.set('idNumber', fallback.idNumber);
+          }
+
+          setModalState('loading');
+          button.disabled = true;
+
+          try {
+            // Consulta backend que resuelve el bloque real (Fabric/Indy) por referencia.
+            const response = await fetch('/admin/reports/block-detail?' + params.toString(), {
+              method: 'GET',
+              credentials: 'same-origin',
+              cache: 'no-store',
+              headers: { 'Accept': 'application/json' }
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || (payload && payload.error)) {
+              throw new Error((payload && payload.error) || 'No fue posible consultar el detalle del bloque.');
+            }
+            applyDetailPayload(payload, fallback);
+            setModalState('content');
+          } catch (error) {
+            setModalState('error', error?.message || 'No fue posible consultar el detalle del bloque.');
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+
+      if (traceDetailCopyRefBtn && traceDetailBlockRef) {
+        traceDetailCopyRefBtn.addEventListener('click', async () => {
+          const blockRef = (traceDetailBlockRef.textContent || '').trim();
+          if (!blockRef || blockRef === 'Sin dato' || !navigator.clipboard) return;
+          try {
+            await navigator.clipboard.writeText(blockRef);
+            traceDetailCopyRefBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Referencia copiada';
+            window.setTimeout(() => {
+              traceDetailCopyRefBtn.innerHTML = '<i class="bi bi-copy me-1"></i>Copiar referencia';
+            }, 1600);
+          } catch (_) {
+            // Si el navegador bloquea clipboard, se conserva comportamiento sin romper flujo.
+          }
+        });
+      }
+    }
+
+    // Exportación de PDF con loader visible durante generación/descarga.
+    const pdfExportLinks = Array.from(document.querySelectorAll('a[data-cc-pdf-export="true"]'));
+    if (pdfExportLinks.length > 0) {
+      // Recupera nombre sugerido por Content-Disposition para conservar nomenclatura del backend.
+      const parseFilename = (contentDisposition) => {
+        if (!contentDisposition) return 'reporte.pdf';
+        const utfName = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+        if (utfName && utfName[1]) {
+          try {
+            return decodeURIComponent(utfName[1]).replace(/["']/g, '');
+          } catch (_) {
+            return utfName[1].replace(/["']/g, '');
+          }
+        }
+        const basicName = contentDisposition.match(/filename\s*=\s*"?([^";]+)"?/i);
+        return basicName && basicName[1] ? basicName[1].trim() : 'reporte.pdf';
+      };
+
+      pdfExportLinks.forEach((link) => {
+        link.addEventListener('click', async (event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          event.preventDefault();
+
+          const href = link.getAttribute('href');
+          if (!href) return;
+          if (link.classList.contains('disabled')) return;
+
+          link.classList.add('disabled');
+          link.setAttribute('aria-disabled', 'true');
+
+          if (window.CCDigitalLoader && typeof window.CCDigitalLoader.show === 'function') {
+            window.CCDigitalLoader.show('Generando PDF de reportes...');
+          }
+
+          try {
+            // Flujo recomendado para descargas con loader: fetch -> blob -> objectURL.
+            const response = await fetch(href, {
+              method: 'GET',
+              credentials: 'same-origin',
+              cache: 'no-store',
+            });
+            if (!response.ok) {
+              throw new Error('No fue posible generar el PDF.');
+            }
+            const filename = parseFilename(response.headers.get('Content-Disposition'));
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(objectUrl);
+          } catch (_) {
+            // Fallback: navegación directa si fetch falla por alguna política del navegador.
+            window.location.href = href;
+          } finally {
+            link.classList.remove('disabled');
+            link.removeAttribute('aria-disabled');
+            if (window.CCDigitalLoader && typeof window.CCDigitalLoader.hide === 'function') {
+              window.CCDigitalLoader.hide(true);
+            }
+          }
+        });
+      });
+    }
+
+    // Inicializa las gráficas solo si Chart.js está cargado y existe dataset embebido.
+    if (!window.Chart) return;
+    const dataHost = document.getElementById('reportChartData');
+    if (!dataHost) return;
+
+    const asInt = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    // Traduce datos renderizados por Thymeleaf a estructuras que consumen las gráficas.
+    const trendRows = Array.from(dataHost.querySelectorAll('.trend-point')).map((el) => ({
+      label: el.getAttribute('data-label') || '',
+      total: asInt(el.getAttribute('data-total')),
+      success: asInt(el.getAttribute('data-success')),
+      unsuccess: asInt(el.getAttribute('data-unsuccess')),
+      consulted: asInt(el.getAttribute('data-consulted')),
+      deposited: asInt(el.getAttribute('data-deposited'))
+    }));
+
+    const topDocs = Array.from(dataHost.querySelectorAll('.top-doc-point')).map((el) => ({
+      label: el.getAttribute('data-label') || 'Documento',
+      value: asInt(el.getAttribute('data-value'))
+    }));
+
+    const topIssuers = Array.from(dataHost.querySelectorAll('.top-issuer-point')).map((el) => ({
+      label: el.getAttribute('data-label') || 'Emisor',
+      value: asInt(el.getAttribute('data-value'))
+    }));
+
+    const totalSuccess = asInt(dataHost.getAttribute('data-success-total'));
+    const totalUnsuccess = asInt(dataHost.getAttribute('data-unsuccess-total'));
+
+    const trendLabels = trendRows.map((r) => r.label);
+    const trendTotals = trendRows.map((r) => r.total);
+    const trendConsulted = trendRows.map((r) => r.consulted);
+    const trendDeposited = trendRows.map((r) => r.deposited);
+    const trendSuccess = trendRows.map((r) => r.success);
+
+    const metricMap = {
+      consulted: { label: 'Documentos consultados', data: trendConsulted, color: '#1e66f5' },
+      deposited: { label: 'Documentos depositados', data: trendDeposited, color: '#0e9f6e' },
+      successful: { label: 'Solicitudes exitosas', data: trendSuccess, color: '#16a34a' }
+    };
+
+    // Gráfica mixta de tendencia: barras para volumen total y línea para métrica seleccionada.
+    const trendCanvas = document.getElementById('adminTrendChart');
+    if (trendCanvas && trendLabels.length > 0) {
+      const initialMetric = metricMap.consulted;
+      const trendChart = new Chart(trendCanvas, {
+        type: 'bar',
+        data: {
+          labels: trendLabels,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Solicitudes totales',
+              data: trendTotals,
+              backgroundColor: 'rgba(100, 116, 139, 0.35)',
+              borderColor: 'rgba(71, 85, 105, 0.85)',
+              borderWidth: 1,
+              yAxisID: 'y'
+            },
+            {
+              type: 'line',
+              label: initialMetric.label,
+              data: initialMetric.data,
+              borderColor: initialMetric.color,
+              backgroundColor: initialMetric.color,
+              borderWidth: 2,
+              pointRadius: 3,
+              pointHoverRadius: 4,
+              tension: 0.25,
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'bottom' }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 }
+            }
+          }
+        }
+      });
+
+      // Permite alternar la línea de tendencia sin recargar la página.
+      document.querySelectorAll('[data-trend-metric]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const metricKey = btn.getAttribute('data-trend-metric') || '';
+          const metric = metricMap[metricKey];
+          if (!metric) return;
+
+          document.querySelectorAll('[data-trend-metric]').forEach((other) => {
+            other.classList.remove('active');
+          });
+          btn.classList.add('active');
+
+          trendChart.data.datasets[1].label = metric.label;
+          trendChart.data.datasets[1].data = metric.data;
+          trendChart.data.datasets[1].borderColor = metric.color;
+          trendChart.data.datasets[1].backgroundColor = metric.color;
+          trendChart.update();
+        });
+      });
+    }
+
+    // Distribución general de éxito vs no éxito en solicitudes.
+    const successCanvas = document.getElementById('adminSuccessChart');
+    if (successCanvas) {
+      new Chart(successCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['Exitosas', 'No exitosas'],
+          datasets: [{
+            data: [totalSuccess, totalUnsuccess],
+            backgroundColor: ['#16a34a', '#dc2626'],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+    }
+
+    // Ranking horizontal de documentos más consultados.
+    const topDocsCanvas = document.getElementById('adminTopDocsChart');
+    if (topDocsCanvas && topDocs.length > 0) {
+      const labels = topDocs.slice(0, 7).map((x) => x.label);
+      const values = topDocs.slice(0, 7).map((x) => x.value);
+      new Chart(topDocsCanvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Consultas',
+            data: values,
+            backgroundColor: 'rgba(30, 102, 245, 0.7)',
+            borderColor: 'rgba(30, 102, 245, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    }
+
+    // Ranking horizontal de emisores con mayor volumen de solicitudes.
+    const topIssuersCanvas = document.getElementById('adminTopIssuersChart');
+    if (topIssuersCanvas && topIssuers.length > 0) {
+      const labels = topIssuers.slice(0, 7).map((x) => x.label);
+      const values = topIssuers.slice(0, 7).map((x) => x.value);
+      new Chart(topIssuersCanvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Solicitudes',
+            data: values,
+            backgroundColor: 'rgba(14, 159, 110, 0.7)',
+            borderColor: 'rgba(14, 159, 110, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    }
+
+  })();
+</script>
+</body>
+</html>

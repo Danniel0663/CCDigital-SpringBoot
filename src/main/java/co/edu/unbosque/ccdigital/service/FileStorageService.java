@@ -15,6 +15,7 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.Normalizer;
+import java.util.Objects;
 
 /**
  * Servicio encargado del almacenamiento y recuperación de archivos en el sistema de archivos local.
@@ -235,7 +236,7 @@ public class FileStorageService {
      */
     public Resource loadAsResource(FileRecord fileRecord) {
         Path path = resolvePath(fileRecord);
-        return new FileSystemResource(path);
+        return new FileSystemResource(Objects.requireNonNull(path));
     }
 
     /**

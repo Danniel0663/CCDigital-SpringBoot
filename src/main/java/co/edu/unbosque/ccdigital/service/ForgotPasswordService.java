@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -189,8 +190,9 @@ public class ForgotPasswordService {
             return false;
         }
 
-        match.user.setPasswordHash(passwordEncoder.encode(passwordNorm));
-        appUserRepository.save(match.user);
+        AppUser matchedUser = Objects.requireNonNull(match.user());
+        matchedUser.setPasswordHash(passwordEncoder.encode(passwordNorm));
+        appUserRepository.save(matchedUser);
 
         challengesByEmail.remove(emailNorm);
         return true;

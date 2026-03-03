@@ -5,8 +5,12 @@ import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 /**
  * Proyección de un documento consultado en Hyperledger Fabric para visualización en la UI.
@@ -48,6 +52,8 @@ public record FabricDocView(
      * zona horaria (por ejemplo, UTC en el IDE o en despliegues).</p>
      */
     private static final ZoneId UI_ZONE = ZoneId.of("America/Bogota");
+    private static final DateTimeFormatter UI_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+            .withZone(UI_ZONE);
 
 
     /**
@@ -70,12 +76,46 @@ public record FabricDocView(
     public String createdAtHuman() {
         if (createdAt == null || createdAt.isBlank()) return "No disponible";
         try {
-            Instant inst = Instant.parse(createdAt);
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                    .withZone(UI_ZONE);
-            return fmt.format(inst);
+            Instant instant = parseCreatedAtToInstant(createdAt);
+            if (instant == null) {
+                return createdAt;
+            }
+            return UI_DATE_TIME.format(instant);
         } catch (Exception e) {
             return createdAt;
+        }
+    }
+
+    /**
+     * Interpreta timestamps de Fabric con y sin zona horaria.
+     *
+     * <p>Cuando llega un valor sin offset (ej. {@code 2026-03-02T18:34:56}), se asume UTC
+     * para mantener consistencia con las marcas temporales on-chain y evitar desfases en UI.</p>
+     */
+    private static Instant parseCreatedAtToInstant(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        String raw = rawValue.trim();
+
+        try {
+            return OffsetDateTime.parse(raw).toInstant();
+        } catch (DateTimeParseException ignored) {
+            // Puede llegar en formato Instant puro.
+        }
+
+        try {
+            return Instant.parse(raw);
+        } catch (DateTimeParseException ignored) {
+            // Puede llegar sin zona horaria.
+        }
+
+        try {
+            String normalized = raw.replace(' ', 'T');
+            LocalDateTime utcDateTime = LocalDateTime.parse(normalized);
+            return utcDateTime.atOffset(ZoneOffset.UTC).toInstant();
+        } catch (DateTimeParseException ignored) {
+            return null;
         }
     }
 

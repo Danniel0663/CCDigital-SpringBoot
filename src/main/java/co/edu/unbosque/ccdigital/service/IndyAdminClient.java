@@ -54,8 +54,10 @@ public class IndyAdminClient {
      */
     public JsonNode get(String baseUrl, String path) {
         String url = normalize(baseUrl) + path;
-        HttpEntity<Void> entity = new HttpEntity<>(buildHeaders());
-        ResponseEntity<String> res = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+        HttpHeaders headers = buildHeaders();
+        HttpEntity<Void> entity = new HttpEntity<>(Objects.requireNonNull(headers));
+        HttpMethod getMethod = Objects.requireNonNull(HttpMethod.GET);
+        ResponseEntity<String> res = restTemplate.exchange(url, getMethod, entity, String.class);
         return readJson(Objects.requireNonNull(res.getBody()));
     }
 
@@ -81,7 +83,8 @@ public class IndyAdminClient {
         }
 
         HttpEntity<String> entity = new HttpEntity<>(payload, headers);
-        ResponseEntity<String> res = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+        HttpMethod postMethod = Objects.requireNonNull(HttpMethod.POST);
+        ResponseEntity<String> res = restTemplate.exchange(url, postMethod, entity, String.class);
         return readJson(Objects.requireNonNull(res.getBody()));
     }
 

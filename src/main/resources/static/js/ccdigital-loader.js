@@ -102,6 +102,40 @@
     });
   }
 
+  function bindActionClicks(selector = 'a[data-cc-loader], button[data-cc-loader]') {
+    document.querySelectorAll(selector).forEach((actionEl) => {
+      if (actionEl.dataset.ccLoaderActionBound === 'true') return;
+      actionEl.dataset.ccLoaderActionBound = 'true';
+
+      // Soporta loader en acciones de navegación (links/botones) además de formularios.
+      actionEl.addEventListener('click', (event) => {
+        if (actionEl.disabled) return;
+
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+          return;
+        }
+
+        if (actionEl.tagName === 'A') {
+          const href = actionEl.getAttribute('href') || '';
+          const target = actionEl.getAttribute('target') || '';
+          if (!href || href === '#' || href.startsWith('javascript:') || target === '_blank') {
+            return;
+          }
+        }
+
+        const msg = actionEl.dataset.ccLoaderMessage || 'Procesando solicitud...';
+        if (actionEl.tagName === 'BUTTON') {
+          setButtonBusy(
+            actionEl,
+            true,
+            '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...'
+          );
+        }
+        show(msg);
+      });
+    });
+  }
+
   function bindProfileToggles(selector = '[data-cc-profile-toggle], [data-cc-panel-toggle]') {
     document.querySelectorAll(selector).forEach((trigger) => {
       if (trigger.dataset.ccProfileToggleBound === 'true') return;
@@ -145,22 +179,148 @@
     });
   }
 
+  function resolveIdleSessionConfig() {
+    const path = window.location.pathname || '';
+    if (path === '/user' || path.startsWith('/user/')) {
+      return {
+        keepaliveUrl: '/user/session/keepalive',
+        expireUrl: '/user/session/expire',
+        loginUrl: '/login/user?expired=true',
+      };
+    }
+    if (path === '/issuer' || path.startsWith('/issuer/')) {
+      return {
+        keepaliveUrl: '/issuer/session/keepalive',
+        expireUrl: '/issuer/session/expire',
+        loginUrl: '/login/issuer?expired=true',
+      };
+    }
+    if (path === '/admin' || path.startsWith('/admin/')) {
+      return {
+        keepaliveUrl: '/admin/session/keepalive',
+        expireUrl: '/admin/session/expire',
+        loginUrl: '/login/admin?expired=true',
+      };
+    }
+    return null;
+  }
+
+  function bindIdleSessionTimeout() {
+    if (window.__ccIdleTimeoutBound === true) return;
+    const config = resolveIdleSessionConfig();
+    if (!config) return;
+    window.__ccIdleTimeoutBound = true;
+
+    // Timeout estricto por inactividad: solo se reinicia con actividad real del usuario.
+    const IDLE_LIMIT_MS = 5 * 60 * 1000;
+    const HEARTBEAT_INTERVAL_MS = 60 * 1000;
+    const TICK_INTERVAL_MS = 15 * 1000;
+    const THROTTLE_ACTIVITY_MS = 800;
+
+    let lastActivityAt = Date.now();
+    let lastHeartbeatAt = 0;
+    let lastMouseMoveAt = 0;
+    let expiring = false;
+
+    const markActivity = () => {
+      if (expiring) return;
+      lastActivityAt = Date.now();
+    };
+
+    const markMouseMoveActivity = () => {
+      const now = Date.now();
+      if (now - lastMouseMoveAt < THROTTLE_ACTIVITY_MS) return;
+      lastMouseMoveAt = now;
+      markActivity();
+    };
+
+    const passiveOpts = { passive: true };
+    window.addEventListener('mousedown', markActivity, passiveOpts);
+    window.addEventListener('keydown', markActivity, passiveOpts);
+    window.addEventListener('touchstart', markActivity, passiveOpts);
+    window.addEventListener('scroll', markActivity, passiveOpts);
+    window.addEventListener('wheel', markActivity, passiveOpts);
+    window.addEventListener('mousemove', markMouseMoveActivity, passiveOpts);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) markActivity();
+    });
+
+    const sendKeepalive = async () => {
+      try {
+        await fetch(config.keepaliveUrl, {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+      } catch (_) {
+        // Si falla, no interrumpimos UI; el timeout del backend seguirá aplicando.
+      }
+    };
+
+    const expireNow = async () => {
+      if (expiring) return;
+      expiring = true;
+      show('Sesión expirada por inactividad. Redirigiendo al login...');
+
+      try {
+        await fetch(config.expireUrl, {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+      } catch (_) {
+        // Si falla la invalidación explícita, se fuerza redirección a login expirado.
+      } finally {
+        window.location.href = config.loginUrl;
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (expiring) return;
+      const now = Date.now();
+      const idleForMs = now - lastActivityAt;
+
+      if (idleForMs >= IDLE_LIMIT_MS) {
+        expireNow();
+        return;
+      }
+
+      // Heartbeat periódico solo si hubo actividad reciente; no mantiene sesión en estado inactivo.
+      if (now - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS && idleForMs < HEARTBEAT_INTERVAL_MS) {
+        lastHeartbeatAt = now;
+        sendKeepalive();
+      }
+    }, TICK_INTERVAL_MS);
+
+    window.addEventListener('beforeunload', () => {
+      window.clearInterval(intervalId);
+    }, { once: true });
+  }
+
   window.CCDigitalLoader = {
     show,
     hide,
     update,
     setButtonBusy,
     bindFormSubmits,
+    bindActionClicks,
     bindProfileToggles,
+    bindIdleSessionTimeout,
   };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       bindFormSubmits();
+      bindActionClicks();
       bindProfileToggles();
+      bindIdleSessionTimeout();
     });
   } else {
     bindFormSubmits();
+    bindActionClicks();
     bindProfileToggles();
+    bindIdleSessionTimeout();
   }
 })();

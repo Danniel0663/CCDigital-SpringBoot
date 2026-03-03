@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -60,7 +60,73 @@
     }
 
     .cc-gov-strip .container{
-      min-height: 38px;
+      min-height: 58px;
+      padding-top: .4rem;
+      padding-bottom: .4rem;
+      gap: .8rem;
+    }
+
+    .cc-gov-meta{
+      display: flex;
+      flex-direction: column;
+      gap: .15rem;
+      min-width: 0;
+    }
+
+    .cc-gov-meta-title{
+      font-weight: 800;
+      letter-spacing: .01em;
+      font-size: .88rem;
+      line-height: 1.15;
+    }
+
+    .cc-gov-meta-sub{
+      font-size: .76rem;
+      line-height: 1.25;
+      opacity: .96;
+    }
+
+    .cc-gov-meta-code{
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 999px;
+      padding: .12rem .5rem;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .03em;
+      background: rgba(255,255,255,.08);
+    }
+
+    .cc-gov-logo{
+      width: 136px;
+      max-width: 34vw;
+      height: auto;
+      border-radius: .45rem;
+      border: 1px solid rgba(255,255,255,.4);
+      background: #fff;
+      object-fit: contain;
+      padding: .2rem;
+      box-shadow: 0 8px 18px rgba(0,0,0,.18);
+    }
+
+    @media (max-width: 575.98px){
+      .cc-gov-strip .container{
+        min-height: 70px;
+      }
+      .cc-gov-meta-title{
+        font-size: .82rem;
+      }
+      .cc-gov-meta-sub{
+        font-size: .72rem;
+      }
+      .cc-gov-meta-code{
+        font-size: .68rem;
+      }
+      .cc-gov-logo{
+        width: 104px;
+      }
     }
 
     .cc-landing-nav{
@@ -367,6 +433,16 @@
       font-size: .88rem;
     }
 
+    .footer-copyright{
+      margin-top: .9rem;
+      padding-top: .75rem;
+      border-top: 1px solid rgba(15,23,42,.10);
+      color: #667085;
+      font-size: .8rem;
+      line-height: 1.35;
+      text-align: center;
+    }
+
     @media (min-width: 992px) {
       .hero-card{ padding: 1.25rem; }
       .module-grid{ grid-template-columns: repeat(3, 1fr); }
@@ -376,10 +452,22 @@
 </head>
 
 <body class="cc-landing">
+<!-- Franja institucional superior con autores/director/código de proyecto y logo universitario. -->
 <div class="cc-gov-strip">
   <div class="container d-flex align-items-center justify-content-between">
-    <span><i class="bi bi-building-check me-2"></i>Plataforma académica de ciudadanía digital</span>
-    <span class="d-none d-md-inline">Gestión segura de documentos y trazabilidad con tecnologías descentralizadas</span>
+    <div class="cc-gov-meta">
+      <div class="cc-gov-meta-title">
+        <i class="bi bi-building-check me-2"></i>Proyecto investigativo de Danniel Alejandro Parra Chavarro y Yeison Hernadez Huertas
+      </div>
+      <div class="cc-gov-meta-sub">
+        Con la guía del director Leonardo Juan Ramirez Lopez
+      </div>
+      <span class="cc-gov-meta-code">AUX_2025-02-02</span>
+    </div>
+    <img class="cc-gov-logo"
+         src="/LogoUniversidad/Logo-u-bosque-01.jpg"
+         th:src="@{/LogoUniversidad/Logo-u-bosque-01.jpg}"
+         alt="Logo Universidad El Bosque">
   </div>
 </div>
 
@@ -602,6 +690,11 @@
           <a href="/login/issuer" class="btn btn-sm btn-outline-secondary">Emisor</a>
           <a href="/login/admin" class="btn btn-sm btn-outline-dark">Admin</a>
         </div>
+      </div>
+      <!-- Aviso legal/copyright del proyecto. -->
+      <div class="footer-copyright">
+        &copy; 2026 CCDigital. Todos los derechos reservados.<br>
+        Proyecto investigativo AUX_2025-02-02.
       </div>
     </footer>
   </div>

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Servicio de negocio para la gestión de entidades emisoras ({@link IssuingEntity}).
@@ -71,7 +72,10 @@ public class IssuingEntityService {
      * @throws IllegalArgumentException si no existe un emisor con el id indicado
      */
     public IssuingEntity getById(Long id) {
-        return repo.findById(id)
+        if (id == null) {
+            throw new IllegalArgumentException("Id de emisor es obligatorio");
+        }
+        return repo.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new IllegalArgumentException("Emisor no encontrado"));
     }
 

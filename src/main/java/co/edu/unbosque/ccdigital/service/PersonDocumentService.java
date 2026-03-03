@@ -9,8 +9,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Servicio de negocio para la gestión de documentos asociados a personas ({@link PersonDocument}).
@@ -102,12 +105,23 @@ public class PersonDocumentService {
      */
     @Transactional
     public PersonDocument create(PersonDocumentRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request de documento es obligatorio");
+        }
+        Long requestPersonId = request.getPersonId();
+        if (requestPersonId == null) {
+            throw new IllegalArgumentException("personId es obligatorio");
+        }
+        Long requestDocumentId = request.getDocumentId();
+        if (requestDocumentId == null) {
+            throw new IllegalArgumentException("documentId es obligatorio");
+        }
 
-        Person person = personRepository.findById(request.getPersonId())
+        Person person = personRepository.findById(Objects.requireNonNull(requestPersonId))
                 .orElseThrow(() -> new IllegalArgumentException("Persona no encontrada"));
 
-        DocumentDefinition def = documentDefinitionService.findById(request.getDocumentId())
-                .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + request.getDocumentId()));
+        DocumentDefinition def = documentDefinitionService.findById(requestDocumentId)
+                .orElseThrow(() -> new IllegalArgumentException("Documento no encontrado: " + requestDocumentId));
 
         IssuingEntity issuer = issuingEntityService.resolveEmitterByName(def.getIssuingEntity());
 
@@ -183,6 +197,8 @@ public class PersonDocumentService {
         if (personId == null) throw new IllegalArgumentException("personId es obligatorio");
         if (documentId == null) throw new IllegalArgumentException("documentId es obligatorio");
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("Archivo obligatorio");
+        // Regla de seguridad del módulo emisor: solo se permite PDF.
+        if (!isPdfFile(file)) throw new IllegalArgumentException("Solo se permite subir archivos PDF.");
 
         IssuingEntity issuer = issuingEntityService.getById(issuerId);
 
@@ -214,7 +230,8 @@ public class PersonDocumentService {
 
         FileStorageService.StoredFileInfo info = fileStorageService.storePersonFile(person, file);
 
-        String mime = (file.getContentType() != null) ? file.getContentType() : "application/octet-stream";
+        // Al validar y almacenar solo PDF, se fija MIME canónico.
+        String mime = "application/pdf";
 
         FileRecord fr = new FileRecord();
         fr.setDocument(def);
@@ -233,6 +250,45 @@ public class PersonDocumentService {
         issuingEntityService.ensureIssuerHasDocument(issuer, def.getId());
 
         return savedPd;
+    }
+
+    /**
+     * Valida que el archivo recibido sea un PDF real.
+     *
+     * <p>Se verifica por:
+     * <ul>
+     *   <li>Extensión/mime declarados por el cliente</li>
+     *   <li>Firma binaria inicial {@code %PDF}</li>
+     * </ul>
+     * De esta forma no se depende solo de la extensión del nombre.</p>
+     *
+     * @param file archivo multipart recibido
+     * @return {@code true} si el archivo cumple validación PDF
+     */
+    private boolean isPdfFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) return false;
+
+        String originalName = file.getOriginalFilename();
+        String normalizedName = originalName == null ? "" : originalName.trim().toLowerCase(Locale.ROOT);
+        boolean hasPdfExtension = normalizedName.endsWith(".pdf");
+
+        String contentType = file.getContentType();
+        String normalizedMime = contentType == null ? "" : contentType.trim().toLowerCase(Locale.ROOT);
+        boolean hasPdfMime = normalizedMime.contains("pdf");
+
+        boolean hasPdfSignature;
+        try (var in = file.getInputStream()) {
+            byte[] header = in.readNBytes(4);
+            hasPdfSignature = header.length == 4
+                    && header[0] == '%'
+                    && header[1] == 'P'
+                    && header[2] == 'D'
+                    && header[3] == 'F';
+        } catch (IOException ex) {
+            return false;
+        }
+
+        return hasPdfSignature && (hasPdfExtension || hasPdfMime);
     }
 
     /**
@@ -264,8 +320,14 @@ public class PersonDocumentService {
                                           java.time.LocalDate issueDate,
                                           java.time.LocalDate expiryDate,
                                           MultipartFile file) {
+        if (personId == null) {
+            throw new IllegalArgumentException("personId es obligatorio");
+        }
+        if (documentId == null) {
+            throw new IllegalArgumentException("documentId es obligatorio");
+        }
 
-        Person person = personRepository.findById(personId)
+        Person person = personRepository.findById(Objects.requireNonNull(personId))
                 .orElseThrow(() -> new IllegalArgumentException("Persona no encontrada"));
 
         DocumentDefinition def = documentDefinitionService.findById(documentId)
@@ -324,8 +386,11 @@ public class PersonDocumentService {
      */
     @Transactional
     public void review(Long personDocumentId, ReviewStatus status, String notes) {
+        if (personDocumentId == null) {
+            throw new IllegalArgumentException("personDocumentId es obligatorio");
+        }
 
-        PersonDocument pd = personDocumentRepository.findById(personDocumentId)
+        PersonDocument pd = personDocumentRepository.findById(Objects.requireNonNull(personDocumentId))
                 .orElseThrow(() -> new IllegalArgumentException("PersonDocument no encontrado"));
 
         pd.setReviewStatus(status != null ? status : ReviewStatus.PENDING);

@@ -10,6 +10,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
+
 /**
  * Servicio de negocio para registro de cuentas de usuario final.
  *
@@ -110,7 +112,7 @@ public class UserAccountService {
         }
         if (!isStrongEnoughPassword(rawPasswordValue)) {
             throw new IllegalArgumentException(
-                    "La contraseña debe tener mínimo 8 caracteres e incluir letras y números."
+                    "La contraseña debe tener mínimo 8 caracteres e incluir letras, números y un carácter especial."
             );
         }
 
@@ -125,8 +127,10 @@ public class UserAccountService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No existe una persona registrada con ese tipo y número de identificación."
                 ));
+        Long personId = requirePersonId(person);
 
-        appUserRepository.findById(person.getId()).ifPresent(existingUser -> {
+        Long safePersonId = Objects.requireNonNull(personId);
+        appUserRepository.findById(safePersonId).ifPresent(existingUser -> {
             throw new IllegalArgumentException(
                     "Ya existe un usuario asociado a esta persona (correo: "
                             + normalize(existingUser.getEmail())
@@ -137,7 +141,7 @@ public class UserAccountService {
         });
 
         appUserRepository.findByEmailIgnoreCase(emailValue).ifPresent(existing -> {
-            if (!existing.getPersonId().equals(person.getId())) {
+            if (!Objects.equals(existing.getPersonId(), safePersonId)) {
                 throw new IllegalArgumentException("El correo ingresado ya está en uso por otro usuario.");
             }
         });
@@ -146,15 +150,23 @@ public class UserAccountService {
         updateContactDataIfChanged(person, emailValue, phoneValue, birthdateValue);
 
         AppUser user = new AppUser();
-        user.setPersonId(person.getId());
+        user.setPersonId(safePersonId);
         user.setFullName(buildFullName(person));
         user.setEmail(emailValue);
         user.setPasswordHash(encoder.encode(rawPasswordValue));
         user.setRole(USER_ROLE);
         user.setIsActive(Boolean.TRUE);
 
-        personRepository.saveAndFlush(person);
+        personRepository.saveAndFlush(Objects.requireNonNull(person));
         return appUserRepository.save(user);
+    }
+
+    private Long requirePersonId(Person person) {
+        Long personId = person == null ? null : person.getId();
+        if (personId == null) {
+            throw new IllegalStateException("La persona no tiene identificador persistido.");
+        }
+        return personId;
     }
 
     private String buildFullName(Person person) {
@@ -215,7 +227,7 @@ public class UserAccountService {
     /**
      * Aplica la misma regla de complejidad usada en el flujo de restablecimiento de contraseña.
      *
-     * <p>Regla mínima: 8 caracteres, con al menos una letra y un número.</p>
+     * <p>Regla mínima: 8 caracteres, con al menos una letra, un número y un carácter especial.</p>
      *
      * @param pwd contraseña normalizada
      * @return {@code true} si cumple la política mínima
@@ -225,10 +237,12 @@ public class UserAccountService {
         if (pwd.length() < 8) return false;
         boolean hasLetter = false;
         boolean hasDigit = false;
+        boolean hasSpecial = false;
         for (char c : pwd.toCharArray()) {
             if (Character.isLetter(c)) hasLetter = true;
             if (Character.isDigit(c)) hasDigit = true;
+            if (!Character.isLetterOrDigit(c)) hasSpecial = true;
         }
-        return hasLetter && hasDigit;
+        return hasLetter && hasDigit && hasSpecial;
     }
 }

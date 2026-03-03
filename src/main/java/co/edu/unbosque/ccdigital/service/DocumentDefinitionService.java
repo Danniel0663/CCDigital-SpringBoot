@@ -73,6 +73,9 @@ public class DocumentDefinitionService {
      * @return {@link Optional} con la definición si existe; vacío si no existe
      */
     public Optional<DocumentDefinition> findById(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id de definición es requerido.");
+        }
         return repository.findById(id);
     }
 
@@ -86,6 +89,9 @@ public class DocumentDefinitionService {
      * @return definición persistida (con id asignado si era nuevo)
      */
     public DocumentDefinition save(DocumentDefinition def) {
+        if (def == null) {
+            throw new IllegalArgumentException("La definición de documento es requerida.");
+        }
         return repository.save(def);
     }
 }

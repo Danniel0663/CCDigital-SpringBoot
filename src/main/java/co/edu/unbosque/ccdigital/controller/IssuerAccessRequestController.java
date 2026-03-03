@@ -9,7 +9,9 @@ import co.edu.unbosque.ccdigital.service.SignedUrlService;
 import co.edu.unbosque.ccdigital.repository.PersonDocumentRepository;
 import co.edu.unbosque.ccdigital.repository.PersonRepository;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
@@ -19,8 +21,11 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Controlador del módulo Emisor para gestionar solicitudes de acceso a documentos.
@@ -229,10 +234,10 @@ public class IssuerAccessRequestController {
             model.addAttribute("error", ex.getMessage());
 
             // Recargar la persona y sus documentos para volver a mostrar la pantalla completa
-            Person person = personRepository.findById(personId).orElse(null);
+            Person person = personId == null ? null : personRepository.findById(personId).orElse(null);
             model.addAttribute("person", person);
             model.addAttribute("personDocuments",
-                    person != null
+                    person != null && personId != null
                             ? personDocumentRepository.findApprovedByPersonIdWithFiles(personId)
                             : Collections.emptyList()
             );
@@ -270,14 +275,158 @@ public class IssuerAccessRequestController {
             @RequestParam("exp") Long exp,
             @RequestParam("sig") String sig
     ) {
+        return serveDocument(auth, requestId, personDocumentId, exp, sig, false);
+    }
+
+    /**
+     * Valida (sin transferir archivo) si un documento puede abrirse en vista previa.
+     *
+     * <p>Se usa desde la UI del emisor antes de cargar el iframe para evitar que una solicitud
+     * vencida termine renderizando una página completa dentro del visor.</p>
+     *
+     * @param auth autenticación del emisor
+     * @param requestId ID de la solicitud
+     * @param personDocumentId ID del documento solicitado
+     * @param exp expiración de URL firmada (epoch seconds)
+     * @param sig firma HMAC de la URL
+     * @return 200 si puede abrirse; 410 con encabezado de error si no aplica
+     */
+    @RequestMapping(
+            value = "/issuer/access-requests/{requestId}/documents/{personDocumentId}/view",
+            method = RequestMethod.HEAD
+    )
+    public ResponseEntity<Void> checkViewDocument(
+            Authentication auth,
+            @PathVariable Long requestId,
+            @PathVariable Long personDocumentId,
+            @RequestParam("exp") Long exp,
+            @RequestParam("sig") String sig
+    ) {
         IssuerPrincipal issuer = (IssuerPrincipal) auth.getPrincipal();
         signedUrlService.validateIssuerDocumentView(requestId, personDocumentId, exp, sig);
+        try {
+            // Validación técnica previa para la UI (HEAD): no registra auditoría para evitar duplicados.
+            accessRequestService.loadApprovedDocumentResource(
+                    issuer.getIssuerId(),
+                    requestId,
+                    personDocumentId,
+                    "DOC_VIEW_PRECHECK",
+                    false
+            );
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .build();
+        } catch (IllegalArgumentException ex) {
+            String encodedMessage = java.net.URLEncoder.encode(ex.getMessage(), StandardCharsets.UTF_8);
+            return ResponseEntity.status(HttpStatus.GONE)
+                    .cacheControl(CacheControl.noStore())
+                    .header("X-CCDigital-Error", encodedMessage)
+                    .build();
+        }
+    }
 
-        // Carga el recurso solo si la solicitud está aprobada y corresponde al emisor
+    /**
+     * Permite descargar un documento solicitado cuando la solicitud ya fue aprobada.
+     *
+     * @param auth autenticación del emisor
+     * @param requestId ID de la solicitud
+     * @param personDocumentId ID del documento solicitado
+     * @param exp expiración de URL firmada (epoch seconds)
+     * @param sig firma HMAC de la URL
+     * @return respuesta con archivo en modo attachment
+     */
+    @GetMapping("/issuer/access-requests/{requestId}/documents/{personDocumentId}/download")
+    public ResponseEntity<?> downloadDocument(
+            Authentication auth,
+            @PathVariable Long requestId,
+            @PathVariable Long personDocumentId,
+            @RequestParam("exp") Long exp,
+            @RequestParam("sig") String sig
+    ) {
+        return serveDocument(auth, requestId, personDocumentId, exp, sig, true);
+    }
+
+    /**
+     * Retorna metadatos de trazabilidad blockchain del documento autorizado (JSON para modal interactivo).
+     *
+     * <p>Usa URL firmada y validaciones de negocio del servicio para asegurar que solo el emisor
+     * propietario de la solicitud aprobada pueda consultar la referencia de bloque.</p>
+     *
+     * @param auth autenticación del emisor
+     * @param requestId id de la solicitud
+     * @param personDocumentId id del documento solicitado
+     * @param exp expiración de URL firmada (epoch seconds)
+     * @param sig firma HMAC de la URL
+     * @return respuesta JSON con detalle de bloque o error de negocio controlado
+     */
+    @GetMapping("/issuer/access-requests/{requestId}/documents/{personDocumentId}/block")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> blockDetail(
+            Authentication auth,
+            @PathVariable Long requestId,
+            @PathVariable Long personDocumentId,
+            @RequestParam("exp") Long exp,
+            @RequestParam("sig") String sig
+    ) {
+        IssuerPrincipal issuer = (IssuerPrincipal) auth.getPrincipal();
+        signedUrlService.validateIssuerDocumentBlock(requestId, personDocumentId, exp, sig);
+
+        try {
+            AccessRequestService.DocumentBlockchainTrace trace = accessRequestService
+                    .loadApprovedDocumentBlockchainTrace(issuer.getIssuerId(), requestId, personDocumentId);
+
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("requestId", requestId);
+            payload.put("personDocumentId", personDocumentId);
+            payload.put("network", trace.network());
+            payload.put("blockReference", trace.blockReference());
+            payload.put("documentTitle", trace.documentTitle());
+            payload.put("issuingEntity", trace.issuingEntity());
+            payload.put("status", trace.status());
+            payload.put("createdAtHuman", trace.createdAtHuman());
+            payload.put("sizeHuman", trace.sizeHuman());
+            payload.put("fileName", trace.fileName());
+            payload.put("filePath", trace.filePath());
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(payload);
+        } catch (IllegalArgumentException ex) {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("error", ex.getMessage());
+            payload.put("requestId", requestId);
+            payload.put("personDocumentId", personDocumentId);
+            return ResponseEntity.status(HttpStatus.GONE)
+                    .cacheControl(CacheControl.noStore())
+                    .body(payload);
+        }
+    }
+
+    /**
+     * Resuelve y sirve el documento autorizado en modo vista o descarga.
+     */
+    private ResponseEntity<?> serveDocument(Authentication auth,
+                                           Long requestId,
+                                           Long personDocumentId,
+                                           Long exp,
+                                           String sig,
+                                           boolean asAttachment) {
+        IssuerPrincipal issuer = (IssuerPrincipal) auth.getPrincipal();
+        if (asAttachment) {
+            signedUrlService.validateIssuerDocumentDownload(requestId, personDocumentId, exp, sig);
+        } else {
+            signedUrlService.validateIssuerDocumentView(requestId, personDocumentId, exp, sig);
+        }
+
         final Resource resource;
         try {
+            // Carga el recurso solo si la solicitud está aprobada y corresponde al emisor.
+            // En GET real sí se registra auditoría on-chain con evento diferenciado (ver/descargar).
             resource = accessRequestService.loadApprovedDocumentResource(
-                    issuer.getIssuerId(), requestId, personDocumentId
+                    issuer.getIssuerId(),
+                    requestId,
+                    personDocumentId,
+                    asAttachment ? "DOC_DOWNLOAD_GRANTED" : "DOC_VIEW_GRANTED",
+                    true
             );
         } catch (IllegalArgumentException ex) {
             // Redirección con mensaje de negocio para evitar stacktrace/500 en la UI del emisor.
@@ -287,16 +436,17 @@ public class IssuerAccessRequestController {
                     .build();
         }
 
-        // Definir un nombre de archivo razonable si no viene en el Resource
         String filename = resource.getFilename() != null ? resource.getFilename() : "documento";
-
-        // Inferir MediaType para que el navegador intente abrirlo (PDF/imagen, etc.)
         MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
+        if (mediaType == null) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+        MediaType responseMediaType = Objects.requireNonNull(mediaType);
+        String dispositionType = asAttachment ? "attachment" : "inline";
 
-        // Content-Disposition inline: se muestra en el navegador (no "attachment" forzado)
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, dispositionType + "; filename=\"" + filename + "\"")
+                .contentType(responseMediaType)
                 .body(resource);
     }
 }
