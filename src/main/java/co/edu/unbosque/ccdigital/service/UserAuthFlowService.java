@@ -2,6 +2,7 @@ package co.edu.unbosque.ccdigital.service;
 
 import co.edu.unbosque.ccdigital.entity.AppUser;
 import co.edu.unbosque.ccdigital.entity.Person;
+import co.edu.unbosque.ccdigital.entity.UserAccessState;
 import co.edu.unbosque.ccdigital.repository.AppUserRepository;
 import co.edu.unbosque.ccdigital.repository.PersonRepository;
 import co.edu.unbosque.ccdigital.security.IndyUserPrincipal;
@@ -70,7 +71,6 @@ public class UserAuthFlowService {
 
         AppUser appUser = appUserRepository
                 .findByEmailIgnoreCase(emailNorm)
-                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
                 .filter(this::hasUserRole)
                 .orElse(null);
 
@@ -79,6 +79,11 @@ public class UserAuthFlowService {
                 || appUser.getPasswordHash().isBlank()
                 || !passwordEncoder.matches(password, appUser.getPasswordHash())) {
             return unauthorized("Correo o clave inválidos");
+        }
+
+        String accessBlockMessage = resolveAccessBlockMessage(appUser);
+        if (accessBlockMessage != null) {
+            return forbidden(accessBlockMessage);
         }
 
         String idNumberFromDb = findIdNumberByUser(appUser);
@@ -159,6 +164,16 @@ public class UserAuthFlowService {
                             .body(Map.of("error", "La sesión de autenticación expiró. Intenta de nuevo."));
                 }
 
+                AppUser governanceUser = findUserByEmail(loginEmail);
+                String accessBlockMessage = resolveAccessBlockMessage(governanceUser);
+                if (accessBlockMessage != null) {
+                    removeExpectedIdNumber(request, presExIdNorm);
+                    removeExpectedEmail(request, presExIdNorm);
+                    removePendingOtpContext(request, presExIdNorm);
+                    userLoginOtpService.invalidate(presExIdNorm);
+                    return forbidden(accessBlockMessage);
+                }
+
                 pending = buildPendingOtpContext(attrs, loginEmail);
                 AppUser loginUser = findActiveUserByEmail(loginEmail);
                 if (loginUser != null) {
@@ -231,6 +246,18 @@ public class UserAuthFlowService {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .cacheControl(CacheControl.noStore())
                     .body(Map.of("error", "La sesión de validación expiró. Intenta iniciar sesión nuevamente."));
+        }
+
+        AppUser governanceUser = pending.getPersonId() != null
+                ? findUserByPersonId(pending.getPersonId())
+                : findUserByEmail(pending.getLoginEmail());
+        String accessBlockMessage = resolveAccessBlockMessage(governanceUser);
+        if (accessBlockMessage != null) {
+            removeExpectedIdNumber(request, presExIdNorm);
+            removeExpectedEmail(request, presExIdNorm);
+            removePendingOtpContext(request, presExIdNorm);
+            userLoginOtpService.invalidate(presExIdNorm);
+            return forbidden(accessBlockMessage);
         }
 
         boolean ok;
@@ -315,6 +342,18 @@ public class UserAuthFlowService {
                     .cacheControl(CacheControl.noStore())
                     .body(Map.of("error", "La sesión de validación expiró. Inicia sesión nuevamente."));
         }
+
+        AppUser governanceUser = pending.getPersonId() != null
+                ? findUserByPersonId(pending.getPersonId())
+                : findUserByEmail(pending.getLoginEmail());
+        String accessBlockMessage = resolveAccessBlockMessage(governanceUser);
+        if (accessBlockMessage != null) {
+            removeExpectedIdNumber(request, presExIdNorm);
+            removeExpectedEmail(request, presExIdNorm);
+            removePendingOtpContext(request, presExIdNorm);
+            userLoginOtpService.invalidate(presExIdNorm);
+            return forbidden(accessBlockMessage);
+        }
         if (isTotpFactor(pending)) {
             boolean sentFallback = userLoginOtpService.issueCode(
                     presExIdNorm,
@@ -378,12 +417,30 @@ public class UserAuthFlowService {
                 .orElse(null);
     }
 
+    private AppUser findUserByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        return appUserRepository.findByEmailIgnoreCase(email.trim())
+                .filter(this::hasUserRole)
+                .orElse(null);
+    }
+
     private AppUser findActiveUserByPersonId(Long personId) {
         if (personId == null) {
             return null;
         }
         return appUserRepository.findById(personId)
                 .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
+                .filter(this::hasUserRole)
+                .orElse(null);
+    }
+
+    private AppUser findUserByPersonId(Long personId) {
+        if (personId == null) {
+            return null;
+        }
+        return appUserRepository.findById(personId)
                 .filter(this::hasUserRole)
                 .orElse(null);
     }
@@ -403,6 +460,32 @@ public class UserAuthFlowService {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .cacheControl(CacheControl.noStore())
                 .body(Map.of("error", message));
+    }
+
+    private ResponseEntity<Map<String, Object>> forbidden(String message) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .cacheControl(CacheControl.noStore())
+                .body(Map.of("error", message));
+    }
+
+    /**
+     * Determina si el usuario puede continuar autenticación según estado de acceso.
+     */
+    private String resolveAccessBlockMessage(AppUser appUser) {
+        if (appUser == null) {
+            return "No se encontró la cuenta de usuario para autenticación.";
+        }
+        if (!Boolean.TRUE.equals(appUser.getIsActive())) {
+            return "Tu cuenta está inhabilitada. Contacta al administrador.";
+        }
+        UserAccessState state = appUser.getAccessState() == null ? UserAccessState.ENABLED : appUser.getAccessState();
+        if (state == UserAccessState.SUSPENDED) {
+            return "Tu cuenta está suspendida temporalmente. Contacta al administrador.";
+        }
+        if (state == UserAccessState.DISABLED) {
+            return "Tu cuenta está inhabilitada. Contacta al administrador.";
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

@@ -41,6 +41,21 @@
       "description": "Script CLI para listar documentos desde Fabric."
     },
     {
+      "name": "external-tools.fabric.block-reader-script",
+      "type": "java.lang.String",
+      "description": "Script CLI para resolver detalle técnico de bloque/tx en Fabric por referencia."
+    },
+    {
+      "name": "external-tools.fabric.record-access-script",
+      "type": "java.lang.String",
+      "description": "Script CLI para registrar eventos de auditoría de acceso en Fabric."
+    },
+    {
+      "name": "external-tools.fabric.list-access-script",
+      "type": "java.lang.String",
+      "description": "Script CLI para listar eventos de auditoría de acceso en Fabric."
+    },
+    {
       "name": "external-tools.fabric.sync-all-script",
       "type": "java.lang.String",
       "description": "Script CLI para sincronización total DB -> Fabric."
@@ -189,6 +204,16 @@
       "name": "app.security.rate-limit.max-requests-per-window",
       "type": "java.lang.Integer",
       "description": "Número máximo de solicitudes POST permitidas por IP+endpoint dentro de la ventana de rate limiting."
+    },
+    {
+      "name": "ccdigital.indy.user-access-sync-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Activa la sincronización del estado de acceso de usuarios hacia el Admin API de ACA-Py."
+    },
+    {
+      "name": "ccdigital.indy.user-access-sync-path",
+      "type": "java.lang.String",
+      "description": "Path de sincronización en ACA-Py. Soporta {conn_id} para resolver conexión activa y escribir metadata."
     }
   ]
 }

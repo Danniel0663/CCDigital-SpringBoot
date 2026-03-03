@@ -423,7 +423,7 @@ public class IndyProofLoginService {
      */
     private Map<String, Object> exchangeForMap(String url, HttpMethod method, HttpEntity<?> request) {
         ResponseEntity<Map<String, Object>> response = rest.exchange(
-                url,
+                Objects.requireNonNull(url),
                 Objects.requireNonNull(method),
                 request,
                 new ParameterizedTypeReference<>() {}

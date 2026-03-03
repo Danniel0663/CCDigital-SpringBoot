@@ -45,6 +45,12 @@ public class IndyProperties {
     /** Etiqueta esperada del Holder ({@code their_label}) para resolver el {@code connection_id}. */
     private String holderLabel;
 
+    /** Activa sincronización de estado de acceso de usuarios hacia endpoint externo de Indy. */
+    private Boolean userAccessSyncEnabled = Boolean.FALSE;
+
+    /** Path del endpoint administrativo para sincronizar estado de acceso del usuario. */
+    private String userAccessSyncPath;
+
     public String getIssuerAdminUrl() {
         return issuerAdminUrl;
     }
@@ -99,5 +105,21 @@ public class IndyProperties {
 
     public void setHolderLabel(String holderLabel) {
         this.holderLabel = holderLabel;
+    }
+
+    public Boolean getUserAccessSyncEnabled() {
+        return userAccessSyncEnabled;
+    }
+
+    public void setUserAccessSyncEnabled(Boolean userAccessSyncEnabled) {
+        this.userAccessSyncEnabled = userAccessSyncEnabled;
+    }
+
+    public String getUserAccessSyncPath() {
+        return userAccessSyncPath;
+    }
+
+    public void setUserAccessSyncPath(String userAccessSyncPath) {
+        this.userAccessSyncPath = userAccessSyncPath;
     }
 }

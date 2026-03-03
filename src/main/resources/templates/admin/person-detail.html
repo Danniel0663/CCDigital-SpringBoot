@@ -71,6 +71,91 @@
     </div>
   </div>
 
+  <div class="cc-card p-4 mb-3">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="h6 text-uppercase text-muted mb-0">
+        Estado de acceso del usuario (login Indy)
+      </h2>
+    </div>
+
+    <div th:if="${accessSuccess}" class="alert alert-success py-2">
+      <i class="bi bi-check-circle me-1"></i><span th:text="${accessSuccess}">Estado actualizado.</span>
+    </div>
+    <div th:if="${accessError}" class="alert alert-danger py-2">
+      <i class="bi bi-exclamation-triangle me-1"></i><span th:text="${accessError}">Error actualizando estado.</span>
+    </div>
+
+    <div th:if="${userAccess == null}" class="alert alert-warning mb-0">
+      Esta persona no tiene cuenta en la tabla <code>users</code> o no corresponde a rol de usuario final.
+    </div>
+
+    <div th:if="${userAccess != null}">
+      <div class="row g-2 mb-3">
+        <div class="col-12 col-md-4">
+          <div class="small text-muted">Cuenta</div>
+          <div class="fw-semibold" th:text="${userAccess.email}">usuario@correo.com</div>
+        </div>
+        <div class="col-12 col-md-2">
+          <div class="small text-muted">isActive</div>
+          <span class="badge"
+                th:text="${userAccess.isActive} ? 'ACTIVO' : 'INACTIVO'"
+                th:classappend="${userAccess.isActive} ? ' text-bg-success' : ' text-bg-danger'">ACTIVO</span>
+        </div>
+        <div class="col-12 col-md-3">
+          <div class="small text-muted">Estado acceso</div>
+          <span class="badge"
+                th:text="${userAccess.accessState}"
+                th:classappend="
+                  ${userAccess.accessState == 'ENABLED'} ? ' text-bg-success' :
+                  (${userAccess.accessState == 'SUSPENDED'} ? ' text-bg-warning' : ' text-bg-danger')
+                ">ENABLED</span>
+        </div>
+        <div class="col-12 col-md-3">
+          <div class="small text-muted">Sync Indy</div>
+          <span class="badge"
+                th:text="${userAccess.indySynced == true} ? 'OK' : (${userAccess.indySynced == false} ? 'ERROR' : 'N/A')"
+                th:classappend="
+                  ${userAccess.indySynced == true} ? ' text-bg-success' :
+                  (${userAccess.indySynced == false} ? ' text-bg-danger' : ' text-bg-secondary')
+                ">N/A</span>
+        </div>
+      </div>
+
+      <div class="text-muted small mb-3" th:if="${userAccess.reason != null}">
+        Motivo actual: <span th:text="${userAccess.reason}">Sin motivo</span>
+      </div>
+
+      <form th:action="@{/admin/persons/{id}/access-state(id=${person.id})}"
+            method="post"
+            class="row g-2"
+            data-cc-loader
+            data-cc-loader-message="Actualizando estado de acceso de usuario...">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <div class="col-12 col-md-3">
+          <label class="form-label small text-muted mb-1">Nuevo estado</label>
+          <select name="state" class="form-select" required>
+            <option th:each="st : ${accessStateOptions}"
+                    th:value="${st.name()}"
+                    th:text="${st.name()}"
+                    th:selected="${userAccess.accessState == st.name()}">
+              ENABLED
+            </option>
+          </select>
+        </div>
+        <div class="col-12 col-md-7">
+          <label class="form-label small text-muted mb-1">Motivo (opcional)</label>
+          <input class="form-control" type="text" name="reason" maxlength="500"
+                 placeholder="Ej: investigación, soporte, rehabilitación de cuenta"/>
+        </div>
+        <div class="col-12 col-md-2 d-flex align-items-end">
+          <button class="btn btn-primary w-100" type="submit">
+            <i class="bi bi-shield-lock me-1"></i>Aplicar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="cc-card p-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
       <h2 class="h6 text-uppercase text-muted mb-0">Documentos de la persona</h2>

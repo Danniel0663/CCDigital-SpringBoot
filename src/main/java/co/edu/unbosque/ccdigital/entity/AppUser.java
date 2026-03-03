@@ -2,6 +2,8 @@ package co.edu.unbosque.ccdigital.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -74,6 +76,55 @@ public class AppUser {
      */
     @Column(name = "role", nullable = false, length = 60)
     private String role;
+
+    /**
+     * Estado de acceso de la cuenta para el flujo de login de usuario.
+     *
+     * <p>Columna: {@code access_state}.</p>
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_state", nullable = false, length = 20)
+    private UserAccessState accessState = UserAccessState.ENABLED;
+
+    /**
+     * Motivo administrativo del último cambio de estado de acceso.
+     *
+     * <p>Columna: {@code access_state_reason}.</p>
+     */
+    @Column(name = "access_state_reason", length = 500)
+    private String accessStateReason;
+
+    /**
+     * Fecha/hora del último cambio de estado de acceso.
+     *
+     * <p>Columna: {@code access_state_updated_at}.</p>
+     */
+    @Column(name = "access_state_updated_at")
+    private LocalDateTime accessStateUpdatedAt;
+
+    /**
+     * Indicador de si la última sincronización de estado con Indy fue exitosa.
+     *
+     * <p>Columna: {@code indy_access_synced}.</p>
+     */
+    @Column(name = "indy_access_synced")
+    private Boolean indyAccessSynced;
+
+    /**
+     * Fecha/hora del último intento de sincronización de estado con Indy.
+     *
+     * <p>Columna: {@code indy_access_sync_at}.</p>
+     */
+    @Column(name = "indy_access_sync_at")
+    private LocalDateTime indyAccessSyncAt;
+
+    /**
+     * Detalle del último error de sincronización de estado con Indy.
+     *
+     * <p>Columna: {@code indy_access_sync_error}.</p>
+     */
+    @Column(name = "indy_access_sync_error", length = 1200)
+    private String indyAccessSyncError;
 
     /**
      * Secreto TOTP en Base32 para MFA con app autenticadora.
@@ -213,6 +264,90 @@ public class AppUser {
      */
     public void setRole(String role) {
         this.role = role;
+    }
+
+    /**
+     * @return estado actual de acceso de la cuenta
+     */
+    public UserAccessState getAccessState() {
+        return accessState;
+    }
+
+    /**
+     * @param accessState estado de acceso de la cuenta
+     */
+    public void setAccessState(UserAccessState accessState) {
+        this.accessState = accessState;
+    }
+
+    /**
+     * @return motivo del último cambio de estado de acceso
+     */
+    public String getAccessStateReason() {
+        return accessStateReason;
+    }
+
+    /**
+     * @param accessStateReason motivo del último cambio de estado de acceso
+     */
+    public void setAccessStateReason(String accessStateReason) {
+        this.accessStateReason = accessStateReason;
+    }
+
+    /**
+     * @return fecha/hora del último cambio de estado de acceso
+     */
+    public LocalDateTime getAccessStateUpdatedAt() {
+        return accessStateUpdatedAt;
+    }
+
+    /**
+     * @param accessStateUpdatedAt fecha/hora del último cambio de estado de acceso
+     */
+    public void setAccessStateUpdatedAt(LocalDateTime accessStateUpdatedAt) {
+        this.accessStateUpdatedAt = accessStateUpdatedAt;
+    }
+
+    /**
+     * @return resultado de la última sincronización con Indy
+     */
+    public Boolean getIndyAccessSynced() {
+        return indyAccessSynced;
+    }
+
+    /**
+     * @param indyAccessSynced resultado de la última sincronización con Indy
+     */
+    public void setIndyAccessSynced(Boolean indyAccessSynced) {
+        this.indyAccessSynced = indyAccessSynced;
+    }
+
+    /**
+     * @return fecha/hora del último intento de sincronización con Indy
+     */
+    public LocalDateTime getIndyAccessSyncAt() {
+        return indyAccessSyncAt;
+    }
+
+    /**
+     * @param indyAccessSyncAt fecha/hora del último intento de sincronización con Indy
+     */
+    public void setIndyAccessSyncAt(LocalDateTime indyAccessSyncAt) {
+        this.indyAccessSyncAt = indyAccessSyncAt;
+    }
+
+    /**
+     * @return error del último intento de sincronización con Indy
+     */
+    public String getIndyAccessSyncError() {
+        return indyAccessSyncError;
+    }
+
+    /**
+     * @param indyAccessSyncError error del último intento de sincronización con Indy
+     */
+    public void setIndyAccessSyncError(String indyAccessSyncError) {
+        this.indyAccessSyncError = indyAccessSyncError;
     }
 
     /**
