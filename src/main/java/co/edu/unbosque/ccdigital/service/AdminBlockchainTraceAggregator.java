@@ -395,6 +395,7 @@ final class AdminBlockchainTraceAggregator {
             case "DOC_DOWNLOAD_GRANTED" -> "Descarga de documento autorizada";
             case "DOC_ACCESS_CHECK" -> "Verificación de acceso a documento";
             case "DOC_BLOCK_TRACE_QUERY" -> "Consulta de trazabilidad de bloque";
+            case "USER_ACCESS_STATE_CHANGE" -> "Cambio de estado de acceso de usuario";
             default -> eventType.isBlank() ? "Evento de auditoría Fabric" : eventType;
         };
     }

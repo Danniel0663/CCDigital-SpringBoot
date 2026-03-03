@@ -622,11 +622,23 @@
       <div id="traceBlockList" class="trace-block-list">
         <article class="trace-block-card"
                  th:each="block : ${report.blockchainBlocks}"
+                 th:with="isAccessGovernanceEvent=${block.network == 'Fabric'
+                           and block.operation == 'Cambio de estado de acceso de usuario'
+                           and block.detail != null
+                           and #strings.contains(block.detail, 'SYNC_INDY_')},
+                          isIndySyncOk=${isAccessGovernanceEvent and #strings.contains(block.detail, 'SYNC_INDY_OK')},
+                          isIndySyncFail=${isAccessGovernanceEvent and #strings.contains(block.detail, 'SYNC_INDY_FAIL')},
+                          isIndySyncSkipped=${isAccessGovernanceEvent and #strings.contains(block.detail, 'SYNC_INDY_SKIPPED')}"
                  th:attr="data-network=${#strings.toLowerCase(block.network)}">
           <div class="trace-block-meta">
             <span class="badge rounded-pill"
                   th:classappend="${block.network == 'Fabric'} ? ' text-bg-primary' : ' text-bg-success'"
-                  th:text="${block.network}">Fabric</span>
+                  th:text="${isAccessGovernanceEvent ? 'Fabric (auditado)' : block.network}">Fabric</span>
+            <span class="badge rounded-pill"
+                  th:if="${isAccessGovernanceEvent}"
+                  th:classappend="${isIndySyncOk} ? ' text-bg-success' : (${isIndySyncFail} ? ' text-bg-danger' : ' text-bg-secondary')"
+                  th:text="${isIndySyncOk} ? 'Indy sincronizado'
+                           : (${isIndySyncFail} ? 'Indy sync falló' : 'Indy sync no ejecutado')">Indy sincronizado</span>
             <span class="badge text-bg-light border"
                   th:text="${block.status}">CONFIRMADO</span>
             <span class="badge text-bg-light border"

@@ -6,12 +6,14 @@ import co.edu.unbosque.ccdigital.dto.SyncPersonForm;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
+import co.edu.unbosque.ccdigital.entity.UserAccessState;
 import co.edu.unbosque.ccdigital.service.AdminReportPdfService;
 import co.edu.unbosque.ccdigital.service.AdminReportService;
 import co.edu.unbosque.ccdigital.service.BlockchainTraceDetailService;
 import co.edu.unbosque.ccdigital.service.ExternalToolsService;
 import co.edu.unbosque.ccdigital.service.PersonDocumentService;
 import co.edu.unbosque.ccdigital.service.PersonService;
+import co.edu.unbosque.ccdigital.service.UserAccessGovernanceService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -56,6 +59,7 @@ public class AdminController {
     private final AdminReportService adminReportService;
     private final AdminReportPdfService adminReportPdfService;
     private final BlockchainTraceDetailService blockchainTraceDetailService;
+    private final UserAccessGovernanceService userAccessGovernanceService;
 
     /**
      * Constructor del controlador administrativo.
@@ -72,13 +76,15 @@ public class AdminController {
                            ExternalToolsService externalToolsService,
                            AdminReportService adminReportService,
                            AdminReportPdfService adminReportPdfService,
-                           BlockchainTraceDetailService blockchainTraceDetailService) {
+                           BlockchainTraceDetailService blockchainTraceDetailService,
+                           UserAccessGovernanceService userAccessGovernanceService) {
         this.personService = personService;
         this.personDocumentService = personDocumentService;
         this.externalToolsService = externalToolsService;
         this.adminReportService = adminReportService;
         this.adminReportPdfService = adminReportPdfService;
         this.blockchainTraceDetailService = blockchainTraceDetailService;
+        this.userAccessGovernanceService = userAccessGovernanceService;
     }
 
     /**
@@ -289,7 +295,47 @@ public class AdminController {
 
         model.addAttribute("person", person);
         model.addAttribute("docs", docs);
+        model.addAttribute("userAccess", userAccessGovernanceService.findByPersonId(id).orElse(null));
+        model.addAttribute("accessStateOptions", UserAccessState.values());
         return "admin/person-detail";
+    }
+
+    /**
+     * Actualiza estado de acceso del usuario final asociado a la persona.
+     *
+     * <p>Estados soportados: ENABLED, SUSPENDED, DISABLED.</p>
+     */
+    @PostMapping("/persons/{id}/access-state")
+    public String updatePersonAccessState(@PathVariable("id") Long id,
+                                          @RequestParam("state") String state,
+                                          @RequestParam(value = "reason", required = false) String reason,
+                                          RedirectAttributes redirectAttributes) {
+        try {
+            UserAccessState target = UserAccessState.valueOf(state == null ? "" : state.trim().toUpperCase());
+            UserAccessGovernanceService.AccessUpdateResult result =
+                    userAccessGovernanceService.updateState(id, target, reason);
+
+            String syncNote;
+            if (result.indyCallAttempted()) {
+                syncNote = result.indyCallSucceeded()
+                        ? " Sincronización Indy: OK."
+                        : " Sincronización Indy: FALLÓ (" + result.indyMessage() + ").";
+            } else {
+                syncNote = " Sincronización Indy no ejecutada (" + result.indyMessage() + ").";
+            }
+            redirectAttributes.addFlashAttribute(
+                    "accessSuccess",
+                    "Estado de acceso actualizado a " + result.access().accessState() + "." + syncNote
+            );
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("accessError", ex.getMessage());
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute(
+                    "accessError",
+                    "No fue posible actualizar el estado de acceso: " + ex.getMessage()
+            );
+        }
+        return "redirect:/admin/persons/" + id;
     }
 
     /**
