@@ -10,7 +10,8 @@
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
 </head>
 
-<body class="bg-body-tertiary">
+<body class="bg-body-tertiary"
+      th:attr="data-cc-requests-signal=${ccRequestsSignal}">
 <nav class="navbar cc-navbar">
   <div class="container d-flex justify-content-between align-items-center">
     <a class="navbar-brand fw-semibold text-decoration-none cc-brand" th:href="@{/user/dashboard}">
@@ -280,5 +281,55 @@
 
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  (function () {
+    const body = document.body;
+    if (!body) return;
+
+    // Señal calculada en backend al momento de render.
+    // Se compara contra el endpoint /signal para saber si hubo cambios.
+    let currentSignal = body.dataset.ccRequestsSignal || '';
+    let pollingInFlight = false;
+    // Polling suave para evitar recarga manual constante.
+    const intervalMs = 6000;
+
+    async function checkChanges() {
+      // Evita llamadas solapadas y pausa cuando la pestaña está oculta.
+      if (pollingInFlight || document.hidden) return;
+      pollingInFlight = true;
+      try {
+        const res = await fetch('/user/requests/signal', {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        const nextSignal = payload && payload.signal ? String(payload.signal) : '';
+        if (!nextSignal) return;
+        // Si cambió la señal, hay cambios reales en solicitudes/estados.
+        if (currentSignal && nextSignal !== currentSignal) {
+          window.location.reload();
+          return;
+        }
+        currentSignal = nextSignal;
+      } catch (_) {
+        // Silencioso: el polling es best-effort para evitar ruido en consola.
+      } finally {
+        pollingInFlight = false;
+      }
+    }
+
+    checkChanges();
+    setInterval(checkChanges, intervalMs);
+    // Al volver a foco, dispara verificación inmediata.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        checkChanges();
+      }
+    });
+  })();
+</script>
 </body>
 </html>

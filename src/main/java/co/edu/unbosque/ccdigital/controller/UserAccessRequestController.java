@@ -1,5 +1,7 @@
 package co.edu.unbosque.ccdigital.controller;
 
+import co.edu.unbosque.ccdigital.entity.AccessRequest;
+import co.edu.unbosque.ccdigital.entity.AccessRequestStatus;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.security.IndyUserPrincipal;
@@ -9,6 +11,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Controlador del módulo Usuario para revisar solicitudes de acceso a documentos.
@@ -70,13 +77,8 @@ public class UserAccessRequestController {
             model.addAttribute("error", error);
         }
 
-        // Principal del usuario autenticado (contiene idType e idNumber)
-        IndyUserPrincipal principal = (IndyUserPrincipal) auth.getPrincipal();
-
         // Buscar la persona asociada a la identificación (mapeo usuario -> person)
-        Person person = personRepository
-                .findByIdTypeAndIdNumber(IdType.valueOf(principal.getIdType()), principal.getIdNumber())
-                .orElse(null);
+        Person person = resolveAuthenticatedPerson(auth);
 
         // Si no hay person asociada, no se puede mostrar solicitudes
         if (person == null) {
@@ -86,8 +88,33 @@ public class UserAccessRequestController {
         }
 
         // Cargar solicitudes de la persona
-        model.addAttribute("requests", accessRequestService.listForPerson(person.getId()));
+        // Además de renderizar, exponemos una "señal" compacta para polling en frontend.
+        // Si esta señal cambia, la UI se recarga automáticamente sin intervención del usuario.
+        List<AccessRequest> requests = accessRequestService.listForPerson(person.getId());
+        model.addAttribute("requests", requests);
+        model.addAttribute("ccRequestsSignal", buildRequestsSignal(requests));
         return "user/requests";
+    }
+
+    /**
+     * Señal ligera para detectar cambios en solicitudes del usuario sin recargar manualmente.
+     *
+     * <p>La UI consulta periódicamente este endpoint; si cambia la señal, recarga la vista para
+     * reflejar nuevas solicitudes o decisiones.</p>
+     *
+     * @param auth autenticación actual
+     * @return payload JSON con señal actual
+     */
+    @GetMapping("/user/requests/signal")
+    @ResponseBody
+    public Map<String, Object> requestsSignal(Authentication auth) {
+        Person person = resolveAuthenticatedPerson(auth);
+        if (person == null) {
+            return Map.of("ok", false, "signal", "NO_PERSON");
+        }
+        // Endpoint ligero: no envía la lista completa, solo una firma de estado para detectar cambios.
+        List<AccessRequest> requests = accessRequestService.listForPerson(person.getId());
+        return Map.of("ok", true, "signal", buildRequestsSignal(requests));
     }
 
     /**
@@ -153,5 +180,55 @@ public class UserAccessRequestController {
             return "redirect:/user/requests?error=" +
                     java.net.URLEncoder.encode(ex.getMessage(), java.nio.charset.StandardCharsets.UTF_8);
         }
+    }
+
+    private Person resolveAuthenticatedPerson(Authentication auth) {
+        IndyUserPrincipal principal = (IndyUserPrincipal) auth.getPrincipal();
+        return personRepository
+                .findByIdTypeAndIdNumber(IdType.valueOf(principal.getIdType()), principal.getIdNumber())
+                .orElse(null);
+    }
+
+    private String buildRequestsSignal(List<AccessRequest> requests) {
+        // Construye una firma estable con métricas y timestamps clave.
+        // Cualquier cambio funcional (nueva solicitud o cambio de estado) modifica esta cadena.
+        long total = requests == null ? 0 : requests.size();
+        long pending = countByStatus(requests, AccessRequestStatus.PENDIENTE);
+        long approved = countByStatus(requests, AccessRequestStatus.APROBADA);
+        long rejected = countByStatus(requests, AccessRequestStatus.RECHAZADA);
+        long expired = countByStatus(requests, AccessRequestStatus.EXPIRADA);
+
+        long maxId = requests == null ? 0 :
+                requests.stream()
+                        .map(AccessRequest::getId)
+                        .filter(java.util.Objects::nonNull)
+                        .mapToLong(Long::longValue)
+                        .max()
+                        .orElse(0);
+
+        LocalDateTime maxRequestedAt = maxDateTime(requests, true);
+        LocalDateTime maxDecidedAt = maxDateTime(requests, false);
+
+        return total + "|" + pending + "|" + approved + "|" + rejected + "|" + expired + "|" + maxId
+                + "|" + (maxRequestedAt != null ? maxRequestedAt : "-")
+                + "|" + (maxDecidedAt != null ? maxDecidedAt : "-");
+    }
+
+    private long countByStatus(List<AccessRequest> requests, AccessRequestStatus status) {
+        if (requests == null || requests.isEmpty()) {
+            return 0;
+        }
+        return requests.stream().filter(r -> r != null && r.getStatus() == status).count();
+    }
+
+    private LocalDateTime maxDateTime(List<AccessRequest> requests, boolean requestedAt) {
+        if (requests == null || requests.isEmpty()) {
+            return null;
+        }
+        return requests.stream()
+                .map(r -> requestedAt ? r.getRequestedAt() : r.getDecidedAt())
+                .filter(java.util.Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
     }
 }
