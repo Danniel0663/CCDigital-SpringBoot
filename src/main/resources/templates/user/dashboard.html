@@ -97,7 +97,8 @@
   <div id="userDashboardProfilePanel" class="cc-card p-4 mb-3 d-none">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
       <div>
-        <h1 class="h4 mb-1" th:text="${displayName}">Usuario</h1>
+        <h1 class="h4 mb-1"
+            th:text="${ccUserProfile != null and ccUserProfile.displayName() != null and !#strings.isEmpty(ccUserProfile.displayName()) ? ccUserProfile.displayName() : displayName}">Usuario</h1>
         <p class="cc-help-text small mb-3">
           Bienvenido. Desde aquí puedes ver tus documentos y revisar solicitudes de acceso.
         </p>
@@ -113,7 +114,8 @@
           </div>
           <div class="cc-kv-item">
             <div class="cc-kv-label">Correo registrado</div>
-            <div class="cc-kv-value" th:text="${email != null and !#strings.isEmpty(email) ? email : 'No registrado'}">email</div>
+            <div class="cc-kv-value"
+                 th:text="${ccUserProfile != null and ccUserProfile.email() != null and !#strings.isEmpty(ccUserProfile.email()) ? ccUserProfile.email() : 'No registrado'}">email</div>
           </div>
           <div class="cc-kv-item" th:if="${ccUserProfile != null}">
             <div class="cc-kv-label">Teléfono</div>
@@ -603,6 +605,49 @@
           link.dataset.ccDownloading = 'false';
         }, 1800);
       });
+    });
+  })();
+
+  (function () {
+    let currentSignal = '';
+    let pollingInFlight = false;
+    const intervalMs = 6000;
+
+    async function checkChanges() {
+      // Evita solapamiento de consultas y pausa cuando la pestaña está oculta.
+      if (pollingInFlight || document.hidden) return;
+      pollingInFlight = true;
+      try {
+        const res = await fetch('/user/requests/signal', {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        const nextSignal = payload && payload.signal ? String(payload.signal) : '';
+        if (!nextSignal) return;
+
+        // Si hay una solicitud nueva o cambio de estado, se refresca para actualizar notificaciones.
+        if (currentSignal && nextSignal !== currentSignal) {
+          window.location.reload();
+          return;
+        }
+        currentSignal = nextSignal;
+      } catch (_) {
+        // Polling best-effort: no ensucia consola en errores transitorios.
+      } finally {
+        pollingInFlight = false;
+      }
+    }
+
+    checkChanges();
+    setInterval(checkChanges, intervalMs);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        checkChanges();
+      }
     });
   })();
 </script>

@@ -2,6 +2,7 @@
   let overlayEl = null;
   let textEl = null;
   let activeCount = 0;
+  let idleTimeoutSuspendUntil = 0;
 
   function ensureOverlay() {
     if (overlayEl) return;
@@ -82,6 +83,12 @@
     }
   }
 
+  function suspendIdleTimeout(ms) {
+    const duration = Number(ms);
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    idleTimeoutSuspendUntil = Math.max(idleTimeoutSuspendUntil, Date.now() + duration);
+  }
+
   function bindFormSubmits(selector = 'form[data-cc-loader]') {
     document.querySelectorAll(selector).forEach((form) => {
       if (form.dataset.ccLoaderBound === 'true') return;
@@ -89,6 +96,8 @@
 
       form.addEventListener('submit', () => {
         const msg = form.dataset.ccLoaderMessage || 'Procesando solicitud...';
+        // Evita cierre de sesión por inactividad durante envíos largos (p.ej. carga de PDF).
+        suspendIdleTimeout(10 * 60 * 1000);
         const submit = form.querySelector('button[type="submit"], input[type="submit"]');
         if (submit) {
           setButtonBusy(
@@ -212,7 +221,8 @@
     window.__ccIdleTimeoutBound = true;
 
     // Timeout estricto por inactividad: solo se reinicia con actividad real del usuario.
-    const IDLE_LIMIT_MS = 5 * 60 * 1000;
+    // Alineado con servidor (SERVER_SESSION_TIMEOUT=30m) para evitar expiraciones prematuras en UI.
+    const IDLE_LIMIT_MS = 30 * 60 * 1000;
     const HEARTBEAT_INTERVAL_MS = 60 * 1000;
     const TICK_INTERVAL_MS = 15 * 1000;
     const THROTTLE_ACTIVITY_MS = 800;
@@ -280,6 +290,7 @@
     const intervalId = window.setInterval(() => {
       if (expiring) return;
       const now = Date.now();
+      if (now < idleTimeoutSuspendUntil) return;
       const idleForMs = now - lastActivityAt;
 
       if (idleForMs >= IDLE_LIMIT_MS) {
