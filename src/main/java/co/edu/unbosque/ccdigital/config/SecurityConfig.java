@@ -451,8 +451,8 @@ public class SecurityConfig {
                                 "base-uri 'self'; " +
                                 "frame-ancestors 'self'; " +
                                 "object-src 'none'; " +
-                                "form-action 'self'; " +
-                                "connect-src 'self'; " +
+                                "form-action 'self' https: http:; " +
+                                "connect-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; " +
                                 "img-src 'self' data: blob:; " +
                                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
                                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; " +
