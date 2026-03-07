@@ -13,6 +13,45 @@ La aplicacion es un monolito Spring Boot que integra:
 - Hyperledger Fabric (registro documental y auditoria)
 - Indy/ACA-Py (pruebas de credencial y sincronizacion de estado)
 
+## 0) Base documental y control de adopcion (Indy, ACA-Py y Fabric)
+
+Esta seccion documenta de forma explicita de donde sale la base tecnica de blockchain, que se adopto y como se usa en el sistema.
+
+### 0.1 Fuentes de referencia tecnicas
+
+- Hyperledger Fabric (documentacion oficial): `https://hyperledger-fabric.readthedocs.io/`
+- Fabric Samples (repositorio oficial): `https://github.com/hyperledger/fabric-samples`
+- ACA-Py (documentacion oficial): `https://aca-py.org/`
+- ACA-Py (repositorio oficial): `https://github.com/openwallet-foundation/acapy`
+- Aries RFCs (protocolo de interoperabilidad): `https://github.com/hyperledger/aries-rfcs`
+- Hyperledger Indy (documentacion tecnica): `https://hyperledger-indy.readthedocs.io/`
+
+### 0.2 Criterio de adopcion
+
+Se aplico el siguiente criterio para incorporar tecnologia al proyecto:
+
+1. Priorizar documentacion oficial y especificaciones del protocolo.
+2. Validar cada flujo con pruebas tecnicas controladas (entorno local de laboratorio).
+3. Encapsular la logica en servicios del backend, evitando dependencia directa del frontend a APIs blockchain.
+4. Registrar variables, endpoints y scripts requeridos para reproducibilidad operativa.
+
+### 0.3 Trazabilidad de uso en CCDigital
+
+- Fabric se usa para trazabilidad de documentos y eventos de acceso.
+- ACA-Py/Indy se usa para pruebas de credencial en login y sincronizacion de estado del usuario.
+- La BD MySQL sigue siendo la fuente transaccional principal.
+- Blockchain funciona como capa de confianza adicional (auditoria, verificacion y evidencia).
+
+### 0.4 Evidencia de control tecnico
+
+Para auditoria interna del proyecto se recomienda mantener una matriz simple por flujo:
+
+- `Flujo`: login verificable, sync de estado, registro de acceso, consulta de documentos.
+- `Fuente tecnica`: URL oficial, RFC o guia de referencia.
+- `Implementacion`: servicio/clase/script donde quedo aplicado.
+- `Prueba`: comando o caso funcional que valida el flujo.
+- `Resultado`: evidencia de ejecucion (log, respuesta API, estado en BD/ledger).
+
 ## 1) Stack tecnico
 
 - Java 17
@@ -42,10 +81,6 @@ src/main/resources
   application.properties
   templates/     Vistas Thymeleaf (admin, auth, issuer, user)
   static/        CSS, JS, assets
-
-docs/sql
-  add-user-totp-columns.sql
-  add-user-access-state-columns.sql
 ```
 
 ## 3) Arquitectura funcional
@@ -198,7 +233,7 @@ Servicios Java involucrados:
 - `FabricAuditCliService`
 - `BlockchainTraceDetailService`
 
-Scripts esperados (Node.js) en `FABRIC_WORKDIR`:
+Scripts esperados (Node.js):
 
 - `list-docs.js`
 - `read-block-by-ref.js`
@@ -333,275 +368,314 @@ Opcional:
 > Nota: Spring Boot usa relaxed binding, por eso una propiedad como
 > `app.security.signed-urls.secret` puede mapearse con env `APP_SECURITY_SIGNED_URLS_SECRET`.
 
-## 10) Ejemplo de archivo de entorno (sin secretos reales)
+## 10) Plantilla de entorno (sin rutas sensibles ni secretos)
 
 ```bash
-# Core
-export APP_NAME='CCDigital'
-export SERVER_PORT='8088'
-export SERVER_SESSION_TIMEOUT='30m'
+# APP_NAME: nombre logico de la aplicacion
+export APP_NAME='NOMBRE_APP'
 
-# DB
-export DB_URL='jdbc:mysql://localhost:3307/ciudadania_digital?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8'
-export DB_USERNAME='root'
-export DB_PASSWORD='REEMPLAZAR'
-export JPA_DDL_AUTO='none'
-export JPA_SHOW_SQL='false'
-export JPA_FORMAT_SQL='false'
+# SERVER_PORT: puerto HTTP donde correra Spring Boot
+export SERVER_PORT='PUERTO_APP'
 
-# Files
-export CCDIGITAL_FS_BASE_PATH='/opt/ccdigital-prod/storage'
+# SERVER_SESSION_TIMEOUT: tiempo maximo de inactividad de sesion (ej: 30m)
+export SERVER_SESSION_TIMEOUT='TIMEOUT_SESION'
 
-# Indy / ACA-Py
-export INDY_ISSUER_ADMIN_URL='http://localhost:8021'
-export INDY_HOLDER_ADMIN_URL='http://localhost:8031'
-export INDY_CRED_DEF_ID='REEMPLAZAR_CRED_DEF_ID'
-export INDY_HOLDER_CONNECTION_ID='auto'
-export INDY_HOLDER_LABEL='Holder-CDigital'
-export INDY_USER_ACCESS_SYNC_ENABLED='true'
-export INDY_USER_ACCESS_SYNC_PATH='/connections/{conn_id}/metadata'
+# DB_URL: cadena JDBC completa (host, puerto, nombre BD y parametros)
+export DB_URL='jdbc:mysql://<HOST_DB>:<PUERTO_DB>/<NOMBRE_BD>?<PARAMETROS>'
 
-# Fabric scripts
-export FABRIC_WORKDIR='/home/ccdigital/fabric/fabric-samples/test-network/client'
-export FABRIC_NODE_BIN='node'
-export FABRIC_LIST_DOCS_SCRIPT='list-docs.js'
-export FABRIC_BLOCK_READER_SCRIPT='read-block-by-ref.js'
-export FABRIC_RECORD_ACCESS_SCRIPT='record-access-event.js'
-export FABRIC_LIST_ACCESS_SCRIPT='list-access-events.js'
-export FABRIC_SYNC_ALL_SCRIPT='sync-db-to-ledger.js'
-export FABRIC_SYNC_PERSON_SCRIPT='sync-db-to-ledger.js'
+# DB_USERNAME: usuario tecnico con permisos sobre la BD de la app
+export DB_USERNAME='USUARIO_BD'
 
-# Indy script
-export INDY_TOOLS_WORKDIR='/home/ccdigital/cdigital-indy-python'
-export INDY_VENV_ACTIVATE='source venv/bin/activate'
-export INDY_SCRIPT='issue_credentials_from_db.py'
-export EXTERNAL_TOOLS_TIMEOUT_SECONDS='180'
+# DB_PASSWORD: clave del usuario tecnico de BD
+export DB_PASSWORD='CLAVE_BD'
 
-# Mail
-export MAIL_HOST='smtp.gmail.com'
-export MAIL_PORT='587'
-export MAIL_USERNAME='tu_correo'
-export MAIL_PASSWORD='tu_app_password'
-export MAIL_SMTP_AUTH='true'
-export MAIL_SMTP_STARTTLS_ENABLE='true'
-export MAIL_SMTP_STARTTLS_REQUIRED='true'
-export FORGOT_PASSWORD_MAIL_FROM='recuperacion@ccdigital.com'
-export MAIL_TEST_CONNECTION='true'
+# JPA_DDL_AUTO: estrategia Hibernate (none/validate/update/create)
+export JPA_DDL_AUTO='MODO_DDL'
 
-# Seguridad opcional
-export APP_SECURITY_SIGNED_URLS_SECRET='SECRETO_LARGO_ESTABLE'
+# JPA_SHOW_SQL: true/false para log de consultas SQL
+export JPA_SHOW_SQL='BOOLEANO'
+
+# JPA_FORMAT_SQL: true/false para formatear SQL en logs
+export JPA_FORMAT_SQL='BOOLEANO'
+
+# CCDIGITAL_FS_BASE_PATH: directorio absoluto donde se almacenan archivos
+export CCDIGITAL_FS_BASE_PATH='DIRECTORIO_ALMACEN'
+
+# ACAPY_VERIFIER_ADMIN_URL: URL de admin API del agente verificador
+export ACAPY_VERIFIER_ADMIN_URL='URL_VERIFIER_ADMIN'
+
+# ACAPY_HOLDER_ADMIN_URL: URL de admin API del agente holder
+export ACAPY_HOLDER_ADMIN_URL='URL_HOLDER_ADMIN'
+
+# ACAPY_CRED_DEF_ID: identificador de credencial emitida por la red Indy
+export ACAPY_CRED_DEF_ID='CRED_DEF_ID'
+
+# ACAPY_PROOF_POLL_INTERVAL_MS: intervalo de consulta de estado de proof
+export ACAPY_PROOF_POLL_INTERVAL_MS='INTERVALO_MS'
+
+# ACAPY_PROOF_POLL_TIMEOUT_MS: timeout maximo de espera de proof
+export ACAPY_PROOF_POLL_TIMEOUT_MS='TIMEOUT_MS'
+
+# INDY_ISSUER_ADMIN_URL: endpoint del agente issuer para operaciones administrativas
+export INDY_ISSUER_ADMIN_URL='URL_ISSUER_ADMIN'
+
+# INDY_HOLDER_ADMIN_URL: endpoint del agente holder para operaciones administrativas
+export INDY_HOLDER_ADMIN_URL='URL_HOLDER_ADMIN'
+
+# INDY_HOLDER_CONNECTION_ID: ID de conexion holder (o modo auto segun implementacion)
+export INDY_HOLDER_CONNECTION_ID='CONNECTION_ID_O_AUTO'
+
+# INDY_HOLDER_LABEL: etiqueta usada para resolver conexion holder
+export INDY_HOLDER_LABEL='LABEL_HOLDER'
+
+# INDY_CRED_DEF_ID: credencial a usar en login/sincronizacion
+export INDY_CRED_DEF_ID='CRED_DEF_ID'
+
+# INDY_ADMIN_API_KEY: API key de proteccion para admin API (si aplica)
+export INDY_ADMIN_API_KEY='API_KEY'
+
+# INDY_USER_ACCESS_SYNC_ENABLED: habilita/deshabilita sincronizacion de estado a Indy
+export INDY_USER_ACCESS_SYNC_ENABLED='BOOLEANO'
+
+# INDY_USER_ACCESS_SYNC_PATH: ruta de metadata para estado de usuario en ACA-Py
+export INDY_USER_ACCESS_SYNC_PATH='RUTA_METADATA'
+
+# FABRIC_WORKDIR: directorio base donde vive el cliente/script de Fabric
+export FABRIC_WORKDIR='DIRECTORIO_FABRIC_CLIENTE'
+
+# FABRIC_NODE_BIN: ejecutable Node.js disponible en el sistema
+export FABRIC_NODE_BIN='BINARIO_NODE'
+
+# FABRIC_LIST_DOCS_SCRIPT: script para listar documentos de una persona en ledger
+export FABRIC_LIST_DOCS_SCRIPT='SCRIPT_LIST_DOCS'
+
+# FABRIC_BLOCK_READER_SCRIPT: script para leer detalle de bloque/transaccion
+export FABRIC_BLOCK_READER_SCRIPT='SCRIPT_BLOCK_READER'
+
+# FABRIC_RECORD_ACCESS_SCRIPT: script para registrar eventos de acceso en ledger
+export FABRIC_RECORD_ACCESS_SCRIPT='SCRIPT_RECORD_ACCESS'
+
+# FABRIC_LIST_ACCESS_SCRIPT: script para listar auditoria de accesos
+export FABRIC_LIST_ACCESS_SCRIPT='SCRIPT_LIST_ACCESS'
+
+# FABRIC_SYNC_ALL_SCRIPT: script para sincronizacion masiva BD -> ledger
+export FABRIC_SYNC_ALL_SCRIPT='SCRIPT_SYNC_ALL'
+
+# FABRIC_SYNC_PERSON_SCRIPT: script para sincronizacion por persona BD -> ledger
+export FABRIC_SYNC_PERSON_SCRIPT='SCRIPT_SYNC_PERSON'
+
+# INDY_TOOLS_WORKDIR: directorio base de utilidades Python para emision
+export INDY_TOOLS_WORKDIR='DIRECTORIO_INDY_TOOLS'
+
+# INDY_VENV_ACTIVATE: comando para activar entorno virtual Python
+export INDY_VENV_ACTIVATE='COMANDO_ACTIVACION_VENV'
+
+# INDY_SCRIPT: script principal de emision/sincronizacion de credenciales
+export INDY_SCRIPT='SCRIPT_INDY'
+
+# EXTERNAL_TOOLS_TIMEOUT_SECONDS: timeout maximo de ejecucion de scripts externos
+export EXTERNAL_TOOLS_TIMEOUT_SECONDS='TIMEOUT_SEGUNDOS'
+
+# MAIL_HOST: servidor SMTP
+export MAIL_HOST='SMTP_HOST'
+
+# MAIL_PORT: puerto SMTP
+export MAIL_PORT='SMTP_PUERTO'
+
+# MAIL_USERNAME: cuenta remitente para OTP/recuperacion
+export MAIL_USERNAME='SMTP_USUARIO'
+
+# MAIL_PASSWORD: clave o app-password del servicio SMTP
+export MAIL_PASSWORD='SMTP_CLAVE'
+
+# MAIL_SMTP_AUTH: habilita autenticacion SMTP
+export MAIL_SMTP_AUTH='BOOLEANO'
+
+# MAIL_SMTP_STARTTLS_ENABLE: habilita STARTTLS
+export MAIL_SMTP_STARTTLS_ENABLE='BOOLEANO'
+
+# MAIL_SMTP_STARTTLS_REQUIRED: obliga STARTTLS
+export MAIL_SMTP_STARTTLS_REQUIRED='BOOLEANO'
+
+# FORGOT_PASSWORD_MAIL_FROM: remitente visible en recuperacion de clave
+export FORGOT_PASSWORD_MAIL_FROM='MAIL_FROM'
+
+# MAIL_TEST_CONNECTION: valida conexion SMTP al iniciar
+export MAIL_TEST_CONNECTION='BOOLEANO'
 ```
 
 ## 11) Arranque local de la aplicacion
 
-1. Cargar variables de entorno.
-2. Tener MySQL disponible.
+1. Cargar variables de entorno obligatorias.
+2. Tener MySQL disponible y la base inicializada.
 3. Importar backup si aplica:
 
 ```bash
-mysql -h127.0.0.1 -P3307 -uroot -p'REEMPLAZAR' ciudadania_digital < /home/ccdigital/respaldo_completoCCDIGITAL.sql
+mysql -h<HOST_DB> -P<PUERTO_DB> -u<USUARIO_BD> -p'<CLAVE_BD>' <NOMBRE_BD> < <ARCHIVO_BACKUP_SQL>
 ```
 
-4. Ejecutar:
+4. Ejecutar en modo desarrollo:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-5. O construir jar:
+5. O construir y correr jar:
 
 ```bash
 ./mvnw -DskipTests package spring-boot:repackage
-java -jar target/CCDigital-1.0.0.jar
+java -jar target/<ARTEFACTO>.jar
 ```
 
-## 12) Paso a paso de red Indy (resumen integrado)
+## 12) Montaje general de red Indy + ACA-Py
 
-Basado en tu guia: `/home/ccdigital/CCDigital~/PasoAPasoIndy.txt`.
+Objetivo: tener issuer y holder operativos para emitir credenciales y ejecutar login por prueba verificable.
 
-1. Bajar red Indy anterior (`von-network`) y liberar puertos 8020, 8021, 8030, 8031, 9000.
-2. Levantar ledger local (`./manage build` y `./manage up`).
-3. Crear red Docker `cdigital-net`.
-4. Registrar DID/seed del issuer en el ledger (`/register`).
-5. Levantar `acapy-issuer` (8020/8021).
-6. Crear schema y cred def en issuer admin API.
-7. Levantar `acapy-holder` (8030/8031).
-8. Crear invitacion desde issuer/verifier y aceptarla en holder.
-9. Verificar que conexion quede `ACTIVE`.
-10. Ejecutar script Python de emision desde BD.
+### 12.1 Prerrequisitos
 
-Comando de emision:
+- Linux o WSL2 con Docker y Docker Compose.
+- Python 3.10+ y `venv` para scripts de emision.
+- `curl` y `jq` para pruebas de API.
+- Puertos libres para ledger y agentes (segun tu arquitectura).
 
-```bash
-cd ~/cdigital-indy-python
-source venv/bin/activate
-python3 issue_credentials_from_db.py
-```
+### 12.2 Descarga de componentes base
 
-## 13) Paso a paso de red Fabric (resumen integrado)
+1. Obtener una implementacion de ledger Indy para laboratorio local.
+2. Descargar imagenes de ACA-Py (issuer y holder) compatibles con la version de ledger.
+3. Crear una red Docker dedicada para aislar servicios.
 
-Basado en tu guia: `/home/ccdigital/CCDigital~/PasoAPasoFabric.txt`.
+### 12.3 Levantar ledger y registrar identidad emisora
 
-1. Arrancar Docker.
-2. Levantar test-network:
+1. Iniciar los nodos del ledger.
+2. Validar salud del ledger.
+3. Registrar DID/seed del issuer con permisos de escritura.
 
-```bash
-cd $HOME/fabric/fabric-samples/test-network
-./network.sh down
-./network.sh up createChannel -c mychannel -ca
-```
+### 12.4 Levantar agentes ACA-Py
 
-3. Desplegar chaincode `cddoc`:
+1. Iniciar agente issuer con wallet, endpoint y admin API.
+2. Iniciar agente holder con wallet, endpoint y admin API.
+3. Verificar conectividad entre agentes y estado `ready`.
 
-```bash
-./network.sh deployCC \
-  -c mychannel \
-  -ccn cddoc \
-  -ccp $HOME/CCDigitalBlock/chaincode/cddoc-js \
-  -ccl javascript \
-  -ccv 1.0 \
-  -ccs 1
-```
+### 12.5 Configurar credenciales
 
-4. Configurar entorno CLI peer (PATH, FABRIC_CFG_PATH, MSP, TLS).
-5. Sincronizar BD -> ledger:
+1. Crear schema en el issuer.
+2. Crear credential definition asociada.
+3. Guardar `cred_def_id` en configuracion de la aplicacion.
 
-```bash
-cd $HOME/fabric/fabric-samples/test-network/client
-node sync-db-to-ledger.js --all
-# o por persona
-node sync-db-to-ledger.js --person CC 1019983896
-```
+### 12.6 Establecer conexion y emitir
 
-6. Consultar docs on-chain:
+1. Generar invitacion desde issuer.
+2. Aceptar invitacion desde holder.
+3. Confirmar conexion activa.
+4. Ejecutar script de emision desde BD para usuarios elegibles.
 
-```bash
-node list-docs.js CC 1019983896
-```
+### 12.7 Verificacion operativa
 
-7. (Opcional) Decodificar bloques con `peer channel fetch` + `configtxlator`.
+- Probar login con present-proof.
+- Confirmar extraccion de atributos esperados.
+- Revisar logs de agente issuer/holder y backend.
 
-## 14) Migrations SQL
+## 13) Montaje general de red Hyperledger Fabric
 
-Archivos:
+Objetivo: tener una red operativa para registrar y consultar trazabilidad documental.
 
-- [docs/sql/add-user-totp-columns.sql](./docs/sql/add-user-totp-columns.sql)
-- [docs/sql/add-user-access-state-columns.sql](./docs/sql/add-user-access-state-columns.sql)
+### 13.1 Prerrequisitos
 
-Aplicar sobre la BD objetivo antes de activar funcionalidades nuevas de MFA y gobierno de acceso.
+- Docker + Docker Compose.
+- `curl`, `git`, `jq`.
+- Node.js LTS para scripts cliente.
+- Binarios de Fabric (`peer`, `orderer`, `configtxlator`) segun version seleccionada.
 
-## 15) Despliegue de referencia en VM (actual)
+### 13.2 Descarga e instalacion
 
-### 15.1 Servicio systemd
+1. Clonar `fabric-samples`.
+2. Ejecutar script de bootstrap oficial para descargar binarios e imagenes.
+3. Verificar version de binarios y compatibilidad de imagenes.
 
-Ejemplo (ruta actual usada en entorno productivo):
+### 13.3 Levantar red base
 
-- Jar: `/opt/ccdigital-prod/app/ccdigital.jar`
-- Env: `/opt/ccdigital-prod/config/ccdigital.env`
-- Unit: `/etc/systemd/system/ccdigital-prod.service`
+1. Apagar cualquier red previa de prueba.
+2. Levantar red con autoridades certificadoras.
+3. Crear canal de negocio.
+4. Confirmar peers/orderer en estado saludable.
 
-Comandos:
+### 13.4 Desplegar chaincode
 
-```bash
-systemctl daemon-reload
-systemctl enable --now ccdigital-prod
-systemctl status ccdigital-prod --no-pager
-journalctl -u ccdigital-prod -f
-```
+1. Empaquetar chaincode.
+2. Instalar y aprobar chaincode en organizaciones requeridas.
+3. Hacer commit de definicion de chaincode en canal.
+4. Validar invocacion y consulta basica.
 
-### 15.2 Reverse proxy
+### 13.5 Configurar cliente de integracion
 
-Caddy publica `:80` hacia `127.0.0.1:8088`.
+1. Definir identidad MSP usada por scripts.
+2. Configurar variables de entorno de peer TLS/MSP.
+3. Preparar scripts Node.js para sync y consulta.
 
-### 15.3 Exposicion externa
+### 13.6 Sincronizacion y consulta
 
-Puede usarse `ngrok`, `cloudflared` (Cloudflare Tunnel), o VPS+FRP.
+- Ejecutar sincronizacion total o por persona de BD hacia ledger.
+- Consultar documentos on-chain y validar que coincidan con BD.
+- Registrar eventos de acceso para trazabilidad.
 
-## 16) Troubleshooting
+### 13.7 Verificacion operativa
 
-### 16.1 Error MySQL definer no existe
+- Revisar logs de peers/orderer/chaincode.
+- Validar que IDs y estados en ledger sean consistentes con la aplicacion.
 
-Error tipico:
+## 14) Recomendaciones operativas generales
 
-`The user specified as a definer ('CCDigital'@'localhost') does not exist`
+- Mantener secretos fuera del repositorio.
+- Definir backups periodicos de BD y almacenamiento de archivos.
+- Versionar cambios de configuracion por ambiente (dev, qa, prod).
+- Monitorear logs de aplicacion, BD y redes blockchain.
+- Probar flujos criticos despues de cada cambio de configuracion.
 
-Solucion:
+## 15) Despliegue general y publicacion externa
 
-```sql
-CREATE USER IF NOT EXISTS 'CCDigital'@'localhost' IDENTIFIED BY 'REEMPLAZAR';
-GRANT ALL PRIVILEGES ON ciudadania_digital.* TO 'CCDigital'@'localhost';
-FLUSH PRIVILEGES;
-```
+### 15.1 Publicacion de la aplicacion
 
-### 16.2 403 al abrir documentos de usuario
+1. Ejecutar el servicio Java como proceso administrado (por ejemplo, systemd).
+2. Exponer el servicio con reverse proxy (por ejemplo, Caddy o Nginx).
+3. Configurar reinicio automatico y rotacion de logs.
 
-Validar:
+### 15.2 Exposicion a internet
 
-- `app.user-files-base-dir` apunta al directorio real de archivos.
-- El `file_path` existe y es legible.
-- La URL firmada no esta expirada (`exp`/`sig`).
+Opciones comunes:
 
-### 16.3 Sesion expirada frecuente
+- Tunel seguro gestionado (ngrok, Cloudflare Tunnel o similar).
+- Servidor con IP publica y proxy reverso.
+- DNS + TLS para URL estable.
 
-Validar:
+### 15.3 Checklist de salida
 
-- `SERVER_SESSION_TIMEOUT` (backend)
-- timeout en `ccdigital-loader.js` (frontend idle)
-- recarga forzada del navegador luego de desplegar cambios (`Ctrl+F5`)
+- Aplicacion responde en endpoint de salud.
+- Login y roles funcionan en navegacion real.
+- Carga/consulta de documentos funciona sin errores de permisos.
+- Flujos de Fabric e Indy operan de extremo a extremo.
 
-### 16.4 Fabric no refleja documentos aprobados
+## 16) Troubleshooting general
 
-Validar:
+### 16.1 Fallos de login o sesion
 
-- Scripts y `FABRIC_WORKDIR` correctos.
-- Network y chaincode levantados.
-- `sync-db-to-ledger.js --person <idType> <idNumber>` ejecutado sin error.
+- Verificar timeout de sesion de backend y frontend.
+- Confirmar politicas CSP, cookies y proxy.
+- Revisar reloj del servidor y del cliente (importante para OTP/TOTP).
 
-### 16.5 Login Indy no avanza
+### 16.2 Fallos de carga/visualizacion de documentos
 
-Validar:
+- Verificar permisos de lectura/escritura del almacenamiento.
+- Confirmar consistencia entre rutas almacenadas y archivos fisicos.
+- Revisar reglas de autorizacion por rol y por propietario de documento.
 
-- `INDY_ISSUER_ADMIN_URL` y `INDY_HOLDER_ADMIN_URL` accesibles.
-- `INDY_CRED_DEF_ID` correcto.
-- Conexion holder `ACTIVE` (manual o `auto` por label).
+### 16.3 Fallos de integracion Indy/ACA-Py
 
-## 17) Buenas practicas operativas
+- Verificar conectividad a admin APIs.
+- Confirmar `cred_def_id` y conexion activa entre agentes.
+- Revisar estados de proof y tiempos de poll/timeout.
 
-- No subir secretos al repositorio.
-- Mantener `APP_SECURITY_SIGNED_URLS_SECRET` estable en produccion.
-- Mantener `MAIL_PASSWORD` como app password, no password real de correo.
-- Versionar y respaldar `ccdigital.env` fuera de git.
-- Antes de cambios en BD, tomar backup:
+### 16.4 Fallos de integracion Fabric
 
-```bash
-mysqldump -h127.0.0.1 -P3307 -uroot -p ciudadania_digital > backup_$(date +%F_%H%M%S).sql
-```
-
-## 18) Comandos utiles de soporte
-
-```bash
-# Build
-./mvnw -DskipTests package spring-boot:repackage
-
-# Ejecutar local
-./mvnw spring-boot:run
-
-# Estado del servicio
-systemctl status ccdigital-prod --no-pager
-
-# Logs
-journalctl -u ccdigital-prod -n 200 --no-pager
-
-# Verificar puertos
-ss -ltnp | rg ':80|:8088|:8021|:8031|:7051|:7050'
-
-# Ver URL ngrok activa (si aplica)
-curl -s http://127.0.0.1:4040/api/tunnels
-```
-
----
-
-Si se modifica el flujo de negocio o las variables, actualizar este README y las guias externas:
-
-- `/home/ccdigital/CCDigital~/PasoAPasoIndy.txt`
-- `/home/ccdigital/CCDigital~/PasoAPasoFabric.txt`
+- Verificar red levantada, canal y chaincode activos.
+- Confirmar identidad MSP y certificados vigentes.
+- Revisar salidas de scripts de sincronizacion/consulta.
