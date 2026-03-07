@@ -20,6 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import static org.springframework.http.HttpStatus.*;
@@ -42,6 +44,8 @@ public class UserDocsController {
 
     @Value("${app.user-files-base-dir:/home/ccdigital/CCDigitalBlock/CCDigital}")
     private String baseDir;
+    @Value("${app.user-files-legacy-base-dir:/home/ccdigital/CCDigitalBlock/CCDigital}")
+    private String legacyBaseDir;
 
     /**
      * Constructor del controlador.
@@ -117,10 +121,11 @@ public class UserDocsController {
         }
 
         try {
-            Path base = Path.of(baseDir).toAbsolutePath().normalize();
             Path file = Path.of(doc.filePath()).toAbsolutePath().normalize();
+            List<Path> allowedRoots = resolveAllowedRoots();
 
-            if (!file.startsWith(base)) {
+            boolean pathAllowed = allowedRoots.stream().anyMatch(file::startsWith);
+            if (!pathAllowed) {
                 throw new ResponseStatusException(FORBIDDEN, "Ruta no permitida");
             }
 
@@ -154,6 +159,23 @@ public class UserDocsController {
         } catch (Exception e) {
             throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "No se pudo abrir el documento", e);
         }
+    }
+
+    private List<Path> resolveAllowedRoots() {
+        List<Path> roots = new ArrayList<>(2);
+        String primary = baseDir == null ? "" : baseDir.trim();
+        if (!primary.isBlank()) {
+            roots.add(Path.of(primary).toAbsolutePath().normalize());
+        }
+        String legacy = legacyBaseDir == null ? "" : legacyBaseDir.trim();
+        if (!legacy.isBlank()) {
+            Path legacyPath = Path.of(legacy).toAbsolutePath().normalize();
+            boolean exists = roots.stream().anyMatch(existing -> existing.equals(legacyPath));
+            if (!exists) {
+                roots.add(legacyPath);
+            }
+        }
+        return roots;
     }
 
     /**

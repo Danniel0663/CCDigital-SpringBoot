@@ -10,6 +10,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -74,11 +76,11 @@ public class UserAccountService {
     @Transactional
     public AppUser registerFromExistingPerson(UserRegisterForm form) {
         String idTypeValue = normalize(form == null ? null : form.getIdType());
-        String idNumberNorm = normalize(form == null ? null : form.getIdNumber());
-        String firstNameValue = normalize(form == null ? null : form.getFirstName());
-        String lastNameValue = normalize(form == null ? null : form.getLastName());
-        String emailValue = normalize(form == null ? null : form.getEmail());
-        String phoneValue = normalize(form == null ? null : form.getPhone());
+        String idNumberNorm = normalizeIdNumber(form == null ? null : form.getIdNumber());
+        String firstNameValue = normalizeHumanText(form == null ? null : form.getFirstName());
+        String lastNameValue = normalizeHumanText(form == null ? null : form.getLastName());
+        String emailValue = normalizeEmail(form == null ? null : form.getEmail());
+        String phoneValue = normalizeHumanText(form == null ? null : form.getPhone());
         var birthdateValue = form == null ? null : form.getBirthdate();
         String rawPasswordValue = normalize(form == null ? null : form.getPassword());
         String confirmPasswordValue = normalize(form == null ? null : form.getConfirmPassword());
@@ -186,11 +188,12 @@ public class UserAccountService {
      * @param lastNameValue apellidos ingresados en el formulario
      */
     private void validateIdentityFieldsAgainstPerson(Person person, String firstNameValue, String lastNameValue) {
-        String dbFirstName = normalize(person.getFirstName());
-        String dbLastName = normalize(person.getLastName());
+        String dbFirstName = canonicalName(person.getFirstName());
+        String dbLastName = canonicalName(person.getLastName());
+        String formFirstName = canonicalName(firstNameValue);
+        String formLastName = canonicalName(lastNameValue);
 
-        if (!dbFirstName.equalsIgnoreCase(normalize(firstNameValue))
-                || !dbLastName.equalsIgnoreCase(normalize(lastNameValue))) {
+        if (!dbFirstName.equals(formFirstName) || !dbLastName.equals(formLastName)) {
             throw new IllegalArgumentException(
                     "Los nombres o apellidos no coinciden con la persona registrada para esa identificación."
             );
@@ -209,10 +212,10 @@ public class UserAccountService {
                                             String emailValue,
                                             String phoneValue,
                                             java.time.LocalDate birthdateValue) {
-        if (!normalize(person.getEmail()).equalsIgnoreCase(normalize(emailValue))) {
+        if (!normalizeEmail(person.getEmail()).equals(normalizeEmail(emailValue))) {
             person.setEmail(emailValue);
         }
-        if (!normalize(person.getPhone()).equals(normalize(phoneValue))) {
+        if (!normalizeHumanText(person.getPhone()).equals(normalizeHumanText(phoneValue))) {
             person.setPhone(phoneValue);
         }
         if (person.getBirthdate() == null || !person.getBirthdate().equals(birthdateValue)) {
@@ -222,6 +225,27 @@ public class UserAccountService {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String normalizeHumanText(String value) {
+        String out = normalize(value);
+        return out.replaceAll("\\s+", " ");
+    }
+
+    private String normalizeEmail(String value) {
+        return normalize(value).toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeIdNumber(String value) {
+        String compact = normalize(value).replaceAll("[^A-Za-z0-9]", "");
+        return compact.toUpperCase(Locale.ROOT);
+    }
+
+    private String canonicalName(String value) {
+        String normalized = normalizeHumanText(value);
+        String nfd = Normalizer.normalize(normalized, Normalizer.Form.NFD);
+        String noDiacritics = nfd.replaceAll("\\p{M}+", "");
+        return noDiacritics.toLowerCase(Locale.ROOT);
     }
 
     /**
