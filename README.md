@@ -29,8 +29,8 @@
 | Tipo de proyecto | Proyecto investigativo aplicado |
 | Universidad | Universidad El Bosque |
 | Linea de trabajo | Identidad digital, trazabilidad y gobierno de acceso documental |
-| Codigo del proyecto | `CCD-INV-2026` *(actualizar si el codigo oficial es otro)* |
-| Integrantes | Yeison Hernandez Huertas, Danniel Parrado *(completar nombres oficiales)* |
+| Codigo del proyecto |  AUX_2025-02-02|
+| Integrantes | Yeison Hernandez Huertas, Danniel Alejandro Parra Chavarro |
 
 Plataforma web para gestion de identidad y documentos ciudadanos con tres modulos funcionales:
 
