@@ -1,4 +1,36 @@
-# CCDigital
+<div align="center">
+  <img src="src/main/resources/static/LogoUniversidad/Logo-u-bosque-01.jpg" alt="Logo Universidad El Bosque" width="240" />
+</div>
+
+<h1 align="center">
+  <span style="font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;">CCDigital</span>
+</h1>
+
+<p align="center">
+  <strong>Proyecto investigativo de identidad digital y gestion documental ciudadana</strong><br/>
+  <em>Universidad El Bosque</em>
+</p>
+
+<p align="center">
+  <img alt="Java" src="https://img.shields.io/badge/Java_17-ED8B00?logo=openjdk&logoColor=white" />
+  <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.5.11-6DB33F?logo=springboot&logoColor=white" />
+  <img alt="MySQL" src="https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql&logoColor=white" />
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" />
+  <img alt="Fabric" src="https://img.shields.io/badge/Hyperledger-Fabric-2F3134?logo=hyperledger&logoColor=white" />
+  <img alt="Indy" src="https://img.shields.io/badge/Hyperledger-Indy-2F3134?logo=hyperledger&logoColor=white" />
+</p>
+
+<p align="center">
+  <img alt="Tecnologias" src="https://skillicons.dev/icons?i=java,spring,mysql,docker,nodejs,python,linux,git&perline=8" />
+</p>
+
+| Campo | Valor |
+|---|---|
+| Tipo de proyecto | Proyecto investigativo aplicado |
+| Universidad | Universidad El Bosque |
+| Linea de trabajo | Identidad digital, trazabilidad y gobierno de acceso documental |
+| Codigo del proyecto | `CCD-INV-2026` *(actualizar si el codigo oficial es otro)* |
+| Integrantes | Yeison Hernandez Huertas, Danniel Parrado *(completar nombres oficiales)* |
 
 Plataforma web para gestion de identidad y documentos ciudadanos con tres modulos funcionales:
 
@@ -368,7 +400,7 @@ Opcional:
 > Nota: Spring Boot usa relaxed binding, por eso una propiedad como
 > `app.security.signed-urls.secret` puede mapearse con env `APP_SECURITY_SIGNED_URLS_SECRET`.
 
-## 10) Plantilla de entorno (sin rutas sensibles ni secretos)
+## 10) Plantilla de entorno
 
 ```bash
 # APP_NAME: nombre logico de la aplicacion
@@ -622,60 +654,3 @@ Objetivo: tener una red operativa para registrar y consultar trazabilidad docume
 
 - Revisar logs de peers/orderer/chaincode.
 - Validar que IDs y estados en ledger sean consistentes con la aplicacion.
-
-## 14) Recomendaciones operativas generales
-
-- Mantener secretos fuera del repositorio.
-- Definir backups periodicos de BD y almacenamiento de archivos.
-- Versionar cambios de configuracion por ambiente (dev, qa, prod).
-- Monitorear logs de aplicacion, BD y redes blockchain.
-- Probar flujos criticos despues de cada cambio de configuracion.
-
-## 15) Despliegue general y publicacion externa
-
-### 15.1 Publicacion de la aplicacion
-
-1. Ejecutar el servicio Java como proceso administrado (por ejemplo, systemd).
-2. Exponer el servicio con reverse proxy (por ejemplo, Caddy o Nginx).
-3. Configurar reinicio automatico y rotacion de logs.
-
-### 15.2 Exposicion a internet
-
-Opciones comunes:
-
-- Tunel seguro gestionado (ngrok, Cloudflare Tunnel o similar).
-- Servidor con IP publica y proxy reverso.
-- DNS + TLS para URL estable.
-
-### 15.3 Checklist de salida
-
-- Aplicacion responde en endpoint de salud.
-- Login y roles funcionan en navegacion real.
-- Carga/consulta de documentos funciona sin errores de permisos.
-- Flujos de Fabric e Indy operan de extremo a extremo.
-
-## 16) Troubleshooting general
-
-### 16.1 Fallos de login o sesion
-
-- Verificar timeout de sesion de backend y frontend.
-- Confirmar politicas CSP, cookies y proxy.
-- Revisar reloj del servidor y del cliente (importante para OTP/TOTP).
-
-### 16.2 Fallos de carga/visualizacion de documentos
-
-- Verificar permisos de lectura/escritura del almacenamiento.
-- Confirmar consistencia entre rutas almacenadas y archivos fisicos.
-- Revisar reglas de autorizacion por rol y por propietario de documento.
-
-### 16.3 Fallos de integracion Indy/ACA-Py
-
-- Verificar conectividad a admin APIs.
-- Confirmar `cred_def_id` y conexion activa entre agentes.
-- Revisar estados de proof y tiempos de poll/timeout.
-
-### 16.4 Fallos de integracion Fabric
-
-- Verificar red levantada, canal y chaincode activos.
-- Confirmar identidad MSP y certificados vigentes.
-- Revisar salidas de scripts de sincronizacion/consulta.
