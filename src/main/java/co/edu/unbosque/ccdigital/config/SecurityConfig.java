@@ -30,6 +30,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.lang.NonNull;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -248,8 +249,12 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authEx) ->
                                 response.sendRedirect("/login/admin?expired=true"))
-                        .accessDeniedHandler((request, response, accessDeniedEx) ->
-                                response.sendRedirect("/login/admin?denied=true"))
+                        .accessDeniedHandler((request, response, accessDeniedEx) -> {
+                            String target = (accessDeniedEx instanceof CsrfException)
+                                    ? "/login/admin?expired=true"
+                                    : "/login/admin?denied=true";
+                            response.sendRedirect(target);
+                        })
                 );
 
         return http.build();
@@ -300,8 +305,12 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authEx) ->
                                 response.sendRedirect("/login/issuer?expired=true"))
-                        .accessDeniedHandler((request, response, accessDeniedEx) ->
-                                response.sendRedirect("/login/issuer?denied=true"))
+                        .accessDeniedHandler((request, response, accessDeniedEx) -> {
+                            String target = (accessDeniedEx instanceof CsrfException)
+                                    ? "/login/issuer?expired=true"
+                                    : "/login/issuer?denied=true";
+                            response.sendRedirect(target);
+                        })
                 );
 
         return http.build();
@@ -345,8 +354,12 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authEx) ->
                                 response.sendRedirect("/login/user?expired=true"))
-                        .accessDeniedHandler((request, response, accessDeniedEx) ->
-                                response.sendRedirect("/login/user?denied=true"))
+                        .accessDeniedHandler((request, response, accessDeniedEx) -> {
+                            String target = (accessDeniedEx instanceof CsrfException)
+                                    ? "/login/user?expired=true"
+                                    : "/login/user?denied=true";
+                            response.sendRedirect(target);
+                        })
                 );
 
         return http.build();
@@ -451,8 +464,8 @@ public class SecurityConfig {
                                 "base-uri 'self'; " +
                                 "frame-ancestors 'self'; " +
                                 "object-src 'none'; " +
-                                "form-action 'self'; " +
-                                "connect-src 'self'; " +
+                                "form-action 'self' https: http:; " +
+                                "connect-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; " +
                                 "img-src 'self' data: blob:; " +
                                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
                                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; " +
@@ -505,13 +518,10 @@ public class SecurityConfig {
                 if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
                     var session = request.getSession(false);
                     String marker = session == null ? null : (String) session.getAttribute(SESSION_APP_INSTANCE_ID);
-                    if (marker == null || !marker.equals(currentAppInstanceId)) {
-                        if (session != null) {
-                            session.invalidate();
-                        }
-                        org.springframework.security.core.context.SecurityContextHolder.clearContext();
-                        response.sendRedirect(loginUrl + "?expired=true");
-                        return;
+                    if (session != null && (marker == null || !marker.equals(currentAppInstanceId))) {
+                        // Re-sincroniza el marcador de instancia para evitar expiraciones
+                        // inesperadas en cambios de sesión/migración/reinicio.
+                        session.setAttribute(SESSION_APP_INSTANCE_ID, currentAppInstanceId);
                     }
                 }
             }

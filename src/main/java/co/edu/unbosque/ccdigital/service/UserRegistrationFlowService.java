@@ -3,6 +3,7 @@ package co.edu.unbosque.ccdigital.service;
 import co.edu.unbosque.ccdigital.dto.UserRegisterForm;
 import co.edu.unbosque.ccdigital.entity.AppUser;
 import co.edu.unbosque.ccdigital.entity.IdType;
+import co.edu.unbosque.ccdigital.entity.UserAccessState;
 import co.edu.unbosque.ccdigital.repository.AppUserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.CacheControl;
@@ -31,15 +32,18 @@ public class UserRegistrationFlowService {
     private final UserRegisterEmailOtpService userRegisterEmailOtpService;
     private final UserTotpService userTotpService;
     private final AppUserRepository appUserRepository;
+    private final UserAccessGovernanceService userAccessGovernanceService;
 
     public UserRegistrationFlowService(UserAccountService userAccountService,
                                        UserRegisterEmailOtpService userRegisterEmailOtpService,
                                        UserTotpService userTotpService,
-                                       AppUserRepository appUserRepository) {
+                                       AppUserRepository appUserRepository,
+                                       UserAccessGovernanceService userAccessGovernanceService) {
         this.userAccountService = userAccountService;
         this.userRegisterEmailOtpService = userRegisterEmailOtpService;
         this.userTotpService = userTotpService;
         this.appUserRepository = appUserRepository;
+        this.userAccessGovernanceService = userAccessGovernanceService;
     }
 
     /**
@@ -59,6 +63,11 @@ public class UserRegistrationFlowService {
         model.addAttribute("idTypes", IdType.values());
         if (isEmailVerificationConfirmationStep(form)) {
             handleEmailVerificationConfirmation(form, model, request);
+            // Si el registro terminó correctamente y no hay paso TOTP pendiente,
+            // se redirige al login para evitar dejar al usuario en el formulario.
+            if (model.containsAttribute("success") && !Boolean.TRUE.equals(model.asMap().get("showRegisterTotpSetup"))) {
+                return "redirect:/login/user?registered=true";
+            }
             return "auth/register-user";
         }
 
@@ -256,6 +265,13 @@ public class UserRegistrationFlowService {
             AppUser createdUser = userAccountService.registerFromExistingPerson(pendingForm);
             removePendingRegisterForm(request, emailToken);
             userRegisterEmailOtpService.invalidate(emailToken);
+
+            // Al registrar exitosamente, sincroniza de inmediato el estado activo en Indy/Fabric.
+            userAccessGovernanceService.updateState(
+                    createdUser.getPersonId(),
+                    UserAccessState.ENABLED,
+                    "Registro web de usuario"
+            );
 
             model.addAttribute("success", "Usuario creado correctamente y correo verificado.");
             model.addAttribute("createdEmail", createdUser.getEmail());

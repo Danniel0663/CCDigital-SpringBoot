@@ -10,7 +10,8 @@
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
 </head>
 
-<body class="bg-body-tertiary">
+<body class="bg-body-tertiary"
+      th:attr="data-cc-requests-signal=${ccRequestsSignal}">
 <nav class="navbar cc-navbar">
   <div class="container d-flex justify-content-between align-items-center">
     <a class="navbar-brand fw-semibold text-decoration-none cc-brand" th:href="@{/issuer}">
@@ -455,6 +456,55 @@
           link.dataset.ccDownloading = 'false';
         }, 1800);
       });
+    });
+  })();
+</script>
+<script>
+  (function () {
+    const body = document.body;
+    if (!body) return;
+
+    // Señal inicial embebida por backend al renderizar la página.
+    let currentSignal = body.dataset.ccRequestsSignal || '';
+    let pollingInFlight = false;
+    // Intervalo de consulta para refresco automático de respuestas del usuario.
+    const intervalMs = 6000;
+
+    async function checkChanges() {
+      // Evita polling concurrente y reduce carga cuando la pestaña no está visible.
+      if (pollingInFlight || document.hidden) return;
+      pollingInFlight = true;
+      try {
+        const res = await fetch('/issuer/access-requests/signal', {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        const nextSignal = payload && payload.signal ? String(payload.signal) : '';
+        if (!nextSignal) return;
+        // Cambio detectado: recarga para mostrar estados y notificaciones actualizadas.
+        if (currentSignal && nextSignal !== currentSignal) {
+          window.location.reload();
+          return;
+        }
+        currentSignal = nextSignal;
+      } catch (_) {
+        // Silencioso: polling best-effort.
+      } finally {
+        pollingInFlight = false;
+      }
+    }
+
+    checkChanges();
+    setInterval(checkChanges, intervalMs);
+    // Revalida apenas el usuario vuelve a esta pestaña.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        checkChanges();
+      }
     });
   })();
 </script>

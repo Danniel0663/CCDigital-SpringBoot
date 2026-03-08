@@ -1,5 +1,7 @@
 package co.edu.unbosque.ccdigital.controller;
 
+import co.edu.unbosque.ccdigital.entity.AccessRequest;
+import co.edu.unbosque.ccdigital.entity.AccessRequestStatus;
 import co.edu.unbosque.ccdigital.entity.IdType;
 import co.edu.unbosque.ccdigital.entity.Person;
 import co.edu.unbosque.ccdigital.entity.PersonDocument;
@@ -20,6 +22,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -105,10 +109,29 @@ public class IssuerAccessRequestController {
         }
 
         // Se consulta en el servicio las solicitudes asociadas a la entidad del emisor
-        model.addAttribute("requests", accessRequestService.listForEntity(issuer.getIssuerId()));
+        // Además de renderizar el listado, publicamos una señal de cambios para polling UI.
+        // Así el emisor ve respuestas (APROBADA/RECHAZADA/EXPIRADA) sin refrescar manualmente.
+        List<AccessRequest> requests = accessRequestService.listForEntity(issuer.getIssuerId());
+        model.addAttribute("requests", requests);
+        model.addAttribute("ccRequestsSignal", buildRequestsSignal(requests));
 
         // Retorna la vista que renderiza el listado de solicitudes
         return "issuer/access-requests";
+    }
+
+    /**
+     * Señal ligera para detectar cambios de estado en solicitudes del emisor sin recarga manual.
+     *
+     * @param auth autenticación actual
+     * @return payload JSON con señal actual
+     */
+    @GetMapping("/issuer/access-requests/signal")
+    @ResponseBody
+    public Map<String, Object> requestsSignal(Authentication auth) {
+        IssuerPrincipal issuer = (IssuerPrincipal) auth.getPrincipal();
+        // Endpoint de bajo costo: retorna solo la firma de estado del listado del emisor.
+        List<AccessRequest> requests = accessRequestService.listForEntity(issuer.getIssuerId());
+        return Map.of("ok", true, "signal", buildRequestsSignal(requests));
     }
 
     /**
@@ -399,6 +422,48 @@ public class IssuerAccessRequestController {
                     .cacheControl(CacheControl.noStore())
                     .body(payload);
         }
+    }
+
+    private String buildRequestsSignal(List<AccessRequest> requests) {
+        // Firma agregada para detectar cambios sin transportar toda la tabla.
+        long total = requests == null ? 0 : requests.size();
+        long pending = countByStatus(requests, AccessRequestStatus.PENDIENTE);
+        long approved = countByStatus(requests, AccessRequestStatus.APROBADA);
+        long rejected = countByStatus(requests, AccessRequestStatus.RECHAZADA);
+        long expired = countByStatus(requests, AccessRequestStatus.EXPIRADA);
+
+        long maxId = requests == null ? 0 :
+                requests.stream()
+                        .map(AccessRequest::getId)
+                        .filter(Objects::nonNull)
+                        .mapToLong(Long::longValue)
+                        .max()
+                        .orElse(0);
+
+        LocalDateTime maxRequestedAt = maxDateTime(requests, true);
+        LocalDateTime maxDecidedAt = maxDateTime(requests, false);
+
+        return total + "|" + pending + "|" + approved + "|" + rejected + "|" + expired + "|" + maxId
+                + "|" + (maxRequestedAt != null ? maxRequestedAt : "-")
+                + "|" + (maxDecidedAt != null ? maxDecidedAt : "-");
+    }
+
+    private long countByStatus(List<AccessRequest> requests, AccessRequestStatus status) {
+        if (requests == null || requests.isEmpty()) {
+            return 0;
+        }
+        return requests.stream().filter(r -> r != null && r.getStatus() == status).count();
+    }
+
+    private LocalDateTime maxDateTime(List<AccessRequest> requests, boolean requestedAt) {
+        if (requests == null || requests.isEmpty()) {
+            return null;
+        }
+        return requests.stream()
+                .map(r -> requestedAt ? r.getRequestedAt() : r.getDecidedAt())
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     /**
