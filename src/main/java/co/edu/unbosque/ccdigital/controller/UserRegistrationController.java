@@ -56,6 +56,21 @@ public class UserRegistrationController {
     }
 
     /**
+     * Request AJAX para obtener la configuración TOTP pendiente del registro.
+     */
+    public static class RegisterTotpSetupRequest {
+        private Long personId;
+
+        public Long getPersonId() {
+            return personId;
+        }
+
+        public void setPersonId(Long personId) {
+            this.personId = personId;
+        }
+    }
+
+    /**
      * Request AJAX para reenviar código de verificación de correo.
      */
     public static class RegisterEmailResendRequest {
@@ -99,6 +114,19 @@ public class UserRegistrationController {
         return registrationFlowService.confirmRegisterTotp(
                 req == null ? null : req.getPersonId(),
                 req == null ? null : req.getCode(),
+                request
+        );
+    }
+
+    /**
+     * Obtiene el secreto/URI TOTP del paso opcional posterior al registro.
+     */
+    @PostMapping("/totp/setup")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> registerTotpSetup(@RequestBody RegisterTotpSetupRequest req,
+                                                                 HttpServletRequest request) {
+        return registrationFlowService.getRegisterTotpSetup(
+                req == null ? null : req.getPersonId(),
                 request
         );
     }

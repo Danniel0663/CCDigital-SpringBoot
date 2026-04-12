@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Detalle Persona · CCDigital</title>
 
+  <script src="/js/ccdigital-theme.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
@@ -27,22 +28,45 @@
           <span class="cc-profile-value" th:text="${ccActiveProfileDisplay}">admin@dominio.com</span>
         </span>
       </div>
-      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/persons}">
+      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/persons}"
+         data-cc-tour-scope="admin"
+         data-cc-tour-step="1"
+         data-cc-tour-title="Volver a personas"
+         data-cc-tour-body="Este botón te regresa al listado general para abrir otra persona o crear un nuevo registro."
+         data-cc-tour-placement="bottom">
         <i class="bi bi-arrow-left"></i> Volver
       </a>
-      <a class="btn btn-sm btn-outline-primary" th:href="@{/admin/sync}">
+      <a class="btn btn-sm btn-outline-primary" th:href="@{/admin/sync}"
+         data-cc-tour-scope="admin"
+         data-cc-tour-step="2"
+         data-cc-tour-title="Ir a sincronización"
+         data-cc-tour-body="Desde aquí saltas al módulo Sync cuando necesites ejecutar procesos de Fabric o de Indy relacionados con esta operación."
+         data-cc-tour-placement="bottom">
         <i class="bi bi-arrow-repeat"></i> Sync
       </a>
-      <a class="btn btn-sm btn-outline-dark" href="/issuer">
+      <a class="btn btn-sm btn-outline-dark" href="/issuer"
+         data-cc-tour-scope="admin"
+         data-cc-tour-step="3"
+         data-cc-tour-title="Abrir módulo emisor"
+         data-cc-tour-body="Este acceso te lleva al módulo del emisor para revisar el flujo operativo de carga y solicitud desde la otra perspectiva."
+         data-cc-tour-placement="bottom">
         <i class="bi bi-building me-1"></i>Módulo Emisor
       </a>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-cc-open-tutorial="adminPersonDetailTutorialTour">
+        <i class="bi bi-mortarboard me-1"></i>Tutorial
+      </button>
     </div>
   </div>
 </nav>
 
 <main class="container py-4">
 
-  <div class="cc-card p-4 mb-3">
+  <div class="cc-card p-4 mb-3"
+       data-cc-tour-scope="admin"
+       data-cc-tour-step="4"
+       data-cc-tour-title="Resumen de la persona"
+       data-cc-tour-body="Aquí ves los datos principales de identificación y el aviso que recuerda que los documentos se cargan desde el módulo emisor."
+       data-cc-tour-placement="bottom">
     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
       <div>
         <h1 class="h4 mb-1" th:text="${person.fullName}">Nombre</h1>
@@ -71,7 +95,12 @@
     </div>
   </div>
 
-  <div class="cc-card p-4 mb-3">
+  <div class="cc-card p-4 mb-3"
+       data-cc-tour-scope="admin"
+       data-cc-tour-step="5"
+       data-cc-tour-title="Estado de acceso del usuario"
+       data-cc-tour-body="En esta sección administras si la cuenta del usuario puede ingresar, el estado actual y el motivo aplicado a la decisión."
+       data-cc-tour-placement="top">
     <div class="d-flex align-items-center justify-content-between mb-3">
       <h2 class="h6 text-uppercase text-muted mb-0">
         Estado de acceso del usuario (login Indy)
@@ -156,7 +185,12 @@
     </div>
   </div>
 
-  <div class="cc-card p-4">
+  <div class="cc-card p-4"
+       data-cc-tour-scope="admin"
+       data-cc-tour-step="6"
+       data-cc-tour-title="Documentos y revisión"
+       data-cc-tour-body="Aquí abres los documentos cargados para la persona, los descargas si hace falta y registras la revisión administrativa de cada uno."
+       data-cc-tour-placement="top">
     <div class="d-flex align-items-center justify-content-between mb-3">
       <h2 class="h6 text-uppercase text-muted mb-0">Documentos de la persona</h2>
       <span class="badge text-bg-light border" th:text="${#lists.size(docs)} + ' registros'">0</span>
@@ -287,9 +321,6 @@
                   <button type="submit" class="btn btn-primary">
                     <i class="bi bi-save me-2"></i>Guardar revisión
                   </button>
-                  <span class="text-muted small align-self-center">
-                    (El campo “reviewed_by_user” queda null hasta implementar login)
-                  </span>
                 </div>
               </form>
             </div>
@@ -302,7 +333,15 @@
   </div>
 </main>
 
+<div id="adminPersonDetailTutorialTour"
+     data-cc-tutorial-root
+     data-cc-autoshow="false"
+     data-cc-tutorial-scope="admin"
+     data-cc-tutorial-key="person-detail"
+     hidden></div>
+
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/ccdigital-tutorial.js"></script>
 </body>
 </html>

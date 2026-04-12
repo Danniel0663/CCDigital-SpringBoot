@@ -4,10 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -30,6 +31,7 @@ public class UserRegisterEmailOtpService {
     private static final SecureRandom RNG = new SecureRandom();
 
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
+    private final SecurityMailTemplateService mailTemplateService;
 
     private static final class Challenge {
         private final String codeHash;
@@ -73,8 +75,10 @@ public class UserRegisterEmailOtpService {
      *
      * @param mailSenderProvider proveedor lazy de {@link JavaMailSender}
      */
-    public UserRegisterEmailOtpService(ObjectProvider<JavaMailSender> mailSenderProvider) {
+    public UserRegisterEmailOtpService(ObjectProvider<JavaMailSender> mailSenderProvider,
+                                       SecurityMailTemplateService mailTemplateService) {
         this.mailSenderProvider = mailSenderProvider;
+        this.mailTemplateService = mailTemplateService;
     }
 
     /**
@@ -186,36 +190,26 @@ public class UserRegisterEmailOtpService {
             return false;
         }
         try {
-            SimpleMailMessage msg = new SimpleMailMessage();
+            SecurityMailTemplateService.MailContent content = mailTemplateService.registrationVerificationCode(
+                    displayName,
+                    code,
+                    Math.max(1, codeTtlMinutes)
+            );
+            MimeMessage msg = sender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, true, StandardCharsets.UTF_8.name());
             String from = !isBlank(mailFrom) ? mailFrom.trim() : (!isBlank(smtpUsername) ? smtpUsername.trim() : null);
             if (!isBlank(from)) {
-                msg.setFrom(from);
+                helper.setFrom(from);
             }
-            msg.setTo(to);
-            msg.setSubject("CCDigital - Verificación de correo para registro");
-            msg.setText(buildBody(displayName, code));
+            helper.setTo(to);
+            helper.setSubject(content.subject());
+            helper.setText(content.textBody(), content.htmlBody());
             sender.send(msg);
             return true;
         } catch (Exception ex) {
             log.error("No se pudo enviar OTP de verificación de registro a {}", to, ex);
             return false;
         }
-    }
-
-    /**
-     * Construye el cuerpo del correo de verificación de registro.
-     *
-     * @param displayName nombre visible del ciudadano
-     * @param code código OTP
-     * @return contenido de texto plano del correo
-     */
-    private String buildBody(String displayName, String code) {
-        String name = isBlank(displayName) ? "usuario" : displayName.trim();
-        long ttl = Math.max(1, codeTtlMinutes);
-        return "Hola " + name + ",\n\n"
-                + "Tu código para verificar el correo y completar el registro en CCDigital es: " + code + "\n\n"
-                + "Este código vence en " + ttl + " minutos y solo puede usarse una vez.\n"
-                + "Si no solicitaste este registro, ignora este correo.\n";
     }
 
     /**

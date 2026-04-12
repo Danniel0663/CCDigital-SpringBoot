@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Sync · CCDigital</title>
 
+  <script src="/js/ccdigital-theme.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
@@ -27,9 +28,17 @@
           <span class="cc-profile-value" th:text="${ccActiveProfileDisplay}">admin@dominio.com</span>
         </span>
       </div>
-      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}">
+      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}"
+         data-cc-tour-scope="admin"
+         data-cc-tour-step="1"
+         data-cc-tour-title="Volver al dashboard"
+         data-cc-tour-body="Con este acceso regresas al panel general de administración para abrir otro módulo."
+         data-cc-tour-placement="bottom">
         <i class="bi bi-house"></i> Dashboard
       </a>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-cc-open-tutorial="adminSyncTutorialTour">
+        <i class="bi bi-mortarboard me-1"></i>Tutorial
+      </button>
     </div>
   </div>
 </nav>
@@ -43,7 +52,12 @@
   <div class="row g-3">
     <!-- Fabric ALL -->
     <div class="col-12 col-lg-4">
-      <div class="cc-card p-4 h-100">
+      <div class="cc-card p-4 h-100"
+           data-cc-tour-scope="admin"
+           data-cc-tour-step="2"
+           data-cc-tour-title="Sync Fabric completo"
+           data-cc-tour-body="Esta tarjeta ejecuta la sincronización total hacia Fabric para llevar el estado general del sistema al ledger."
+           data-cc-tour-placement="bottom">
         <h2 class="h6 text-uppercase text-muted mb-2">Fabric</h2>
         <div class="fw-semibold mb-3">Sync ALL</div>
         <p class="text-muted small mb-3">Ejecuta: <code>node sync-db-to-ledger.js --all</code></p>
@@ -58,7 +72,12 @@
 
     <!-- Fabric Persona -->
     <div class="col-12 col-lg-4">
-      <div class="cc-card p-4 h-100">
+      <div class="cc-card p-4 h-100"
+           data-cc-tour-scope="admin"
+           data-cc-tour-step="3"
+           data-cc-tour-title="Sync por persona"
+           data-cc-tour-body="Aquí sincronizas un caso puntual indicando tipo y número de documento, útil para reprocesos o verificaciones individuales."
+           data-cc-tour-placement="bottom">
         <h2 class="h6 text-uppercase text-muted mb-2">Fabric</h2>
         <div class="fw-semibold mb-3">Sync Persona</div>
 
@@ -87,7 +106,12 @@
 
     <!-- Indy -->
     <div class="col-12 col-lg-4">
-      <div class="cc-card p-4 h-100">
+      <div class="cc-card p-4 h-100"
+           data-cc-tour-scope="admin"
+           data-cc-tour-step="4"
+           data-cc-tour-title="Emisión en Indy"
+           data-cc-tour-body="Desde esta tarjeta disparas el proceso de emisión de credenciales o sincronización relacionada con la red Indy."
+           data-cc-tour-placement="bottom">
         <h2 class="h6 text-uppercase text-muted mb-2">Indy</h2>
         <div class="fw-semibold mb-3">Emitir credenciales</div>
         <p class="text-muted small mb-3">Ejecuta el script Python desde DB.</p>
@@ -103,7 +127,12 @@
   </div>
 
   <!-- Resultado -->
-  <div class="cc-card p-4 mt-3">
+  <div class="cc-card p-4 mt-3"
+       data-cc-tour-scope="admin"
+       data-cc-tour-step="5"
+       data-cc-tour-title="Resultado de ejecución"
+       data-cc-tour-body="Aquí revisas el resultado, el código de salida y la evidencia stdout o stderr para diagnosticar cada sincronización."
+       data-cc-tour-placement="top">
     <div class="d-flex align-items-center justify-content-between mb-2">
       <h2 class="h6 text-uppercase text-muted mb-0">Resultado</h2>
       <span th:if="${result != null}"
@@ -135,7 +164,15 @@
   </div>
 </main>
 
+<div id="adminSyncTutorialTour"
+     data-cc-tutorial-root
+     data-cc-autoshow="false"
+     data-cc-tutorial-scope="admin"
+     data-cc-tutorial-key="sync"
+     hidden></div>
+
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/ccdigital-tutorial.js"></script>
 </body>
 </html>

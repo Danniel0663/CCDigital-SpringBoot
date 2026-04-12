@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Reportes · CCDigital</title>
 
+  <script src="/js/ccdigital-theme.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
@@ -168,6 +169,43 @@
       word-break: break-all;
       color: #1f2937;
     }
+
+    html[data-bs-theme="dark"] .trace-filter-chip .btn.active {
+      color: #eff6ff;
+      background-color: #2563eb;
+      border-color: #2563eb;
+    }
+
+    html[data-bs-theme="dark"] .trace-block-card,
+    html[data-bs-theme="dark"] .trace-detail-box,
+    html[data-bs-theme="dark"] .trace-human-card,
+    html[data-bs-theme="dark"] .trace-kv-value {
+      border-color: rgba(148,163,184,.18);
+      background: rgba(15,23,42,.74);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
+      color: #dbe7fb;
+    }
+
+    html[data-bs-theme="dark"] .trace-block-ref {
+      background: rgba(15,23,42,.82);
+      color: #dbe7fb;
+      border-color: rgba(148,163,184,.18);
+    }
+
+    html[data-bs-theme="dark"] .trace-detail-list dt,
+    html[data-bs-theme="dark"] .trace-human-label,
+    html[data-bs-theme="dark"] .trace-detail-table th {
+      color: #97a9c2;
+    }
+
+    html[data-bs-theme="dark"] .trace-detail-list dd,
+    html[data-bs-theme="dark"] .trace-human-value {
+      color: #e5eefc;
+    }
+
+    html[data-bs-theme="dark"] .trace-detail-table th {
+      background: rgba(15,23,42,.86);
+    }
   </style>
 </head>
 
@@ -188,9 +226,17 @@
           <span class="cc-profile-value" th:text="${ccActiveProfileDisplay}">admin@dominio.com</span>
         </span>
       </div>
-      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}">
+      <a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/dashboard}"
+         data-cc-tour-scope="admin"
+         data-cc-tour-step="1"
+         data-cc-tour-title="Volver al dashboard"
+         data-cc-tour-body="Usa este botón para regresar al panel principal y cambiar entre módulos administrativos."
+         data-cc-tour-placement="bottom">
         <i class="bi bi-house me-1"></i>Dashboard
       </a>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-cc-open-tutorial="adminReportsTutorialTour">
+        <i class="bi bi-mortarboard me-1"></i>Tutorial
+      </button>
     </div>
   </div>
 </nav>
@@ -203,7 +249,12 @@
         <p class="text-muted mb-0">
           Monitoreo integral del uso del sistema: solicitudes, consultas de documentos, depósitos y tendencias.
         </p>
-        <div class="btn-group btn-group-sm mt-3" role="group" aria-label="Vista de reportes">
+        <div class="btn-group btn-group-sm mt-3" role="group" aria-label="Vista de reportes"
+             data-cc-tour-scope="admin"
+             data-cc-tour-step="2"
+             data-cc-tour-title="Cambiar vista del reporte"
+             data-cc-tour-body="Aquí alternas entre la analítica general del sistema y la trazabilidad blockchain para inspecciones más técnicas."
+             data-cc-tour-placement="bottom">
           <a class="btn"
              th:classappend="${reportView == 'analytics'} ? ' btn-primary' : ' btn-outline-primary'"
              th:href="@{/admin/reports(view='analytics',from=${report.fromDate},to=${report.toDate},period=${report.period.name()})}">
@@ -216,7 +267,12 @@
           </a>
         </div>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2"
+           data-cc-tour-scope="admin"
+           data-cc-tour-step="3"
+           data-cc-tour-title="Acciones del reporte"
+           data-cc-tour-body="Desde este grupo exportas el reporte en PDF o saltas a sincronización si necesitas contrastar la evidencia."
+           data-cc-tour-placement="left">
         <!-- Exporta el reporte completo con los mismos filtros activos en la vista. -->
         <!-- data-cc-pdf-export habilita descarga por fetch+blob para poder mostrar loader
              mientras el backend genera el archivo PDF. -->
@@ -245,6 +301,11 @@
   <div class="cc-card p-3 p-md-4 mb-3">
     <form class="row g-2 align-items-end" method="get" th:action="@{/admin/reports}"
           th:if="${reportView == 'analytics'}"
+          data-cc-tour-scope="admin"
+          data-cc-tour-step="4"
+          data-cc-tour-title="Filtros de analítica"
+          data-cc-tour-body="En esta vista defines el rango de fechas y la tendencia temporal para recalcular los indicadores y gráficas del sistema."
+          data-cc-tour-placement="bottom"
           data-cc-loader data-cc-loader-message="Aplicando filtros de trazabilidad...">
       <input type="hidden" name="view" value="analytics">
       <div class="col-12 col-md-4 col-lg-3">
@@ -276,6 +337,11 @@
 
     <form class="row g-2 align-items-end" method="get" th:action="@{/admin/reports}"
           th:if="${reportView == 'blockchain'}"
+          data-cc-tour-scope="admin"
+          data-cc-tour-step="4"
+          data-cc-tour-title="Filtros blockchain"
+          data-cc-tour-body="Aquí delimitas la consulta por fechas e identidad para rastrear bloques de Fabric e Indy sobre un usuario o a nivel global."
+          data-cc-tour-placement="bottom"
           data-cc-loader data-cc-loader-message="Consultando trazabilidad blockchain...">
       <input type="hidden" name="view" value="blockchain">
       <div class="col-12 col-md-3 col-lg-2">
@@ -307,7 +373,7 @@
           <i class="bi bi-funnel me-1"></i>Aplicar
         </button>
         <a class="btn btn-outline-primary"
-           th:href="@{/admin/reports(view='blockchain',from=${report.fromDate},to=${report.toDate},traceAll=true)}"
+           th:href="@{/admin/reports(view='blockchain',traceAll=true)}"
            data-cc-loader
            data-cc-loader-message="Consultando trazabilidad global...">
           <i class="bi bi-collection me-1"></i>Ver todos
@@ -322,7 +388,12 @@
     </form>
   </div>
 
-  <section th:if="${reportView == 'analytics'}">
+  <section th:if="${reportView == 'analytics'}"
+           data-cc-tour-scope="admin"
+           data-cc-tour-step="5"
+           data-cc-tour-title="Analítica y tendencias"
+           data-cc-tour-body="Esta sección muestra KPIs, gráficas y rankings para entender el comportamiento del sistema en el rango consultado."
+           data-cc-tour-placement="top">
   <!-- KPI principales -->
   <div class="row g-3 mb-3">
     <div class="col-12 col-md-6 col-xl-3">
@@ -560,7 +631,12 @@
   </section>
 
   <!-- Trazabilidad blockchain por usuario/documento -->
-  <div class="cc-card p-3 p-md-4 mt-3" th:if="${reportView == 'blockchain'}">
+  <div class="cc-card p-3 p-md-4 mt-3" th:if="${reportView == 'blockchain'}"
+       data-cc-tour-scope="admin"
+       data-cc-tour-step="5"
+       data-cc-tour-title="Bloques de trazabilidad"
+       data-cc-tour-body="Aquí inspeccionas los bloques encontrados, aplicas filtros rápidos y abres el detalle completo de cada evento blockchain."
+       data-cc-tour-placement="top">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
       <div>
         <h2 class="h6 text-uppercase text-muted mb-1">Trazabilidad Blockchain (Fabric + Indy)</h2>
@@ -601,7 +677,7 @@
         <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
           <a class="btn btn-sm btn-outline-secondary"
              th:if="${report.traceLookupRequested and !report.traceAllSelected}"
-             th:href="@{/admin/reports(view='blockchain',from=${report.fromDate},to=${report.toDate},traceAll=true)}"
+             th:href="@{/admin/reports(view='blockchain',traceAll=true)}"
              data-cc-loader
              data-cc-loader-message="Quitando filtro y consultando todos los bloques...">
             <i class="bi bi-x-circle me-1"></i>Quitar filtro y ver todos
@@ -692,7 +768,12 @@
 
       <div id="traceNoDataMessage" class="text-muted text-center py-3 border rounded mt-2"
            th:if="${#lists.isEmpty(report.blockchainBlocks)}">
-        No se encontraron bloques para el usuario y rango seleccionado.
+        <span th:if="${report.traceAllSelected}">
+          No se encontraron bloques para el rango seleccionado. Prueba ampliar las fechas o genera nuevas operaciones para auditar.
+        </span>
+        <span th:if="${!report.traceAllSelected}">
+          No se encontraron bloques para el usuario y rango seleccionado. Verifica el número de identificación o amplía las fechas.
+        </span>
       </div>
       <div id="traceNoDataMessageByFilter" class="text-muted text-center py-3 border rounded mt-2 d-none">
         No hay bloques que coincidan con el filtro interactivo.
@@ -841,9 +922,17 @@
   </div>
 </main>
 
+<div id="adminReportsTutorialTour"
+     data-cc-tutorial-root
+     data-cc-autoshow="false"
+     data-cc-tutorial-scope="admin"
+     data-cc-tutorial-key="reports"
+     hidden></div>
+
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="/js/ccdigital-tutorial.js"></script>
 <script>
   (() => {
     // Filtro interactivo para la sección de bloques blockchain (Fabric/Indy).
@@ -851,7 +940,7 @@
     const traceSearchInput = document.getElementById('traceSearchInput');
     const traceNoDataMessageByFilter = document.getElementById('traceNoDataMessageByFilter');
     const traceVisibleCounter = document.getElementById('traceVisibleCounter');
-    const traceFilterButtons = Array.from(document.querySelectorAll('[data-trace-network]'));
+    const traceFilterButtons = Array.from(document.querySelectorAll('.trace-filter-chip [data-trace-network]'));
     let resetTraceCardFilters = null;
     if (traceBlockList && traceFilterButtons.length > 0) {
       const traceCards = Array.from(traceBlockList.querySelectorAll('.trace-block-card'));

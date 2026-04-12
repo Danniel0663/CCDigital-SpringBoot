@@ -54,7 +54,7 @@ final class AdminBlockchainTraceAggregator {
                       String traceIdNumberRaw,
                       boolean traceAllRequested) {
         String traceIdType = normalize(traceIdTypeRaw).toUpperCase(Locale.ROOT);
-        String traceIdNumber = normalize(traceIdNumberRaw);
+        String traceIdNumber = normalizeIdNumber(traceIdNumberRaw);
         boolean allSelected = traceAllRequested;
         if (allSelected) {
             traceIdType = "";
@@ -148,7 +148,7 @@ final class AdminBlockchainTraceAggregator {
         try {
             List<IndyProofLoginService.ProofTraceEvent> proofEvents = indyProofLoginService.listProofTraceEvents();
             for (IndyProofLoginService.ProofTraceEvent event : proofEvents) {
-                if (!traceIdNumber.equals(normalize(event.idNumber()))) {
+                if (!traceIdNumber.equals(normalizeIdNumber(event.idNumber()))) {
                     continue;
                 }
                 String eventIdType = normalize(event.idType()).toUpperCase(Locale.ROOT);
@@ -213,7 +213,7 @@ final class AdminBlockchainTraceAggregator {
             if (person == null || person.getIdType() == null) {
                 continue;
             }
-            String idNumber = normalize(person.getIdNumber());
+            String idNumber = normalizeIdNumber(person.getIdNumber());
             if (idNumber.isBlank()) {
                 continue;
             }
@@ -350,7 +350,7 @@ final class AdminBlockchainTraceAggregator {
         }
         IdType parsedIdType = parseIdType(idType);
         if (parsedIdType != null && idNumber != null && !idNumber.isBlank() && !"N/A".equalsIgnoreCase(idNumber)) {
-            return personRepository.findByIdTypeAndIdNumber(parsedIdType, idNumber)
+            return personRepository.findByIdTypeAndIdNumber(parsedIdType, normalizeIdNumber(idNumber))
                     .map(this::resolvePersonLabel)
                     .orElse(idPart.isBlank() ? "Usuario no identificado" : idPart);
         }
@@ -359,7 +359,7 @@ final class AdminBlockchainTraceAggregator {
 
     private String resolvePersonLabelById(String idType, String idNumber) {
         String normalizedType = normalize(idType).toUpperCase(Locale.ROOT);
-        String normalizedNumber = normalize(idNumber);
+        String normalizedNumber = normalizeIdNumber(idNumber);
         if (normalizedType.isBlank() || normalizedNumber.isBlank() || "N/A".equalsIgnoreCase(normalizedNumber)) {
             return "Usuario no identificado";
         }
@@ -477,6 +477,17 @@ final class AdminBlockchainTraceAggregator {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    /**
+     * Admite números escritos con formato humano (puntos, guiones o espacios) al consultar blockchain.
+     */
+    private String normalizeIdNumber(String value) {
+        String normalized = normalize(value);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        return normalized.replaceAll("[^\\p{Alnum}]", "");
     }
 
     private String normalizeOrFallback(String value, String fallback) {

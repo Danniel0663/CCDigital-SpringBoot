@@ -27,6 +27,7 @@ public class UserRegistrationFlowService {
 
     private static final String SESSION_REGISTER_PENDING_TOTP_SECRETS = "register.user.pendingTotpSecretsByPersonId";
     private static final String SESSION_REGISTER_PENDING_FORMS = "register.user.pendingFormsByEmailToken";
+    public static final String SESSION_FORCE_USER_TUTORIAL_PERSON_ID = "register.user.forceTutorialPersonId";
 
     private final UserAccountService userAccountService;
     private final UserRegisterEmailOtpService userRegisterEmailOtpService;
@@ -117,6 +118,34 @@ public class UserRegistrationFlowService {
     }
 
     /**
+     * Retorna la configuración TOTP pendiente para el paso opcional posterior al registro.
+     */
+    public ResponseEntity<Map<String, Object>> getRegisterTotpSetup(Long personId,
+                                                                    HttpServletRequest request) {
+        if (personId == null) {
+            return noStore(ResponseEntity.badRequest().body(Map.of("error", "personId es requerido")));
+        }
+
+        String secret = getPendingTotpSecret(request, personId);
+        if (secret == null || secret.isBlank()) {
+            return noStore(ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "La configuración del autenticador expiró. Regístrate o actívalo después desde tu panel.")));
+        }
+
+        AppUser user = appUserRepository.findById(personId).orElse(null);
+        if (user == null) {
+            return noStore(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No se encontró el usuario recién registrado.")));
+        }
+
+        return noStore(ResponseEntity.ok(Map.of(
+                "ok", true,
+                "secret", secret,
+                "otpauthUri", userTotpService.buildOtpAuthUri(user.getEmail(), secret)
+        )));
+    }
+
+    /**
      * Reenvía código de verificación de correo para registro pendiente.
      */
     public ResponseEntity<Map<String, Object>> resendRegisterEmailOtp(String emailToken,
@@ -162,8 +191,6 @@ public class UserRegistrationFlowService {
 
         model.addAttribute("showRegisterTotpSetup", true);
         model.addAttribute("registerTotpPersonId", createdUser.getPersonId());
-        model.addAttribute("registerTotpSecret", secret);
-        model.addAttribute("registerTotpOtpAuthUri", userTotpService.buildOtpAuthUri(createdUser.getEmail(), secret));
     }
 
     private void handleRegistrationStart(UserRegisterForm form, Model model, HttpServletRequest request) {
@@ -275,6 +302,7 @@ public class UserRegistrationFlowService {
 
             model.addAttribute("success", "Usuario creado correctamente y correo verificado.");
             model.addAttribute("createdEmail", createdUser.getEmail());
+            markUserTutorialForNextLogin(request, createdUser.getPersonId());
             prepareOptionalTotpSetupIfRequested(pendingForm, createdUser, request, model);
             model.addAttribute("form", new UserRegisterForm());
         } catch (IllegalArgumentException ex) {
@@ -398,6 +426,13 @@ public class UserRegistrationFlowService {
         if (personId == null) return;
         Map<Long, String> map = pendingTotpSecrets(request, false);
         if (map != null) map.remove(personId);
+    }
+
+    private void markUserTutorialForNextLogin(HttpServletRequest request, Long personId) {
+        if (personId == null) {
+            return;
+        }
+        request.getSession(true).setAttribute(SESSION_FORCE_USER_TUTORIAL_PERSON_ID, personId);
     }
 
     private static String normalize(String value) {

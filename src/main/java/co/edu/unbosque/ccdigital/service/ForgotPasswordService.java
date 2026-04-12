@@ -8,12 +8,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -50,6 +51,7 @@ public class ForgotPasswordService {
     private final PersonRepository personRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
+    private final SecurityMailTemplateService mailTemplateService;
 
     /**
      * Estado temporal de un código de recuperación emitido.
@@ -91,12 +93,14 @@ public class ForgotPasswordService {
             AppUserRepository appUserRepository,
             PersonRepository personRepository,
             PasswordEncoder passwordEncoder,
-            ObjectProvider<JavaMailSender> mailSenderProvider
+            ObjectProvider<JavaMailSender> mailSenderProvider,
+            SecurityMailTemplateService mailTemplateService
     ) {
         this.appUserRepository = appUserRepository;
         this.personRepository = personRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailSenderProvider = mailSenderProvider;
+        this.mailTemplateService = mailTemplateService;
     }
 
     /**
@@ -206,27 +210,23 @@ public class ForgotPasswordService {
         }
 
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(to);
-            message.setSubject("CCDigital - Código de recuperación de contraseña");
-            message.setText(buildMailBody(fullName, code));
+            SecurityMailTemplateService.MailContent content = mailTemplateService.passwordResetCode(
+                    fullName,
+                    code,
+                    Math.max(1, codeTtlMinutes)
+            );
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            helper.setFrom(mailFrom);
+            helper.setTo(to);
+            helper.setSubject(content.subject());
+            helper.setText(content.textBody(), content.htmlBody());
             mailSender.send(message);
             return true;
         } catch (Exception ex) {
             log.error("No se pudo enviar correo de recuperación a {}", to, ex);
             return false;
         }
-    }
-
-    private String buildMailBody(String fullName, String code) {
-        long ttl = Math.max(1, codeTtlMinutes);
-        String name = isBlank(fullName) ? "usuario" : fullName;
-        return "Hola " + name + ",\n\n"
-                + "Se solicitó restablecer tu contraseña en CCDigital.\n"
-                + "Tu código temporal es: " + code + "\n\n"
-                + "Este código vence en " + ttl + " minutos y solo puede usarse una vez.\n"
-                + "Si no realizaste esta solicitud, ignora este correo.\n";
     }
 
     private IdentityMatch findMatchingActiveUser(String email, String idType, String idNumber) {

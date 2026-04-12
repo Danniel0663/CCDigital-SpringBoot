@@ -6,6 +6,7 @@
   <meta name="description" content="CCDigital: plataforma para gestionar documentos ciudadanos con seguridad, trazabilidad y validación de identidad.">
   <title>CCDigital · Ciudadanía Digital Segura</title>
 
+  <script src="/js/ccdigital-theme.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -441,6 +442,99 @@
       font-size: .8rem;
       line-height: 1.35;
       text-align: center;
+    }
+
+    html[data-bs-theme="dark"] body.cc-landing{
+      background:
+        radial-gradient(circle at 15% 15%, rgba(33, 104, 248, .22), transparent 38%),
+        radial-gradient(circle at 88% 10%, rgba(15, 157, 88, .16), transparent 35%),
+        linear-gradient(180deg, #07111f 0%, #0d1728 55%, #111d33 100%);
+      color: #e5eefc;
+    }
+
+    html[data-bs-theme="dark"] .landing-shell::before{
+      background: linear-gradient(145deg, rgba(47,111,237,.30), rgba(15,23,42,.10));
+    }
+
+    html[data-bs-theme="dark"] .landing-shell::after{
+      border-color: rgba(15, 157, 88, .14);
+    }
+
+    html[data-bs-theme="dark"] .cc-gov-strip{
+      background: linear-gradient(90deg, #082c67, #154897);
+      border-bottom-color: rgba(255,255,255,.12);
+    }
+
+    html[data-bs-theme="dark"] .cc-gov-logo{
+      background: #f8fafc;
+      box-shadow: 0 10px 22px rgba(2,6,23,.34);
+    }
+
+    html[data-bs-theme="dark"] .cc-landing-nav{
+      background: rgba(9,15,28,.84);
+      border-bottom-color: rgba(148,163,184,.14);
+      box-shadow: 0 12px 26px rgba(2,6,23,.22);
+    }
+
+    html[data-bs-theme="dark"] .cc-landing-brand{
+      color: #f8fbff;
+    }
+
+    html[data-bs-theme="dark"] .cc-landing-brand .badge-icon{
+      background: linear-gradient(180deg, rgba(15,23,42,.96) 0%, rgba(30,41,59,.96) 100%);
+      border-color: rgba(96,165,250,.28);
+      box-shadow: 0 10px 20px rgba(30,64,175,.16);
+      color: #93c5fd;
+    }
+
+    html[data-bs-theme="dark"] .hero-card,
+    html[data-bs-theme="dark"] .hero-panel,
+    html[data-bs-theme="dark"] .trust-pill,
+    html[data-bs-theme="dark"] .module-card,
+    html[data-bs-theme="dark"] .section-block,
+    html[data-bs-theme="dark"] .step-card,
+    html[data-bs-theme="dark"] .security-card,
+    html[data-bs-theme="dark"] .audience-card{
+      background:
+        linear-gradient(180deg, rgba(15,23,42,.96), rgba(19,31,53,.96)),
+        linear-gradient(140deg, rgba(59,130,246,.08), transparent 45%);
+      border-color: rgba(148,163,184,.16);
+      box-shadow: 0 16px 30px rgba(2,6,23,.18);
+    }
+
+    html[data-bs-theme="dark"] .hero-eyebrow{
+      border-color: rgba(96,165,250,.22);
+      background: rgba(37,99,235,.14);
+      color: #bfdbfe;
+    }
+
+    html[data-bs-theme="dark"] .hero-title,
+    html[data-bs-theme="dark"] .section-title,
+    html[data-bs-theme="dark"] .module-card h3,
+    html[data-bs-theme="dark"] .step-card h4,
+    html[data-bs-theme="dark"] .security-card .title,
+    html[data-bs-theme="dark"] .audience-card h3{
+      color: #f8fbff;
+    }
+
+    html[data-bs-theme="dark"] .hero-title .accent{
+      color: #93c5fd;
+    }
+
+    html[data-bs-theme="dark"] .hero-lead,
+    html[data-bs-theme="dark"] .trust-pill small,
+    html[data-bs-theme="dark"] .module-card p,
+    html[data-bs-theme="dark"] .section-sub,
+    html[data-bs-theme="dark"] .step-card p,
+    html[data-bs-theme="dark"] .security-card p,
+    html[data-bs-theme="dark"] .audience-card ul,
+    html[data-bs-theme="dark"] .footer-note,
+    html[data-bs-theme="dark"] .footer-copyright{
+      color: #97a9c2;
+    }
+
+    html[data-bs-theme="dark"] .footer-copyright{
+      border-top-color: rgba(148,163,184,.14);
     }
 
     @media (min-width: 992px) {

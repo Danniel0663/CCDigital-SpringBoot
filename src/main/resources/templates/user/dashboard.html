@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Dashboard Usuario · CCDigital</title>
+  <script src="/js/ccdigital-theme.js"></script>
   <meta name="_csrf" th:content="${_csrf.token}">
   <meta name="_csrf_header" th:content="${_csrf.headerName}">
 
@@ -21,6 +22,11 @@
     <div class="d-flex align-items-center gap-2">
       <div class="cc-profile-chip"
            data-cc-profile-toggle="userDashboardProfilePanel"
+           data-cc-tour-scope="user"
+           data-cc-tour-step="1"
+           data-cc-tour-title="Tu perfil"
+           data-cc-tour-body="Este botón abre tu perfil para revisar tus datos registrados y la información de tu cuenta."
+           data-cc-tour-placement="bottom"
            th:if="${ccActiveProfileDisplay != null and !#strings.isEmpty(ccActiveProfileDisplay)}">
         <span class="cc-profile-icon">
           <i class="bi" th:classappend="${(ccActiveProfileIcon != null and !#strings.isEmpty(ccActiveProfileIcon)) ? ' ' + ccActiveProfileIcon : ' bi-person'}"></i>
@@ -34,6 +40,11 @@
       <button type="button"
               class="btn btn-sm btn-outline-secondary cc-notif-btn"
               data-cc-panel-toggle="userDashboardNotificationsPanel"
+              data-cc-tour-scope="user"
+              data-cc-tour-step="2"
+              data-cc-tour-title="Notificaciones"
+              data-cc-tour-body="Aquí se concentran las novedades sobre solicitudes pendientes y respuestas recientes."
+              data-cc-tour-placement="bottom"
               th:classappend="${ccNotificationHighlight ? ' cc-notif-btn--highlight' : ''}">
         <i class="bi bi-bell"></i>
         <span class="d-none d-md-inline">Notificaciones</span>
@@ -43,6 +54,11 @@
 
       <a class="btn btn-sm btn-outline-primary cc-nav-action-btn"
          th:href="@{/user/requests}"
+         data-cc-tour-scope="user"
+         data-cc-tour-step="3"
+         data-cc-tour-title="Solicitudes"
+         data-cc-tour-body="Entra aquí para aprobar o rechazar accesos que otras entidades pidan sobre tus documentos."
+         data-cc-tour-placement="bottom"
          th:classappend="${ccCurrentUri == '/user/requests' ? ' is-active' : ''}">
         <i class="bi bi-inbox me-1"></i>
         <span class="d-none d-md-inline">Solicitudes</span>
@@ -178,7 +194,12 @@
     </div>
 
     <div class="d-flex flex-wrap gap-2 mt-3">
-      <button id="btnTotpSetupStart" type="button" class="btn btn-outline-primary btn-sm">
+      <button id="btnTotpSetupStart" type="button" class="btn btn-outline-primary btn-sm"
+              data-cc-tour-scope="user"
+              data-cc-tour-step="5"
+              data-cc-tour-title="Seguridad con app autenticadora"
+              data-cc-tour-body="Desde este botón activas o reconfiguras la app autenticadora para proteger tu ingreso."
+              data-cc-tour-placement="top">
         <i class="bi bi-phone me-1"></i>
         <span th:text="${totpEnabled} ? 'Reconfigurar app' : 'Activar app autenticadora'">Activar app autenticadora</span>
       </button>
@@ -239,7 +260,12 @@
   </div>
 
   <!-- Documentos -->
-  <div id="mis-documentos" class="cc-card p-4">
+  <div id="mis-documentos" class="cc-card p-4"
+       data-cc-tour-scope="user"
+       data-cc-tour-step="4"
+       data-cc-tour-title="Tus documentos"
+       data-cc-tour-body="En esta sección puedes revisar tus documentos disponibles y usar las acciones de ver o descargar."
+       data-cc-tour-placement="top">
     <div class="d-flex align-items-center justify-content-between mb-3">
       <div>
         <h2 class="h6 text-uppercase text-muted mb-1">Mis documentos</h2>
@@ -323,9 +349,17 @@
   </section>
 </main>
 
+<div id="userTutorialTour"
+     data-cc-tutorial-root
+     data-cc-autoshow="true"
+     data-cc-tutorial-scope="user"
+     th:attr="data-cc-tutorial-key=${idNumber},data-cc-force-autoshow=${forceUserTutorial}"
+     hidden></div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/ccdigital-tutorial.js"></script>
 <script>
   (function () {
     const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || '';

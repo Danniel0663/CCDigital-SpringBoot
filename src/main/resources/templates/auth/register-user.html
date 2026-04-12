@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Registro de Usuario · CCDigital</title>
+  <script src="/js/ccdigital-theme.js"></script>
   <meta name="_csrf" th:content="${_csrf.token}">
   <meta name="_csrf_header" th:content="${_csrf.headerName}">
 
@@ -94,7 +95,7 @@
         </div>
 
         <div th:if="${showRegisterTotpSetup}" class="cc-form-section mb-3" id="registerTotpPanel"
-             th:attr="data-person-id=${registerTotpPersonId},data-otpauth-uri=${registerTotpOtpAuthUri}">
+             th:attr="data-person-id=${registerTotpPersonId}">
           <div class="cc-section-title">
             <i class="bi bi-phone"></i>Activar autenticador de celular (opcional)
           </div>
@@ -109,7 +110,7 @@
             <div class="col-12 col-md-6">
               <div class="cc-kv-item h-100">
                 <div class="cc-kv-label">Clave manual</div>
-                <div id="registerTotpSecret" class="cc-kv-value" th:text="${registerTotpSecret}" style="word-break:break-all;">SECRET</div>
+                <div id="registerTotpSecret" class="cc-kv-value" style="word-break:break-all;">Preparando clave...</div>
                 <div class="small text-muted mt-2">Úsala si prefieres ingresar la cuenta manualmente en la app.</div>
               </div>
             </div>
@@ -120,6 +121,11 @@
                 <div class="small text-muted mt-2 text-center">Escanea este QR con la app.</div>
               </div>
             </div>
+          </div>
+
+          <div class="small text-muted mt-3">
+            URI de configuración:
+            <span id="registerTotpUriValue" style="word-break:break-all;">Preparando...</span>
           </div>
 
           <div id="registerTotpStatus" class="cc-status-box alert py-2 mt-3 mb-0 d-none" role="status" aria-live="polite">
@@ -356,12 +362,14 @@
     const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || '';
     const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
     const personId = panel.getAttribute('data-person-id') || '';
-    const otpAuthUri = panel.getAttribute('data-otpauth-uri') || '';
+    const secretValue = document.getElementById('registerTotpSecret');
+    const uriValue = document.getElementById('registerTotpUriValue');
     const qrBox = document.getElementById('registerTotpQrBox');
     const codeInput = document.getElementById('registerTotpCode');
     const btnConfirm = document.getElementById('btnRegisterTotpConfirm');
     const statusBox = document.getElementById('registerTotpStatus');
     const statusText = document.getElementById('registerTotpStatusText');
+    let setupReady = false;
 
     function setStatus(message, tone) {
       statusText.textContent = message || '';
@@ -372,9 +380,14 @@
       else statusBox.classList.add('alert-info');
     }
 
-    // Genera el QR para que el usuario pueda escanear directamente la cuenta TOTP.
-    if (window.QRCode && qrBox && otpAuthUri) {
+    function renderQr(otpAuthUri) {
+      if (!qrBox) return;
       qrBox.innerHTML = '';
+      if (!otpAuthUri) return;
+      if (!window.QRCode) {
+        setStatus('No se pudo cargar el generador de QR. Puedes usar la clave manual.', 'warning');
+        return;
+      }
       try {
         new window.QRCode(qrBox, {
           text: otpAuthUri,
@@ -385,12 +398,58 @@
       } catch (_) {
         setStatus('No fue posible generar el QR. Puedes usar la clave manual.', 'warning');
       }
-    } else {
-      setStatus('No se pudo cargar el generador de QR. Puedes usar la clave manual.', 'warning');
     }
+
+    async function loadRegisterTotpSetup() {
+      if (!personId) {
+        setStatus('No se encontró el usuario recién creado. Intenta iniciar sesión y actívalo desde el panel.', 'danger');
+        return;
+      }
+
+      try {
+        btnConfirm.disabled = true;
+        codeInput.disabled = true;
+        setStatus('Preparando la configuración del autenticador...', 'info');
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers[csrfHeader] = csrfToken;
+
+        const res = await fetch('/register/user/totp/setup', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ personId: Number(personId) })
+        });
+        const txt = await res.text();
+        let data = {};
+        try { data = txt ? JSON.parse(txt) : {}; } catch (_) {}
+        if (!res.ok) {
+          throw new Error((data && (data.error || data.message)) || 'No fue posible preparar el autenticador.');
+        }
+
+        secretValue.textContent = data.secret || '-';
+        uriValue.textContent = data.otpauthUri || '-';
+        renderQr(data.otpauthUri || '');
+        setupReady = true;
+        codeInput.disabled = false;
+        btnConfirm.disabled = false;
+        codeInput.focus();
+        setStatus('Escanea el QR o usa la clave manual y luego confirma con el código generado por la app.', 'info');
+      } catch (e) {
+        secretValue.textContent = '-';
+        uriValue.textContent = '-';
+        renderQr('');
+        setStatus(e.message || 'No fue posible preparar el autenticador.', 'danger');
+      }
+    }
+
+    loadRegisterTotpSetup();
 
     btnConfirm?.addEventListener('click', async function () {
       try {
+        if (!setupReady) {
+          setStatus('Todavía estamos preparando el autenticador. Espera un momento e intenta de nuevo.', 'warning');
+          return;
+        }
         const code = (codeInput.value || '').trim();
         if (!code) {
           setStatus('Ingresa el código generado por la app.', 'warning');
