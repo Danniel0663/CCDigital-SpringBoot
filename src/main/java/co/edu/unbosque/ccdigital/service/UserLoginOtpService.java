@@ -4,10 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -31,6 +32,7 @@ public class UserLoginOtpService {
     private static final SecureRandom RNG = new SecureRandom();
 
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
+    private final SecurityMailTemplateService mailTemplateService;
 
     private static final class LoginOtpChallenge {
         private final String codeHash;
@@ -69,8 +71,10 @@ public class UserLoginOtpService {
     @Value("${spring.mail.username:}")
     private String smtpUsername;
 
-    public UserLoginOtpService(ObjectProvider<JavaMailSender> mailSenderProvider) {
+    public UserLoginOtpService(ObjectProvider<JavaMailSender> mailSenderProvider,
+                               SecurityMailTemplateService mailTemplateService) {
         this.mailSenderProvider = mailSenderProvider;
+        this.mailTemplateService = mailTemplateService;
     }
 
     /**
@@ -124,11 +128,7 @@ public class UserLoginOtpService {
         if (isBlank(email)) {
             return false;
         }
-        return sendEmail(
-                email.trim(),
-                "CCDigital - Alerta de seguridad en tu cuenta",
-                buildSuspiciousLoginBody(displayName)
-        );
+        return sendEmail(email.trim(), mailTemplateService.suspiciousLoginAlert(displayName));
     }
 
     /**
@@ -190,12 +190,11 @@ public class UserLoginOtpService {
     private boolean sendLoginOtpEmail(String to, String displayName, String code) {
         return sendEmail(
                 to,
-                "CCDigital - Código de verificación de ingreso",
-                buildLoginOtpBody(displayName, code)
+                mailTemplateService.loginVerificationCode(displayName, code, Math.max(1, codeTtlMinutes))
         );
     }
 
-    private boolean sendEmail(String to, String subject, String body) {
+    private boolean sendEmail(String to, SecurityMailTemplateService.MailContent content) {
         JavaMailSender sender = mailSenderProvider.getIfAvailable();
         if (sender == null) {
             log.warn("Login OTP: JavaMailSender no está configurado.");
@@ -203,39 +202,21 @@ public class UserLoginOtpService {
         }
 
         try {
-            SimpleMailMessage msg = new SimpleMailMessage();
+            MimeMessage msg = sender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, true, StandardCharsets.UTF_8.name());
             String from = !isBlank(mailFrom) ? mailFrom.trim() : (!isBlank(smtpUsername) ? smtpUsername.trim() : null);
             if (!isBlank(from)) {
-                msg.setFrom(from);
+                helper.setFrom(from);
             }
-            msg.setTo(to);
-            msg.setSubject(subject);
-            msg.setText(body);
+            helper.setTo(to);
+            helper.setSubject(content.subject());
+            helper.setText(content.textBody(), content.htmlBody());
             sender.send(msg);
             return true;
         } catch (Exception ex) {
             log.error("No se pudo enviar correo de seguridad/login a {}", to, ex);
             return false;
         }
-    }
-
-    private String buildLoginOtpBody(String displayName, String code) {
-        String name = isBlank(displayName) ? "usuario" : displayName.trim();
-        long ttl = Math.max(1, codeTtlMinutes);
-        return "Hola " + name + ",\n\n"
-                + "Tu código de verificación para ingresar a CCDigital es: " + code + "\n\n"
-                + "Este código vence en " + ttl + " minutos y solo puede usarse una vez.\n"
-                + "Si no intentaste iniciar sesión, ignora este correo.\n";
-    }
-
-    private String buildSuspiciousLoginBody(String displayName) {
-        String name = isBlank(displayName) ? "usuario" : displayName.trim();
-        return "Hola " + name + ",\n\n"
-                + "Se bloquearon intentos de ingreso en tu cuenta CCDigital al superar el máximo de errores "
-                + "en el código de verificación.\n\n"
-                + "Si no fuiste tú, por favor reporta este evento al soporte de la plataforma y cambia "
-                + "tu contraseña de inmediato.\n\n"
-                + "Este mensaje es automático de seguridad.";
     }
 
     private String generateNumericCode(int length) {

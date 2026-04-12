@@ -1,0 +1,336 @@
+{
+  "info": {
+    "_postman_id": "a4e3f9ff-5321-43f5-ae8c-ccdigital-newman-smoke",
+    "name": "CCDigital Smoke Validation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8088"
+    }
+  ],
+  "item": [
+    {
+      "name": "GET Home",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            ""
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET User Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/login/user",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "login",
+            "user"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET User Register",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/register/user",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "register",
+            "user"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET User Forgot Password Page",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/login/user/forgot",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "login",
+            "user",
+            "forgot"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET Admin Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/login/admin",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "login",
+            "admin"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET Issuer Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/login/issuer",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "login",
+            "issuer"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET Admin API Without Session",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 302', function () {",
+              "  pm.response.to.have.status(302);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/persons",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "persons"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET Actuator Health Without Role",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 403', function () {",
+              "  pm.response.to.have.status(403);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/actuator/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "actuator",
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST Forgot Verify",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"nobody@example.com\",\n  \"idType\": \"CC\",\n  \"idNumber\": \"0000000000\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/auth/forgot/verify",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "user",
+            "auth",
+            "forgot",
+            "verify"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST User Auth Start",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"nobody@example.com\",\n  \"password\": \"wrong\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/auth/start",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "user",
+            "auth",
+            "start"
+          ]
+        }
+      }
+    }
+  ]
+}

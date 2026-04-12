@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Solicitudes de acceso · Usuario · CCDigital</title>
 
+  <script src="/js/ccdigital-theme.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
@@ -21,6 +22,10 @@
     <div class="d-flex align-items-center gap-2">
       <div class="cc-profile-chip"
            data-cc-profile-toggle="userRequestsProfilePanel"
+           data-cc-tour-scope="user"
+           data-cc-tour-step="1"
+           data-cc-tour-title="Perfil del usuario"
+           data-cc-tour-body="Este botón abre tus datos básicos para confirmar con qué cuenta estás tomando decisiones sobre solicitudes."
            th:if="${ccActiveProfileDisplay != null and !#strings.isEmpty(ccActiveProfileDisplay)}">
         <span class="cc-profile-icon">
           <i class="bi" th:classappend="${(ccActiveProfileIcon != null and !#strings.isEmpty(ccActiveProfileIcon)) ? ' ' + ccActiveProfileIcon : ' bi-person'}"></i>
@@ -34,6 +39,11 @@
       <button type="button"
               class="btn btn-sm btn-outline-secondary cc-notif-btn"
               data-cc-panel-toggle="userRequestsNotificationsPanel"
+              data-cc-tour-scope="user"
+              data-cc-tour-step="2"
+              data-cc-tour-title="Notificaciones"
+              data-cc-tour-body="Aquí se agrupan las novedades de solicitudes nuevas pendientes o cambios recientes relacionados con tus decisiones."
+              data-cc-tour-placement="bottom"
               th:classappend="${ccNotificationHighlight ? ' cc-notif-btn--highlight' : ''}">
         <i class="bi bi-bell"></i>
         <span class="d-none d-md-inline">Notificaciones</span>
@@ -43,12 +53,22 @@
 
       <a class="btn btn-sm btn-outline-secondary cc-nav-action-btn"
          th:href="@{/user/dashboard}"
+         data-cc-tour-scope="user"
+         data-cc-tour-step="3"
+         data-cc-tour-title="Volver al inicio"
+         data-cc-tour-body="Este acceso te devuelve al dashboard para revisar documentos disponibles y la seguridad de tu cuenta."
+         data-cc-tour-placement="bottom"
          th:classappend="${ccCurrentUri == '/user/dashboard' ? ' is-active' : ''}">
         <i class="bi bi-house"></i> Inicio
       </a>
 
       <a class="btn btn-sm btn-outline-primary cc-nav-action-btn"
          th:href="@{/user/requests}"
+         data-cc-tour-scope="user"
+         data-cc-tour-step="4"
+         data-cc-tour-title="Módulo de solicitudes"
+         data-cc-tour-body="Este botón mantiene abierta la pantalla donde apruebas o rechazas los accesos que otras entidades piden sobre tus documentos."
+         data-cc-tour-placement="bottom"
          th:classappend="${ccCurrentUri == '/user/requests' ? ' is-active' : ''}">
         <i class="bi bi-inbox me-1"></i>
         <span class="d-none d-md-inline">Solicitudes</span>
@@ -156,7 +176,12 @@
     </div>
   </div>
 
-  <div class="cc-tip mb-3">
+  <div class="cc-tip mb-3"
+       data-cc-tour-scope="user"
+       data-cc-tour-step="5"
+       data-cc-tour-title="Guía de decisión"
+       data-cc-tour-body="Esta ayuda rápida resume cómo interpretar una solicitud y qué significa cada estado antes de decidir."
+       data-cc-tour-placement="bottom">
     <div class="fw-semibold small mb-2">
       <i class="bi bi-info-circle me-1"></i>Cómo usar esta pantalla
     </div>
@@ -173,7 +198,12 @@
     </div>
   </div>
 
-  <div class="cc-card p-3 p-md-4">
+  <div class="cc-card p-3 p-md-4"
+       data-cc-tour-scope="user"
+       data-cc-tour-step="6"
+       data-cc-tour-title="Listado y acciones"
+       data-cc-tour-body="En esta tabla revisas entidad, motivo, documentos pedidos y, si está pendiente, usas los botones para aprobar o rechazar la solicitud."
+       data-cc-tour-placement="top">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
@@ -279,8 +309,16 @@
 
 </main>
 
+<div id="userRequestsTutorialTour"
+     data-cc-tutorial-root
+     data-cc-autoshow="true"
+     data-cc-tutorial-scope="user"
+     th:attr="data-cc-tutorial-key=|${idNumber}-requests|"
+     hidden></div>
+
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/ccdigital-tutorial.js"></script>
 <script>
   (function () {
     const body = document.body;

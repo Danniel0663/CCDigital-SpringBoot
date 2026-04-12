@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>CCDigital Admin</title>
 
+  <script src="/js/ccdigital-theme.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
@@ -28,6 +29,10 @@
         </span>
       </div>
 
+      <button type="button" class="btn btn-sm btn-outline-primary" data-cc-open-tutorial="adminTutorialTour">
+        <i class="bi bi-mortarboard me-1"></i>Tutorial
+      </button>
+
       <form th:action="@{/admin/logout}" method="post" class="cc-nav-inline-form"
             data-cc-loader data-cc-loader-message="Cerrando sesión...">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -47,19 +52,39 @@
         <p class="text-muted mb-4">Gestiona personas, documentos y sincronización con Fabric/Indy.</p>
 
         <div class="d-flex flex-wrap gap-2">
-          <a class="btn btn-primary" th:href="@{/admin/persons}">
+          <a class="btn btn-primary" th:href="@{/admin/persons}"
+             data-cc-tour-scope="admin"
+             data-cc-tour-step="1"
+             data-cc-tour-title="Personas"
+             data-cc-tour-body="Desde aquí administras el listado de ciudadanos y accedes a su detalle."
+             data-cc-tour-placement="bottom">
             <i class="bi bi-people me-2"></i>Personas
           </a>
 
-          <a class="btn btn-outline-primary" th:href="@{/admin/sync}">
+          <a class="btn btn-outline-primary" th:href="@{/admin/sync}"
+             data-cc-tour-scope="admin"
+             data-cc-tour-step="2"
+             data-cc-tour-title="Sincronización"
+             data-cc-tour-body="Usa este acceso para ejecutar procesos de sincronización con Fabric e Indy."
+             data-cc-tour-placement="bottom">
             <i class="bi bi-arrow-repeat me-2"></i>Sincronización (Fabric / Indy)
           </a>
 
-          <a class="btn btn-outline-primary" th:href="@{/admin/issuers}">
+          <a class="btn btn-outline-primary" th:href="@{/admin/issuers}"
+             data-cc-tour-scope="admin"
+             data-cc-tour-step="3"
+             data-cc-tour-title="Emisores"
+             data-cc-tour-body="Aquí gestionas las entidades emisoras y revisas su estado operativo."
+             data-cc-tour-placement="bottom">
             <i class="bi bi-building me-2"></i>Emisores
           </a>
 
-          <a class="btn btn-outline-primary" th:href="@{/admin/reports}">
+          <a class="btn btn-outline-primary" th:href="@{/admin/reports}"
+             data-cc-tour-scope="admin"
+             data-cc-tour-step="4"
+             data-cc-tour-title="Reportes"
+             data-cc-tour-body="Consulta la trazabilidad y las evidencias consolidadas del sistema."
+             data-cc-tour-placement="bottom">
             <i class="bi bi-graph-up-arrow me-2"></i>Reportes
           </a>
         </div>
@@ -89,7 +114,15 @@
   </div>
 </main>
 
+<div id="adminTutorialTour"
+     data-cc-tutorial-root
+     data-cc-autoshow="false"
+     data-cc-tutorial-scope="admin"
+     data-cc-tutorial-key="dashboard"
+     hidden></div>
+
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/ccdigital-tutorial.js"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Nueva solicitud · Emisor · CCDigital</title>
 
+  <script src="/js/ccdigital-theme.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" th:href="@{/css/ccdigital.css}">
@@ -33,6 +34,11 @@
       <button type="button"
               class="btn btn-sm btn-outline-secondary cc-notif-btn"
               data-cc-panel-toggle="issuerNewRequestNotificationsPanel"
+              data-cc-tour-scope="issuer"
+              data-cc-tour-step="1"
+              data-cc-tour-title="Notificaciones"
+              data-cc-tour-body="Aquí ves respuestas recientes de usuarios para no perder el seguimiento de tus solicitudes."
+              data-cc-tour-placement="bottom"
               th:classappend="${ccNotificationHighlight ? ' cc-notif-btn--highlight' : ''}">
         <i class="bi bi-bell"></i>
         <span class="d-none d-md-inline">Notificaciones</span>
@@ -41,19 +47,38 @@
       </button>
 
       <a class="btn btn-sm btn-outline-secondary cc-nav-action-btn" th:href="@{/issuer/access-requests}"
+         data-cc-tour-scope="issuer"
+         data-cc-tour-step="2"
+         data-cc-tour-title="Volver a solicitudes"
+         data-cc-tour-body="Este botón te regresa al historial de solicitudes ya creadas para revisar sus estados."
+         data-cc-tour-placement="bottom"
          th:classappend="${ccCurrentUri == '/issuer/access-requests' ? ' is-active' : ''}">
         <i class="bi bi-list-check"></i> Solicitudes
       </a>
 
       <a class="btn btn-sm btn-outline-secondary cc-nav-action-btn" th:href="@{/issuer}"
+         data-cc-tour-scope="issuer"
+         data-cc-tour-step="3"
+         data-cc-tour-title="Regresar al inicio"
+         data-cc-tour-body="Desde aquí vuelves al tablero principal del emisor y al flujo de carga de documentos."
+         data-cc-tour-placement="bottom"
          th:classappend="${ccCurrentUri == '/issuer' ? ' is-active' : ''}">
         <i class="bi bi-house"></i> Inicio
       </a>
 
       <a class="btn btn-sm btn-primary cc-nav-action-btn" th:href="@{/issuer/access-requests/new}"
+         data-cc-tour-scope="issuer"
+         data-cc-tour-step="4"
+         data-cc-tour-title="Nueva solicitud activa"
+         data-cc-tour-body="Este acceso mantiene abierto el formulario actual para crear una solicitud nueva."
+         data-cc-tour-placement="bottom"
          th:classappend="${ccCurrentUri == '/issuer/access-requests/new' ? ' is-active' : ''}">
         <i class="bi bi-plus-circle me-1"></i>Nueva solicitud
       </a>
+
+      <button type="button" class="btn btn-sm btn-outline-primary" data-cc-open-tutorial="issuerNewRequestTutorialTour">
+        <i class="bi bi-mortarboard me-1"></i>Tutorial
+      </button>
 
       <form th:action="@{/issuer/logout}" method="post" class="cc-nav-inline-form"
             data-cc-loader data-cc-loader-message="Cerrando sesión...">
@@ -130,7 +155,12 @@
     </div>
   </div>
 
-  <div class="cc-card p-4 mb-3">
+  <div class="cc-card p-4 mb-3"
+       data-cc-tour-scope="issuer"
+       data-cc-tour-step="5"
+       data-cc-tour-title="Objetivo del flujo"
+       data-cc-tour-body="Esta cabecera resume que aquí creas una solicitud para consultar documentos y luego el usuario decide aprobar o rechazar."
+       data-cc-tour-placement="bottom">
     <h1 class="h4 mb-1">Nueva solicitud de acceso</h1>
     <p class="text-muted mb-0">
       La entidad crea una solicitud para consultar documentos aprobados. El usuario decide si aprueba o rechaza.
@@ -143,7 +173,12 @@
   </div>
 
   <!-- Buscar persona -->
-  <div class="cc-card p-4 mb-3">
+  <div class="cc-card p-4 mb-3"
+       data-cc-tour-scope="issuer"
+       data-cc-tour-step="6"
+       data-cc-tour-title="Buscar persona"
+       data-cc-tour-body="Primero identificas a la persona por documento para habilitar la creación de la solicitud sobre sus documentos aprobados."
+       data-cc-tour-placement="right">
     <h2 class="h6 text-uppercase text-muted mb-3">Buscar persona</h2>
 
     <form th:action="@{/issuer/access-requests/search}" method="post" class="row g-3"
@@ -166,7 +201,12 @@
       </div>
 
       <div class="col-12 col-md-2 d-flex align-items-end">
-        <button class="btn btn-primary w-100" type="submit">
+        <button class="btn btn-primary w-100" type="submit"
+                data-cc-tour-scope="issuer"
+                data-cc-tour-step="7"
+                data-cc-tour-title="Ejecutar búsqueda"
+                data-cc-tour-body="Con este botón consultas la persona en la base y cargas su contexto para continuar el proceso."
+                data-cc-tour-placement="left">
           <i class="bi bi-search me-2"></i>Buscar
         </button>
       </div>
@@ -191,7 +231,12 @@
   </div>
 
   <!-- Crear solicitud -->
-  <div class="cc-card p-4" th:if="${person != null}">
+  <div class="cc-card p-4" th:if="${person != null}"
+       data-cc-tour-scope="issuer"
+       data-cc-tour-step="8"
+       data-cc-tour-title="Crear solicitud"
+       data-cc-tour-body="Cuando ya encontraste a la persona, aquí defines el motivo, eliges documentos y dejas lista la petición de acceso."
+       data-cc-tour-placement="top">
     <div class="d-flex align-items-center justify-content-between mb-3">
       <h2 class="h6 text-uppercase text-muted mb-0">Crear solicitud</h2>
       <span class="badge text-bg-light border"
@@ -259,7 +304,12 @@
       </div>
 
       <div class="col-12 d-flex flex-wrap gap-2">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary"
+                data-cc-tour-scope="issuer"
+                data-cc-tour-step="9"
+                data-cc-tour-title="Enviar solicitud"
+                data-cc-tour-body="Este botón envía la solicitud al usuario y la deja en estado pendiente hasta que tome una decisión."
+                data-cc-tour-placement="top">
           <i class="bi bi-send me-2"></i>Enviar solicitud
         </button>
         <a class="btn btn-outline-secondary" th:href="@{/issuer/access-requests}">
@@ -274,7 +324,15 @@
 
 </main>
 
+<div id="issuerNewRequestTutorialTour"
+     data-cc-tutorial-root
+     data-cc-autoshow="false"
+     data-cc-tutorial-scope="issuer"
+     data-cc-tutorial-key="access-requests-new"
+     hidden></div>
+
 <script src="/js/ccdigital-loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/ccdigital-tutorial.js"></script>
 </body>
 </html>

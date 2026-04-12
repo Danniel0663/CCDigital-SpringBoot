@@ -6,6 +6,8 @@ import co.edu.unbosque.ccdigital.repository.AppUserRepository;
 import co.edu.unbosque.ccdigital.repository.PersonRepository;
 import co.edu.unbosque.ccdigital.security.IndyUserPrincipal;
 import co.edu.unbosque.ccdigital.service.FabricLedgerCliService;
+import co.edu.unbosque.ccdigital.service.UserRegistrationFlowService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -49,25 +51,27 @@ public class UserController {
      * Vista del dashboard del usuario.
      *
      * @param authentication autenticación actual
+     * @param request request HTTP para consumir flags del primer ingreso
      * @param model modelo de Spring MVC
      * @return nombre de la vista del dashboard
      */
     @GetMapping("/user/dashboard")
-    public String dashboard(Authentication authentication, Model model) {
+    public String dashboard(Authentication authentication, HttpServletRequest request, Model model) {
         IndyUserPrincipal p = (IndyUserPrincipal) authentication.getPrincipal();
+        AppUser appUser = findAppUserByPrincipal(p);
 
         model.addAttribute("displayName", p.getDisplayName());
         model.addAttribute("idType", p.getIdType());
         model.addAttribute("idNumber", p.getIdNumber());
         model.addAttribute("email", p.getEmail());
         model.addAttribute("docs", fabric.listDocsView(p.getIdType(), p.getIdNumber()));
-        addTotpStatus(model, p);
+        addTotpStatus(model, appUser);
+        model.addAttribute("forceUserTutorial", consumeForcedTutorialFlag(request, appUser));
 
         return "user/dashboard";
     }
 
-    private void addTotpStatus(Model model, IndyUserPrincipal principal) {
-        AppUser appUser = findAppUserByPrincipal(principal);
+    private void addTotpStatus(Model model, AppUser appUser) {
         boolean totpEnabled = appUser != null
                 && Boolean.TRUE.equals(appUser.getTotpEnabled())
                 && appUser.getTotpSecretBase32() != null
@@ -80,6 +84,25 @@ public class UserController {
                         ? UI_DATE_TIME.format(appUser.getTotpConfirmedAt())
                         : null
         );
+    }
+
+    private boolean consumeForcedTutorialFlag(HttpServletRequest request, AppUser appUser) {
+        if (request == null || appUser == null || appUser.getPersonId() == null) {
+            return false;
+        }
+
+        var session = request.getSession(false);
+        if (session == null) {
+            return false;
+        }
+
+        Object raw = session.getAttribute(UserRegistrationFlowService.SESSION_FORCE_USER_TUTORIAL_PERSON_ID);
+        if (!(raw instanceof Long personId) || !personId.equals(appUser.getPersonId())) {
+            return false;
+        }
+
+        session.removeAttribute(UserRegistrationFlowService.SESSION_FORCE_USER_TUTORIAL_PERSON_ID);
+        return true;
     }
 
     private AppUser findAppUserByPrincipal(IndyUserPrincipal principal) {

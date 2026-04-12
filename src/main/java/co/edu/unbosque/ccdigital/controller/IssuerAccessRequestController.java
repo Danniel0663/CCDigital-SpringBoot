@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriUtils;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -340,7 +341,7 @@ public class IssuerAccessRequestController {
                     .cacheControl(CacheControl.noStore())
                     .build();
         } catch (IllegalArgumentException ex) {
-            String encodedMessage = java.net.URLEncoder.encode(ex.getMessage(), StandardCharsets.UTF_8);
+            String encodedMessage = encodeUiMessage(ex.getMessage());
             return ResponseEntity.status(HttpStatus.GONE)
                     .cacheControl(CacheControl.noStore())
                     .header("X-CCDigital-Error", encodedMessage)
@@ -495,7 +496,7 @@ public class IssuerAccessRequestController {
             );
         } catch (IllegalArgumentException ex) {
             // Redirección con mensaje de negocio para evitar stacktrace/500 en la UI del emisor.
-            String msg = java.net.URLEncoder.encode(ex.getMessage(), StandardCharsets.UTF_8);
+            String msg = encodeUiMessage(ex.getMessage());
             return ResponseEntity.status(302)
                     .header(HttpHeaders.LOCATION, "/issuer/access-requests?error=" + msg)
                     .build();
@@ -513,5 +514,9 @@ public class IssuerAccessRequestController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, dispositionType + "; filename=\"" + filename + "\"")
                 .contentType(responseMediaType)
                 .body(resource);
+    }
+
+    private String encodeUiMessage(String message) {
+        return UriUtils.encode(message == null ? "" : message, StandardCharsets.UTF_8);
     }
 }
